@@ -106,16 +106,17 @@ class Computed<T> extends Stream<T> {
   final _upstreamComputations = <Computed, StreamSubscription>{};
   final _dataSources = <Stream, SubscriptionLastValue>{};
   final _listeners = <ComputedSubscription<T>>{};
+  var _suppressedEvalDueToNoListener = true;
   var _hasLastResult = false;
   bool get hasLastResult => _hasLastResult;
   T? _lastResult;
   T? get lastResult => _lastResult;
   final T Function(ComputedStreamResolver ctx) f;
-  Computed(this.f) {
-    _evalF();
-  }
+
+  Computed(this.f);
 
   void _evalF() {
+    _suppressedEvalDueToNoListener = false;
     late T fRes;
     var fFinished = false;
     try {
@@ -154,7 +155,10 @@ class Computed<T> extends Stream<T> {
   }
 
   void _maybeEvalF(bool noChangeComparison, dynamic old, dynamic neww) {
-    if (_listeners.isEmpty) return;
+    if (_listeners.isEmpty) {
+      _suppressedEvalDueToNoListener = true;
+      return;
+    }
     if (!noChangeComparison && old == neww) return;
     _evalF();
   }
@@ -170,9 +174,16 @@ class Computed<T> extends Stream<T> {
   StreamSubscription<T> listen(void Function(T event)? onData,
       {Function? onError, void Function()? onDone, bool? cancelOnError}) {
     final sub = ComputedSubscription<T>(_removeListener, onData, onError);
+    if (_listeners.isEmpty && _suppressedEvalDueToNoListener) {
+      _evalF();
+      // Might set lastResult, won't notify the listener just yet (as that is against the Stream contract)
+    }
     _listeners.add(sub);
-    // if this is the only listener: try running f(), if it succeeds, notify the listener right away
-    // if this is not the only listener, and we have firstData, notify the listener right away
+    if (_hasLastResult && onData != null) {
+      scheduleMicrotask(() {
+        onData(_lastResult!);
+      });
+    }
     return sub;
   }
 }
@@ -195,12 +206,13 @@ void main() async {
   append0.listen((value) => print(value));
 
   final unused = Computed((ctx) {
-    ctx(source);
-    print("Never prints, this computation is never used.");
+    while (true) {
+      print("Never prints, this computation is never used.");
+    }
   });
 
-  controller.add([1, 2, -3, 5].toBuiltList()); // prints [-3, 2, 1, 0]
-  controller.add([1, 2, -3, -4].toBuiltList()); // prints [-3, 2, 1]
+  controller.add([1, 2, -3, 4].toBuiltList()); // prints [4, -3, 2, 1, 0]
+  controller.add([1, 2, -3, -4].toBuiltList()); // prints [-4, -3, 2, 1, 0]
   controller.add([4, 5, 6].toBuiltList()); // prints [4, 5, 6, 0]
   controller.add([4, 5, 6].toBuiltList()); // Same result: Not printed again
 }
