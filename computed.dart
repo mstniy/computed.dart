@@ -163,6 +163,12 @@ void main() async {
 
   maybeReversed.listen((value) => print(value));
 
-  controller.add([1, 2, -3]);
-  controller.add([4, 5, 6]);
+  final unused = Computed((ctx) {
+    ctx(source);
+    print("Never prints, this computation is never used.");
+  });
+
+  controller.add([1, 2, -3]); // prints [-3, 2, 1]
+  controller.add([4, 5, 6]); // prints [4, 5, 6]
+  controller.add([4, 5, 6]); // Same result: Not printed again
 }
