@@ -20,22 +20,30 @@ class ComputedGlobalCtx {
 }
 
 class ComputedStreamResolver {
-  final Map<Computed, SubscriptionLastValueRefCtr> _computations;
-  ComputedStreamResolver(this._computations);
+  final Computed _parent;
+  ComputedStreamResolver(this._parent);
   T call<T>(Stream<T> s) {
     late SubscriptionLastValueRefCtr? slv;
     if (s is Computed<T>) {
-      // Use the local cache
-      slv = _computations[s];
+      // Make sure we are subscribed
+      _parent._upstreamComputations.putIfAbsent(
+          s,
+          () => s.listen((event) {
+                // Store the last value of upstream comps, do not reeval if it didn't change
+                _parent._maybeEvalF();
+              }) as ComputedSubscription);
+      if (!s._hasLastResult)
+        s._evalF(); // What if f throws? _lastResult won't be set then
+      return s._lastResult!;
     } else {
       // Refer to the global map
       slv = ComputedGlobalCtx.streams[s];
+      if (slv == null) throw NoSubscriptionException(s);
+      if (!slv.hasValue) {
+        throw NoValueException();
+      }
+      return slv.lastValue!;
     }
-    if (slv == null) throw NoSubscriptionException(s);
-    if (!slv.hasValue) {
-      throw NoValueException();
-    }
-    return slv.lastValue!;
   }
 }
 
@@ -86,7 +94,7 @@ class ComputedSubscription<T> implements StreamSubscription<T> {
 class Computed<T> extends Stream<T> {
   // We store these here instead of the global dict to avoid the global dict becoming too large
   // Reasoning: A real-world application might have lots of computations but likely much fewer actual streams
-  final _upstreamComputations = <Computed, SubscriptionLastValueRefCtr>{};
+  final _upstreamComputations = <Computed, ComputedSubscription>{};
   final _listeners = <ComputedSubscription<T>>{};
   var _hasLastResult = false;
   bool get hasLastResult => _hasLastResult;
@@ -101,7 +109,7 @@ class Computed<T> extends Stream<T> {
     late T fRes;
     var fFinished = false;
     try {
-      fRes = f(ComputedStreamResolver(_upstreamComputations));
+      fRes = f(ComputedStreamResolver(this));
       // cancel subscriptions to unused streams & remove them from the context (bonus: allow the user to specify a duration before doing that)
       fFinished = true;
     } on NoValueException {
@@ -113,11 +121,9 @@ class Computed<T> extends Stream<T> {
         slv.lastValue = event;
         _maybeEvalF();
       })); // Handle onError (passthrough), onDone (close subscriptions to upstreams)
-      if (e.s is! Computed) {
-        ComputedGlobalCtx.streams[e.s] = slv;
-      } else {
-        _upstreamComputations[e.s as Computed] = slv;
-      }
+      assert(e.s
+          is! Computed); // We never raise SubscriptionException-s on Computed-s
+      ComputedGlobalCtx.streams[e.s] = slv;
     } catch (e) {
       _notifyListeners(null, e);
     }
@@ -163,6 +169,8 @@ class Computed<T> extends Stream<T> {
       {Function? onError, void Function()? onDone, bool? cancelOnError}) {
     final sub = ComputedSubscription<T>(_removeListener, onData, onError);
     _listeners.add(sub);
+    // if this is the only listener: try running f(), if it succeeds, notify the listener right away
+    // if this is not the only listener, and we have firstData, notify the listener right away
     return sub;
   }
 }
@@ -177,14 +185,16 @@ void main() async {
   final maybeReversed = Computed(
       (ctx) => ctx(anyNegative) ? ctx(source).reversed.toList() : ctx(source));
 
-  maybeReversed.listen((value) => print(value));
+  final append0 = Computed((ctx) => List<int>.of(ctx(maybeReversed))..add(0));
+
+  append0.listen((value) => print(value));
 
   final unused = Computed((ctx) {
     ctx(source);
     print("Never prints, this computation is never used.");
   });
 
-  controller.add([1, 2, -3]); // prints [-3, 2, 1]
-  controller.add([4, 5, 6]); // prints [4, 5, 6]
+  controller.add([1, 2, -3]); // prints [-3, 2, 1, 0]
+  controller.add([4, 5, 6]); // prints [4, 5, 6, 0]
   controller.add([4, 5, 6]); // Same result: Not printed again
 }
