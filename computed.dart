@@ -20,8 +20,17 @@ class ComputedGlobalCtx {
 }
 
 class ComputedStreamResolver {
+  final Map<Computed, SubscriptionLastValueRefCtr> _computations;
+  ComputedStreamResolver(this._computations);
   T call<T>(Stream<T> s) {
-    final slv = ComputedGlobalCtx.streams[s];
+    late SubscriptionLastValueRefCtr? slv;
+    if (s is Computed<T>) {
+      // Use the local cache
+      slv = _computations[s];
+    } else {
+      // Refer to the global map
+      slv = ComputedGlobalCtx.streams[s];
+    }
     if (slv == null) throw NoSubscriptionException(s);
     if (!slv.hasValue) {
       throw NoValueException();
@@ -75,6 +84,9 @@ class ComputedSubscription<T> implements StreamSubscription<T> {
 }
 
 class Computed<T> extends Stream<T> {
+  // We store these here instead of the global dict to avoid the global dict becoming too large
+  // Reasoning: A real-world application might have lots of computations but likely much fewer actual streams
+  final _upstreamComputations = <Computed, SubscriptionLastValueRefCtr>{};
   final _listeners = <ComputedSubscription<T>>{};
   var _hasLastResult = false;
   bool get hasLastResult => _hasLastResult;
@@ -89,10 +101,10 @@ class Computed<T> extends Stream<T> {
     late T fRes;
     var fFinished = false;
     try {
-      fRes = f(ComputedStreamResolver());
+      fRes = f(ComputedStreamResolver(_upstreamComputations));
       // cancel subscriptions to unused streams & remove them from the context (bonus: allow the user to specify a duration before doing that)
       fFinished = true;
-    } on NoValueException catch (_) {
+    } on NoValueException {
       // Not much we can do
     } on NoSubscriptionException catch (e) {
       late SubscriptionLastValueRefCtr slv;
@@ -101,7 +113,11 @@ class Computed<T> extends Stream<T> {
         slv.lastValue = event;
         _maybeEvalF();
       })); // Handle onError (passthrough), onDone (close subscriptions to upstreams)
-      ComputedGlobalCtx.streams[e.s] = slv;
+      if (e.s is! Computed) {
+        ComputedGlobalCtx.streams[e.s] = slv;
+      } else {
+        _upstreamComputations[e.s as Computed] = slv;
+      }
     } catch (e) {
       _notifyListeners(null, e);
     }
