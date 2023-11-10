@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:built_collection/built_collection.dart';
+
 class NoValueException {}
 
 class NoSubscriptionException<T> {
@@ -7,12 +9,16 @@ class NoSubscriptionException<T> {
   NoSubscriptionException(this.s);
 }
 
-class SubscriptionLastValueRefCtr<T> {
-  StreamSubscription<T> subscription;
+class SubscriptionLastValue<T> {
+  StreamSubscription<T>? subscription;
   bool hasValue = false;
   T? lastValue;
+  SubscriptionLastValue();
+}
+
+class SubscriptionLastValueRefCtr<T> extends SubscriptionLastValue<T> {
   int refCtr = 1;
-  SubscriptionLastValueRefCtr(this.subscription);
+  SubscriptionLastValueRefCtr();
 }
 
 class ComputedGlobalCtx {
@@ -23,21 +29,22 @@ class ComputedStreamResolver {
   final Computed _parent;
   ComputedStreamResolver(this._parent);
   T call<T>(Stream<T> s) {
-    late SubscriptionLastValueRefCtr? slv;
     if (s is Computed<T>) {
       // Make sure we are subscribed
-      _parent._upstreamComputations.putIfAbsent(
-          s,
-          () => s.listen((event) {
-                // Store the last value of upstream comps, do not reeval if it didn't change
-                _parent._maybeEvalF();
-              }) as ComputedSubscription);
-      if (!s._hasLastResult)
-        s._evalF(); // What if f throws? _lastResult won't be set then
-      return s._lastResult!;
+      if (!_parent._upstreamComputations.containsKey(s)) {
+        final slv = SubscriptionLastValue<T>();
+        slv.subscription = s.listen((event) {
+          _parent._maybeEvalF(!slv.hasValue, slv.lastValue, event);
+          slv.hasValue = true;
+          slv.lastValue = event;
+        });
+        _parent._upstreamComputations[s] = slv;
+      }
+      if (!s._hasLastResult) s._evalF();
+      return s._lastResult!; // What if f throws? _lastResult won't be set then
     } else {
       // Refer to the global map
-      slv = ComputedGlobalCtx.streams[s];
+      final slv = ComputedGlobalCtx.streams[s];
       if (slv == null) throw NoSubscriptionException(s);
       if (!slv.hasValue) {
         throw NoValueException();
@@ -94,7 +101,7 @@ class ComputedSubscription<T> implements StreamSubscription<T> {
 class Computed<T> extends Stream<T> {
   // We store these here instead of the global dict to avoid the global dict becoming too large
   // Reasoning: A real-world application might have lots of computations but likely much fewer actual streams
-  final _upstreamComputations = <Computed, ComputedSubscription>{};
+  final _upstreamComputations = <Computed, SubscriptionLastValue>{};
   final _listeners = <ComputedSubscription<T>>{};
   var _hasLastResult = false;
   bool get hasLastResult => _hasLastResult;
@@ -115,12 +122,14 @@ class Computed<T> extends Stream<T> {
     } on NoValueException {
       // Not much we can do
     } on NoSubscriptionException catch (e) {
-      late SubscriptionLastValueRefCtr slv;
-      slv = SubscriptionLastValueRefCtr(e.s.listen((event) {
+      final slv = SubscriptionLastValueRefCtr();
+      slv.subscription = e.s.listen((event) {
+        final oldHasValue = slv.hasValue;
+        final oldLastValue = slv.lastValue;
         slv.hasValue = true;
         slv.lastValue = event;
-        _maybeEvalF();
-      })); // Handle onError (passthrough), onDone (close subscriptions to upstreams)
+        _maybeEvalF(!oldHasValue, oldLastValue, event);
+      }); // Handle onError (passthrough), onDone (close subscriptions to upstreams)
       assert(e.s
           is! Computed); // We never raise SubscriptionException-s on Computed-s
       ComputedGlobalCtx.streams[e.s] = slv;
@@ -153,8 +162,10 @@ class Computed<T> extends Stream<T> {
     }
   }
 
-  void _maybeEvalF() {
-    if (_listeners.isNotEmpty) _evalF();
+  void _maybeEvalF(bool noChangeComparison, dynamic old, dynamic neww) {
+    if (_listeners.isEmpty) return;
+    if (!noChangeComparison && old == neww) return;
+    _evalF();
   }
 
   void _removeListener(ComputedSubscription<T> sub) {
@@ -176,16 +187,19 @@ class Computed<T> extends Stream<T> {
 }
 
 void main() async {
-  final controller = StreamController<List<int>>();
+  final controller = StreamController<BuiltList<int>>();
   final source = controller.stream.asBroadcastStream();
 
   final anyNegative =
       Computed((ctx) => ctx(source).any((element) => element < 0));
 
-  final maybeReversed = Computed(
-      (ctx) => ctx(anyNegative) ? ctx(source).reversed.toList() : ctx(source));
+  final maybeReversed = Computed((ctx) =>
+      ctx(anyNegative) ? ctx(source).reversed.toBuiltList() : ctx(source));
 
-  final append0 = Computed((ctx) => List<int>.of(ctx(maybeReversed))..add(0));
+  final append0 = Computed((ctx) {
+    ctx(anyNegative);
+    return ctx(maybeReversed).rebuild((p0) => p0.add(0));
+  });
 
   append0.listen((value) => print(value));
 
@@ -194,7 +208,7 @@ void main() async {
     print("Never prints, this computation is never used.");
   });
 
-  controller.add([1, 2, -3]); // prints [-3, 2, 1, 0]
-  controller.add([4, 5, 6]); // prints [4, 5, 6, 0]
-  controller.add([4, 5, 6]); // Same result: Not printed again
+  controller.add([1, 2, -3].toBuiltList()); // prints [-3, 2, 1, 0]
+  controller.add([4, 5, 6].toBuiltList()); // prints [4, 5, 6, 0]
+  controller.add([4, 5, 6].toBuiltList()); // Same result: Not printed again
 }
