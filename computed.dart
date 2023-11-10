@@ -9,16 +9,11 @@ class NoSubscriptionException<T> {
   NoSubscriptionException(this.s);
 }
 
-class SubscriptionLastValue<T> {
+class SubscriptionLastValueRefCtr<T> {
   StreamSubscription<T>? subscription;
   bool hasValue = false;
   T? lastValue;
-  SubscriptionLastValue();
-}
-
-class SubscriptionLastValueRefCtr<T> extends SubscriptionLastValue<T> {
   int refCtr = 1;
-  SubscriptionLastValueRefCtr();
 }
 
 class ComputedGlobalCtx {
@@ -31,15 +26,12 @@ class ComputedStreamResolver {
   T call<T>(Stream<T> s) {
     if (s is Computed<T>) {
       // Make sure we are subscribed
-      if (!_parent._upstreamComputations.containsKey(s)) {
-        final slv = SubscriptionLastValue<T>();
-        slv.subscription = s.listen((event) {
-          _parent._maybeEvalF(!slv.hasValue, slv.lastValue, event);
-          slv.hasValue = true;
-          slv.lastValue = event;
-        });
-        _parent._upstreamComputations[s] = slv;
-      }
+      _parent._upstreamComputations.putIfAbsent(
+          s,
+          () => s.listen((event) {
+                _parent._maybeEvalF(true, null,
+                    null); //// what if the callback is call right away?
+              }));
       if (!s._hasLastResult) s._evalF();
       return s._lastResult!; // What if f throws? _lastResult won't be set then
     } else {
@@ -101,7 +93,7 @@ class ComputedSubscription<T> implements StreamSubscription<T> {
 class Computed<T> extends Stream<T> {
   // We store these here instead of the global dict to avoid the global dict becoming too large
   // Reasoning: A real-world application might have lots of computations but likely much fewer actual streams
-  final _upstreamComputations = <Computed, SubscriptionLastValue>{};
+  final _upstreamComputations = <Computed, StreamSubscription>{};
   final _listeners = <ComputedSubscription<T>>{};
   var _hasLastResult = false;
   bool get hasLastResult => _hasLastResult;
@@ -123,6 +115,7 @@ class Computed<T> extends Stream<T> {
       // Not much we can do
     } on NoSubscriptionException catch (e) {
       final slv = SubscriptionLastValueRefCtr();
+      ComputedGlobalCtx.streams[e.s] = slv;
       slv.subscription = e.s.listen((event) {
         final oldHasValue = slv.hasValue;
         final oldLastValue = slv.lastValue;
@@ -132,7 +125,6 @@ class Computed<T> extends Stream<T> {
       }); // Handle onError (passthrough), onDone (close subscriptions to upstreams)
       assert(e.s
           is! Computed); // We never raise SubscriptionException-s on Computed-s
-      ComputedGlobalCtx.streams[e.s] = slv;
     } catch (e) {
       _notifyListeners(null, e);
     }
@@ -197,7 +189,6 @@ void main() async {
       ctx(anyNegative) ? ctx(source).reversed.toBuiltList() : ctx(source));
 
   final append0 = Computed((ctx) {
-    ctx(anyNegative);
     return ctx(maybeReversed).rebuild((p0) => p0.add(0));
   });
 
