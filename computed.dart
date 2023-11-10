@@ -7,17 +7,21 @@ class NoSubscriptionException<T> {
   NoSubscriptionException(this.s);
 }
 
-class SubscriptionLastValue<T> {
+class SubscriptionLastValueRefCtr<T> {
   StreamSubscription<T> subscription;
   bool hasValue = false;
   T? lastValue;
-  SubscriptionLastValue(this.subscription);
+  int refCtr = 1;
+  SubscriptionLastValueRefCtr(this.subscription);
 }
 
-class ComputedContext {
-  final _streams = <Stream, SubscriptionLastValue>{};
+class ComputedGlobalCtx {
+  static final streams = <Stream, SubscriptionLastValueRefCtr>{};
+}
+
+class ComputedStreamResolver {
   T call<T>(Stream<T> s) {
-    final slv = _streams[s];
+    final slv = ComputedGlobalCtx.streams[s];
     if (slv == null) throw NoSubscriptionException(s);
     if (!slv.hasValue) {
       throw NoValueException();
@@ -71,13 +75,12 @@ class ComputedSubscription<T> implements StreamSubscription<T> {
 }
 
 class Computed<T> extends Stream<T> {
-  final _ctx = ComputedContext();
   final _listeners = <ComputedSubscription<T>>{};
   var _hasLastResult = false;
   bool get hasLastResult => _hasLastResult;
   T? _lastResult;
   T? get lastResult => _lastResult;
-  final T Function(ComputedContext ctx) f;
+  final T Function(ComputedStreamResolver ctx) f;
   Computed(this.f) {
     _evalF();
   }
@@ -86,19 +89,19 @@ class Computed<T> extends Stream<T> {
     late T fRes;
     var fFinished = false;
     try {
-      fRes = f(_ctx);
+      fRes = f(ComputedStreamResolver());
       // cancel subscriptions to unused streams & remove them from the context (bonus: allow the user to specify a duration before doing that)
       fFinished = true;
     } on NoValueException catch (_) {
       // Not much we can do
     } on NoSubscriptionException catch (e) {
-      late SubscriptionLastValue slv;
-      slv = SubscriptionLastValue(e.s.listen((event) {
+      late SubscriptionLastValueRefCtr slv;
+      slv = SubscriptionLastValueRefCtr(e.s.listen((event) {
         slv.hasValue = true;
         slv.lastValue = event;
         _maybeEvalF();
       })); // Handle onError (passthrough), onDone (close subscriptions to upstreams)
-      _ctx._streams[e.s] = slv;
+      ComputedGlobalCtx.streams[e.s] = slv;
     } catch (e) {
       _notifyListeners(null, e);
     }
@@ -149,9 +152,8 @@ class Computed<T> extends Stream<T> {
 }
 
 void main() async {
-  final completer = Completer<List<int>>();
-  final source =
-      Stream<List<int>>.fromFuture(completer.future).asBroadcastStream();
+  final controller = StreamController<List<int>>();
+  final source = controller.stream.asBroadcastStream();
 
   final anyNegative =
       Computed((ctx) => ctx(source).any((element) => element < 0));
@@ -161,5 +163,6 @@ void main() async {
 
   maybeReversed.listen((value) => print(value));
 
-  completer.complete([1, 2, -3]);
+  controller.add([1, 2, -3]);
+  controller.add([4, 5, 6]);
 }
