@@ -23,15 +23,14 @@ class ComputedStreamResolver {
       _parent._upstreamComputations.putIfAbsent(
           s,
           () => s.listen((event) {
-                _parent._maybeEvalF(true, null,
-                    null); //// what if the callback is called right away?
+                _parent._maybeEvalF(true, null, null);
               })); // Handle onError (passthrough), onDone (close subscriptions to upstreams)
       if (!s._hasLastResult) s._evalF();
       return s._lastResult!; // What if f throws? _lastResult won't be set then
     } else {
       // Maintain a global cache of stream last values for any new dependencies discovered to use
       // TODO: When to unsubscribe?
-      ComputedGlobalCtx.streams.putIfAbsent(s, () {
+      final slv = ComputedGlobalCtx.streams.putIfAbsent(s, () {
         final slv = SubscriptionLastValue();
         slv.subscription = s.listen((value) {
           slv.hasValue = true;
@@ -40,15 +39,14 @@ class ComputedStreamResolver {
         return slv;
       });
       // Make sure we are subscribed
-      final slv = _parent._dataSources.putIfAbsent(s, () {
+      _parent._dataSources.putIfAbsent(s, () {
         final slv = SubscriptionLastValue();
         slv.subscription = s.listen((event) {
           final oldHasValue = slv.hasValue;
           final oldLastValue = slv.lastValue;
           slv.hasValue = true;
           slv.lastValue = event;
-          _parent._maybeEvalF(!oldHasValue, oldLastValue,
-              event); //// what if the callback is called right away?
+          _parent._maybeEvalF(!oldHasValue, oldLastValue, event);
         });
         return slv;
       }); // Handle onError (passthrough), onDone (close subscriptions to upstreams)
@@ -180,7 +178,8 @@ class Computed<T> extends Stream<T> {
 }
 
 void main() async {
-  final controller = StreamController<BuiltList<int>>();
+  final controller = StreamController<BuiltList<int>>(
+      sync: true); // Use a sync controller to make debugging easier
   final source = controller.stream.asBroadcastStream();
 
   final anyNegative =
