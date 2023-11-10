@@ -4,20 +4,14 @@ import 'package:built_collection/built_collection.dart';
 
 class NoValueException {}
 
-class NoSubscriptionException<T> {
-  Stream<T> s;
-  NoSubscriptionException(this.s);
-}
-
-class SubscriptionLastValueRefCtr<T> {
+class SubscriptionLastValue<T> {
   StreamSubscription<T>? subscription;
   bool hasValue = false;
   T? lastValue;
-  int refCtr = 1;
 }
 
 class ComputedGlobalCtx {
-  static final streams = <Stream, SubscriptionLastValueRefCtr>{};
+  static final streams = <Stream, SubscriptionLastValue>{};
 }
 
 class ComputedStreamResolver {
@@ -30,14 +24,34 @@ class ComputedStreamResolver {
           s,
           () => s.listen((event) {
                 _parent._maybeEvalF(true, null,
-                    null); //// what if the callback is call right away?
-              }));
+                    null); //// what if the callback is called right away?
+              })); // Handle onError (passthrough), onDone (close subscriptions to upstreams)
       if (!s._hasLastResult) s._evalF();
       return s._lastResult!; // What if f throws? _lastResult won't be set then
     } else {
-      // Refer to the global map
-      final slv = ComputedGlobalCtx.streams[s];
-      if (slv == null) throw NoSubscriptionException(s);
+      // Maintain a global cache of stream last values for any new dependencies discovered to use
+      // TODO: When to unsubscribe?
+      ComputedGlobalCtx.streams.putIfAbsent(s, () {
+        final slv = SubscriptionLastValue();
+        slv.subscription = s.listen((value) {
+          slv.hasValue = true;
+          slv.lastValue = value;
+        });
+        return slv;
+      });
+      // Make sure we are subscribed
+      final slv = _parent._dataSources.putIfAbsent(s, () {
+        final slv = SubscriptionLastValue();
+        slv.subscription = s.listen((event) {
+          final oldHasValue = slv.hasValue;
+          final oldLastValue = slv.lastValue;
+          slv.hasValue = true;
+          slv.lastValue = event;
+          _parent._maybeEvalF(!oldHasValue, oldLastValue,
+              event); //// what if the callback is called right away?
+        });
+        return slv;
+      }); // Handle onError (passthrough), onDone (close subscriptions to upstreams)
       if (!slv.hasValue) {
         throw NoValueException();
       }
@@ -91,9 +105,8 @@ class ComputedSubscription<T> implements StreamSubscription<T> {
 }
 
 class Computed<T> extends Stream<T> {
-  // We store these here instead of the global dict to avoid the global dict becoming too large
-  // Reasoning: A real-world application might have lots of computations but likely much fewer actual streams
   final _upstreamComputations = <Computed, StreamSubscription>{};
+  final _dataSources = <Stream, SubscriptionLastValue>{};
   final _listeners = <ComputedSubscription<T>>{};
   var _hasLastResult = false;
   bool get hasLastResult => _hasLastResult;
@@ -113,18 +126,6 @@ class Computed<T> extends Stream<T> {
       fFinished = true;
     } on NoValueException {
       // Not much we can do
-    } on NoSubscriptionException catch (e) {
-      final slv = SubscriptionLastValueRefCtr();
-      ComputedGlobalCtx.streams[e.s] = slv;
-      slv.subscription = e.s.listen((event) {
-        final oldHasValue = slv.hasValue;
-        final oldLastValue = slv.lastValue;
-        slv.hasValue = true;
-        slv.lastValue = event;
-        _maybeEvalF(!oldHasValue, oldLastValue, event);
-      }); // Handle onError (passthrough), onDone (close subscriptions to upstreams)
-      assert(e.s
-          is! Computed); // We never raise SubscriptionException-s on Computed-s
     } catch (e) {
       _notifyListeners(null, e);
     }
@@ -199,7 +200,8 @@ void main() async {
     print("Never prints, this computation is never used.");
   });
 
-  controller.add([1, 2, -3].toBuiltList()); // prints [-3, 2, 1, 0]
+  controller.add([1, 2, -3, 5].toBuiltList()); // prints [-3, 2, 1, 0]
+  controller.add([1, 2, -3, -4].toBuiltList()); // prints [-3, 2, 1]
   controller.add([4, 5, 6].toBuiltList()); // prints [4, 5, 6, 0]
   controller.add([4, 5, 6].toBuiltList()); // Same result: Not printed again
 }
