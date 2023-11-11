@@ -31,22 +31,21 @@ class ComputedStreamResolverImpl implements ComputedStreamResolver {
       // Make sure we are subscribed
       _parent._upstreamComputations.putIfAbsent(
           s,
-          () => s._listen(_parent, _parent._depth, (event) {
+          () => s._listen(_parent, _parent.depth, (event) {
                 try {
                   _parent._maybeEvalF(true, null, null);
                 } on NoValueException {}
               })); // Handle onError (passthrough), onDone (close subscriptions to upstreams)
       // Update our depth
-      // TODO:How about our children's depth? Mark them for a future update by setting a flag
-      if (s._depth + 1 > _parent._depth) {
-        final oldDepth = _parent._depth;
-        final newDepth = s._depth + 1;
+      if (s.depth + 1 > _parent.depth) {
+        final oldDepth = _parent.depth;
+        final newDepth = s.depth + 1;
         // Also modify the _listeners-s of upstream computations
         _parent._upstreamComputations.forEach((upstreamNode, subscription) {
           assert(upstreamNode._listeners[oldDepth]!.remove(subscription));
           upstreamNode._addListenerInternal(newDepth, subscription);
         });
-        _parent._depth = newDepth;
+        _parent.depth = newDepth;
       }
 
       if (!s._hasLastResult) s._evalF(); // Only do this once per computation
@@ -59,11 +58,15 @@ class ComputedStreamResolverImpl implements ComputedStreamResolver {
         lv = LastValueRouter(ComputedImpl((ctx) => ctx(s)));
         ComputedGlobalCtx.lvExpando[s] = lv;
       }
+      if (lv.router != this._parent) {
+        // Subscribe to the router instead
+        return call(lv.router);
+      }
+      // We are the router
       // Make sure we are subscribed
       _parent._dataSources.putIfAbsent(s, () {
         final slv = SubscriptionLastValue();
-        slv.subscription =
-            (lv!.router == this._parent ? s : lv.router).listen((newValue) {
+        slv.subscription = s.listen((newValue) {
           final oldHasValue = slv.hasValue;
           final oldLastValue = slv.lastValue;
           slv.hasValue = true;
@@ -133,7 +136,34 @@ class ComputedSubscription<T> implements StreamSubscription<T> {
 
 class ComputedImpl<T> extends Stream<T> implements Computed<T> {
   final _upstreamComputations = <ComputedImpl, ComputedSubscription>{};
+
   var _depth = 0;
+  var depthDirty = false;
+  var dirtyDepth = 0;
+
+  int get depth {
+    if (depthDirty) {
+      if (dirtyDepth > _depth) {
+        depth = dirtyDepth;
+      }
+      depthDirty = false;
+    }
+    return _depth;
+  }
+
+  void set depth(int newDepth) {
+    if (_depth == newDepth) return;
+    for (var listeners in _listeners.values) {
+      for (var listener in listeners) {
+        if (listener._creator != null) {
+          listener._creator!.depthDirty = true;
+          listener._creator!.dirtyDepth = newDepth + 1;
+        }
+      }
+    }
+    _depth = newDepth;
+  }
+
   final _dataSources = <Stream, SubscriptionLastValue>{};
   final _listeners = SplayTreeMap<int, Set<ComputedSubscription<T>>>();
   var _numListeners = 0; // Note that this is NOT equal to _listeners.length
@@ -200,7 +230,7 @@ class ComputedImpl<T> extends Stream<T> implements Computed<T> {
   }
 
   void _removeListener(ComputedSubscription<T> sub) {
-    final listenersOfDepth = _listeners[sub._creator?._depth ?? 0]!;
+    final listenersOfDepth = _listeners[sub._creator?.depth ?? 0]!;
     assert(listenersOfDepth.remove(sub));
     _numListeners--;
     if (_numListeners == 0) {
