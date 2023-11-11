@@ -27,7 +27,9 @@ class ComputedStreamResolverImpl implements ComputedStreamResolver {
       _parent._upstreamComputations.putIfAbsent(
           s,
           () => s._listen(_parent, _parent._depth, (event) {
-                _parent._maybeEvalF(true, null, null);
+                try {
+                  _parent._maybeEvalF(true, null, null);
+                } on NoValueException {}
               })); // Handle onError (passthrough), onDone (close subscriptions to upstreams)
       // Update our depth
       if (s._depth + 1 > _parent._depth) {
@@ -42,9 +44,7 @@ class ComputedStreamResolverImpl implements ComputedStreamResolver {
       }
 
       if (!s._hasLastResult) s._evalF(); // Only do this once per computation
-      if (!s._hasLastResult)
-        throw NoValueException(); // What if f throws? _lastResult won't be set then
-      return s._lastResult!;
+      return s._lastResult!; // What if f throws? _lastResult won't be set then
     } else {
       // Maintain a global cache of stream last values for any new dependencies discovered to use
       var lv = ComputedGlobalCtx.lvExpando[s];
@@ -150,8 +150,9 @@ class ComputedImpl<T> extends Stream<T> implements Computed<T> {
       fRes = f(ComputedStreamResolverImpl(this));
       // cancel subscriptions to unused streams & remove them from the context (bonus: allow the user to specify a duration before doing that)
       fFinished = true;
-    } on NoValueException {
+    } on NoValueException catch (e) {
       // Not much we can do
+      throw e;
     } catch (e) {
       _notifyListeners(null, e);
     }
@@ -213,8 +214,10 @@ class ComputedImpl<T> extends Stream<T> implements Computed<T> {
       {Function? onError, void Function()? onDone, bool? cancelOnError}) {
     final sub = ComputedSubscription<T>(this, caller, onData, onError);
     if (_numListeners == 0 && _suppressedEvalDueToNoListener) {
-      _evalF();
-      // Might set lastResult, won't notify the listener just yet (as that is against the Stream contract)
+      try {
+        _evalF();
+        // Might set lastResult, won't notify the listener just yet (as that is against the Stream contract)
+      } on NoValueException {}
     }
     _listeners
         .putIfAbsent(callerDepth, (() => <ComputedSubscription<T>>{}))
