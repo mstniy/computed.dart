@@ -4,15 +4,17 @@ import 'package:built_collection/built_collection.dart';
 
 class NoValueException {}
 
-class SubscriptionLastValue<T> {
-  StreamSubscription<T>? subscription;
+class LastValue<T> {
   bool hasValue = false;
   T? lastValue;
 }
 
+class SubscriptionLastValue<T> extends LastValue<T> {
+  StreamSubscription<T>? subscription;
+}
+
 class ComputedGlobalCtx {
-  static final slvExpando =
-      Expando<SubscriptionLastValue>('computed_slv_expando');
+  static final lvExpando = Expando<LastValue>('computed_lv');
 }
 
 class ComputedStreamResolver {
@@ -30,33 +32,33 @@ class ComputedStreamResolver {
       return s._lastResult!; // What if f throws? _lastResult won't be set then
     } else {
       // Maintain a global cache of stream last values for any new dependencies discovered to use
-      // TODO: When to unsubscribe?
-      var slv = ComputedGlobalCtx.slvExpando[s];
+      var lv = ComputedGlobalCtx.lvExpando[s];
 
-      if (slv == null) {
-        slv = SubscriptionLastValue();
-        slv.subscription = s.listen((value) {
-          slv!.hasValue = true;
-          slv.lastValue = value;
-        });
-        ComputedGlobalCtx.slvExpando[s] = slv;
+      if (lv == null) {
+        lv = LastValue();
+        ComputedGlobalCtx.lvExpando[s] = lv;
       }
       // Make sure we are subscribed
       _parent._dataSources.putIfAbsent(s, () {
         final slv = SubscriptionLastValue();
-        slv.subscription = s.listen((event) {
+        slv.subscription = s.listen((newValue) {
           final oldHasValue = slv.hasValue;
           final oldLastValue = slv.lastValue;
           slv.hasValue = true;
-          slv.lastValue = event;
-          _parent._maybeEvalF(!oldHasValue, oldLastValue, event);
+          slv.lastValue = newValue;
+          if (identityHashCode(lv!.lastValue) != identityHashCode(newValue)) {
+            // Update the global last value cache
+            lv.hasValue = true;
+            lv.lastValue = newValue;
+          }
+          _parent._maybeEvalF(!oldHasValue, oldLastValue, newValue);
         });
         return slv;
       }); // Handle onError (passthrough), onDone (close subscriptions to upstreams)
-      if (!slv.hasValue) {
+      if (!lv.hasValue) {
         throw NoValueException();
       }
-      return slv.lastValue!;
+      return lv.lastValue!;
     }
   }
 }
