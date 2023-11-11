@@ -50,7 +50,7 @@ class ComputedStreamResolverImpl implements ComputedStreamResolver {
       _parent._dataSources.putIfAbsent(
           s,
           () => s.listen((newValue) {
-                if (lv!.lastValue == newValue) return;
+                if (lv!.hasValue && lv.lastValue == newValue) return;
                 // Update the global last value cache
                 lv.hasValue = true;
                 lv.lastValue = newValue;
