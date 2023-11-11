@@ -10,12 +10,17 @@ class LastValue<T> {
   T? lastValue;
 }
 
+class LastValueRouter<T> extends LastValue<T> {
+  ComputedImpl<T> router;
+  LastValueRouter(this.router);
+}
+
 class SubscriptionLastValue<T> extends LastValue<T> {
   StreamSubscription<T>? subscription;
 }
 
 class ComputedGlobalCtx {
-  static final lvExpando = Expando<LastValue>('computed_lv');
+  static final lvExpando = Expando<LastValueRouter>('computed_lv');
 }
 
 class ComputedStreamResolverImpl implements ComputedStreamResolver {
@@ -32,6 +37,7 @@ class ComputedStreamResolverImpl implements ComputedStreamResolver {
                 } on NoValueException {}
               })); // Handle onError (passthrough), onDone (close subscriptions to upstreams)
       // Update our depth
+      // TODO:How about our children's depth? Mark them for a future update by setting a flag
       if (s._depth + 1 > _parent._depth) {
         final oldDepth = _parent._depth;
         final newDepth = s._depth + 1;
@@ -47,18 +53,17 @@ class ComputedStreamResolverImpl implements ComputedStreamResolver {
       return s._lastResult!; // What if f throws? _lastResult won't be set then
     } else {
       // Maintain a global cache of stream last values for any new dependencies discovered to use
-      var lv = ComputedGlobalCtx.lvExpando[s];
+      var lv = ComputedGlobalCtx.lvExpando[s] as LastValueRouter<T>?;
 
       if (lv == null) {
-        lv = LastValue();
+        lv = LastValueRouter(ComputedImpl((ctx) => ctx(s)));
         ComputedGlobalCtx.lvExpando[s] = lv;
       }
       // Make sure we are subscribed
       _parent._dataSources.putIfAbsent(s, () {
         final slv = SubscriptionLastValue();
-        // TODO: Do not directly subscribe to s, but to a router (an identity Computed?)
-        // so that it'll respect the topological order
-        slv.subscription = s.listen((newValue) {
+        slv.subscription =
+            (lv!.router == this._parent ? s : lv.router).listen((newValue) {
           final oldHasValue = slv.hasValue;
           final oldLastValue = slv.lastValue;
           slv.hasValue = true;

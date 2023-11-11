@@ -56,8 +56,7 @@ void main() {
       // Run the test twice to make sure the order of operations doesn't matter
       final controller = StreamController<int>(
           sync: true); // Use a sync controller to make debugging easier
-      final _source = controller.stream.asBroadcastStream();
-      final source = Computed((ctx) => ctx(_source));
+      final source = controller.stream.asBroadcastStream();
 
       final outputs = <int>[];
 
