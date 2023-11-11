@@ -14,10 +14,6 @@ class LastValueRouter<T> extends LastValue<T> {
   LastValueRouter(this.router);
 }
 
-class SubscriptionLastValue<T> extends LastValue<T> {
-  StreamSubscription<T>? subscription;
-}
-
 class ComputedGlobalCtx {
   static final lvExpando = Expando<LastValueRouter>('computed_lv');
 }
@@ -51,20 +47,15 @@ class ComputedStreamResolverImpl implements ComputedStreamResolver {
       }
       // We are the router
       // Make sure we are subscribed
-      _parent._dataSources.putIfAbsent(s, () {
-        final slv = SubscriptionLastValue();
-        slv.subscription = s.listen((newValue) {
-          // TODO: Why have the last value both in the Expando and in the local var?
-          slv.hasValue = true;
-          slv.lastValue = newValue;
-          if (lv!.lastValue == newValue) return;
-          // Update the global last value cache
-          lv.hasValue = true;
-          lv.lastValue = newValue;
-          _parent._rerunGraph();
-        });
-        return slv;
-      }); // Handle onError (passthrough), onDone (close subscriptions to upstreams)
+      _parent._dataSources.putIfAbsent(
+          s,
+          () => s.listen((newValue) {
+                if (lv!.lastValue == newValue) return;
+                // Update the global last value cache
+                lv.hasValue = true;
+                lv.lastValue = newValue;
+                _parent._rerunGraph();
+              })); // Handle onError (passthrough), onDone (close subscriptions to upstreams)
       if (!lv.hasValue) {
         throw NoValueException();
       }
@@ -121,7 +112,7 @@ class ComputedImpl<T> extends Stream<T> implements Computed<T> {
   final _upstreamComputations = <ComputedImpl>{};
   final _downstreamComputations = <ComputedImpl>{};
 
-  final _dataSources = <Stream, SubscriptionLastValue>{};
+  final _dataSources = <Stream, StreamSubscription>{};
   final _listeners = Set<ComputedSubscription<T>>();
   var _suppressedEvalDueToNoListener = true;
 
