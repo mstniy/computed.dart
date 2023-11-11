@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:collection';
 
 import '../computed.dart';
 
@@ -29,27 +28,15 @@ class ComputedStreamResolverImpl implements ComputedStreamResolver {
   T call<T>(Stream<T> s) {
     if (s is ComputedImpl<T>) {
       // Make sure we are subscribed
-      _parent._upstreamComputations.putIfAbsent(
-          s,
-          () => s._listen(_parent, _parent.depth, (event) {
-                try {
-                  _parent._maybeEvalF(true, null, null);
-                } on NoValueException {}
-              })); // Handle onError (passthrough), onDone (close subscriptions to upstreams)
-      // Update our depth
-      if (s.depth + 1 > _parent.depth) {
-        final oldDepth = _parent.depth;
-        final newDepth = s.depth + 1;
-        // Also modify the _listeners-s of upstream computations
-        _parent._upstreamComputations.forEach((upstreamNode, subscription) {
-          assert(upstreamNode._listeners[oldDepth]!.remove(subscription));
-          upstreamNode._addListenerInternal(newDepth, subscription);
-        });
-        _parent.depth = newDepth;
-      }
+      _parent._upstreamComputations.add(s);
+      s._downstreamComputations.add(this._parent);
 
-      if (!s._hasLastResult) s._evalF(); // Only do this once per computation
-      return s._lastResult!; // What if f throws? _lastResult won't be set then
+      if (!s._evaluated) s._evalF();
+      assert(s._evaluated);
+      if (s._lastWasError!)
+        throw s._lastError!;
+      else
+        return s._lastResult!;
     } else {
       // Maintain a global cache of stream last values for any new dependencies discovered to use
       var lv = ComputedGlobalCtx.lvExpando[s] as LastValueRouter<T>?;
@@ -67,16 +54,14 @@ class ComputedStreamResolverImpl implements ComputedStreamResolver {
       _parent._dataSources.putIfAbsent(s, () {
         final slv = SubscriptionLastValue();
         slv.subscription = s.listen((newValue) {
-          final oldHasValue = slv.hasValue;
-          final oldLastValue = slv.lastValue;
+          // TODO: Why have the last value both in the Expando and in the local var?
           slv.hasValue = true;
           slv.lastValue = newValue;
-          if (identityHashCode(lv!.lastValue) != identityHashCode(newValue)) {
-            // Update the global last value cache
-            lv.hasValue = true;
-            lv.lastValue = newValue;
-          }
-          _parent._maybeEvalF(!oldHasValue, oldLastValue, newValue);
+          if (lv!.lastValue == newValue) return;
+          // Update the global last value cache
+          lv.hasValue = true;
+          lv.lastValue = newValue;
+          _parent._rerunGraph();
         });
         return slv;
       }); // Handle onError (passthrough), onDone (close subscriptions to upstreams)
@@ -89,12 +74,10 @@ class ComputedStreamResolverImpl implements ComputedStreamResolver {
 }
 
 class ComputedSubscription<T> implements StreamSubscription<T> {
-  final ComputedImpl? _creator;
-  final ComputedImpl<T> _parent;
+  final ComputedImpl<T> _node;
   void Function(T event)? _onData;
   Function? _onError;
-  ComputedSubscription(
-      this._parent, this._creator, this._onData, this._onError);
+  ComputedSubscription(this._node, this._onData, this._onError);
   @override
   Future<E> asFuture<E>([E? futureValue]) {
     throw UnimplementedError(); // Doesn't make much sense in this context
@@ -102,7 +85,7 @@ class ComputedSubscription<T> implements StreamSubscription<T> {
 
   @override
   Future<void> cancel() async {
-    _parent._removeListener(this);
+    _node._removeListener(this);
   }
 
   @override
@@ -135,146 +118,114 @@ class ComputedSubscription<T> implements StreamSubscription<T> {
 }
 
 class ComputedImpl<T> extends Stream<T> implements Computed<T> {
-  final _upstreamComputations = <ComputedImpl, ComputedSubscription>{};
-
-  var _depth = 0;
-  var depthDirty = false;
-  var dirtyDepth = 0;
-
-  int get depth {
-    if (depthDirty) {
-      if (dirtyDepth > _depth) {
-        depth = dirtyDepth;
-      }
-      depthDirty = false;
-    }
-    return _depth;
-  }
-
-  void set depth(int newDepth) {
-    if (_depth == newDepth) return;
-    for (var listeners in _listeners.values) {
-      for (var listener in listeners) {
-        if (listener._creator != null) {
-          listener._creator!.depthDirty = true;
-          listener._creator!.dirtyDepth = newDepth + 1;
-        }
-      }
-    }
-    _depth = newDepth;
-  }
+  final _upstreamComputations = <ComputedImpl>{};
+  final _downstreamComputations = <ComputedImpl>{};
 
   final _dataSources = <Stream, SubscriptionLastValue>{};
-  final _listeners = SplayTreeMap<int, Set<ComputedSubscription<T>>>();
-  var _numListeners = 0; // Note that this is NOT equal to _listeners.length
+  final _listeners = Set<ComputedSubscription<T>>();
   var _suppressedEvalDueToNoListener = true;
-  var _hasLastResult = false;
-  bool get hasLastResult => _hasLastResult;
 
+  var _evaluated = false;
+  bool get evaluated => _evaluated;
+  bool? _lastWasError;
+  bool? get lastWasError => _lastWasError;
   T? _lastResult;
+  Object? _lastError;
   T? get lastResult => _lastResult;
+  Object? get lastError => _lastError;
+
   final T Function(ComputedStreamResolver ctx) f;
 
   ComputedImpl(this.f);
 
+  void _rerunGraph() {
+    final numUnsatDep = <ComputedImpl, int>{};
+    final resultDirty = <ComputedImpl>{this};
+    final noUnsatDep = <ComputedImpl>{this};
+
+    while (noUnsatDep.isNotEmpty) {
+      final cur = noUnsatDep.first;
+      noUnsatDep.remove(cur);
+      if (!resultDirty.contains(cur)) continue;
+      if (cur._downstreamComputations.isEmpty && cur._listeners.isEmpty) {
+        cur._suppressedEvalDueToNoListener = true;
+        continue;
+      }
+      final prevRes = cur.lastResult;
+      cur._evalF();
+      final resultChanged = cur.lastResult != prevRes;
+      if (resultChanged) {
+        cur._notifyListeners();
+      }
+      for (var down in cur._downstreamComputations) {
+        if (resultChanged) resultDirty.add(down);
+        final nud =
+            (numUnsatDep[down] ?? down._upstreamComputations.length) - 1;
+        if (nud == 0) {
+          noUnsatDep.add(down);
+        } else {
+          numUnsatDep[down] = nud;
+        }
+      }
+    }
+  }
+
   void _evalF() {
     _suppressedEvalDueToNoListener = false;
-    late T fRes;
-    var fFinished = false;
     try {
-      fRes = f(ComputedStreamResolverImpl(this));
+      _lastResult = f(ComputedStreamResolverImpl(this));
+      _lastError = null;
+      _lastWasError = false;
+      _evaluated = true;
       // cancel subscriptions to unused streams & remove them from the context (bonus: allow the user to specify a duration before doing that)
-      fFinished = true;
     } on NoValueException catch (e) {
       // Not much we can do
       throw e;
     } catch (e) {
-      _notifyListeners(null, e);
-    }
-    if (fFinished) {
-      _maybeNotifyListeners(fRes, null);
+      _lastResult = null;
+      _lastError = e;
+      _lastWasError = true;
+      _evaluated = true;
     }
   }
 
-  void _maybeNotifyListeners(T? t, dynamic error) {
-    if (error == null) {
-      // Not an exception
-      if (_hasLastResult == true && t == lastResult) return;
-      _lastResult = t;
-      _hasLastResult = true;
-    }
-    _notifyListeners(t, error);
-  }
-
-  void _notifyListeners(T? t, dynamic error) {
-    // Eagerly marshall a list of subscriptions in case a listener changes depth/cancels.
-    final listeners =
-        _listeners.values.expand((listeners) => listeners).toList();
-    if (error == null) {
-      for (var listener in listeners)
-        if (listener._onData != null) listener._onData!(t!);
+  void _notifyListeners() {
+    if (_lastError == null) {
+      for (var listener in _listeners)
+        if (listener._onData != null) listener._onData!(_lastResult!);
     } else {
       // Exception
-      for (var listener in listeners)
-        if (listener._onError != null) listener._onError!(error);
+      for (var listener in _listeners)
+        if (listener._onError != null) listener._onError!(_lastError);
     }
-  }
-
-  void _maybeEvalF(bool noChangeComparison, dynamic old, dynamic neww) {
-    if (_numListeners == 0) {
-      _suppressedEvalDueToNoListener = true;
-      return;
-    }
-    if (!noChangeComparison && old == neww) return;
-    _evalF();
   }
 
   void _removeListener(ComputedSubscription<T> sub) {
-    final listenersOfDepth = _listeners[sub._creator?.depth ?? 0]!;
-    assert(listenersOfDepth.remove(sub));
-    _numListeners--;
-    if (_numListeners == 0) {
-      // cancel subscriptions to all upstreams & remove them from the context (bonus: allow the user to specify a duration before doing that)
-    }
+    _listeners.remove(sub);
+    // if no listeners and no downstream computations left, cancel subscriptions to all upstreams & remove them from the context (bonus: allow the user to specify a duration before doing that)
   }
 
-  void _addListenerInternal(int depth, dynamic sub) {
-    // VERY internal method. Use with great care.
-    _listeners.putIfAbsent(depth, (() => <ComputedSubscription<T>>{})).add(sub);
-    _numListeners++;
-  }
-
-  ComputedSubscription<T> _listen<TT>(
-      ComputedImpl<TT>? caller, int callerDepth, void Function(T event)? onData,
+  StreamSubscription<T> listen(void Function(T event)? onData,
       {Function? onError, void Function()? onDone, bool? cancelOnError}) {
-    final sub = ComputedSubscription<T>(this, caller, onData, onError);
-    if (_numListeners == 0 && _suppressedEvalDueToNoListener) {
+    final sub = ComputedSubscription<T>(this, onData, onError);
+    if (_listeners.isEmpty && _suppressedEvalDueToNoListener) {
       try {
         _evalF();
         // Might set lastResult, won't notify the listener just yet (as that is against the Stream contract)
       } on NoValueException {}
     }
-    _listeners
-        .putIfAbsent(callerDepth, (() => <ComputedSubscription<T>>{}))
-        .add(sub);
-    _numListeners++;
-    if (_hasLastResult && onData != null) {
-      scheduleMicrotask(() {
-        onData(_lastResult!);
-      });
+    _listeners.add(sub);
+    if (_evaluated) {
+      if (_lastWasError! && onError != null) {
+        scheduleMicrotask(() {
+          onError(_lastError!);
+        });
+      } else if (!_lastWasError! && onData != null) {
+        scheduleMicrotask(() {
+          onData(_lastResult!);
+        });
+      }
     }
     return sub;
-  }
-
-  @override
-  StreamSubscription<T> listen(void Function(T event)? onData,
-      {Function? onError, void Function()? onDone, bool? cancelOnError}) {
-    return _listen(
-        null,
-        0, // Downstream Computed-s don't use this method, so pass a 0 as the depth
-        onData,
-        onError: onError,
-        onDone: onDone,
-        cancelOnError: cancelOnError);
   }
 }

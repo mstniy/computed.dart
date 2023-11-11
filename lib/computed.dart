@@ -7,7 +7,7 @@ abstract class ComputedStreamResolver {
 }
 
 abstract class Computed<T> extends Stream<T> {
-  bool get hasLastResult;
+  bool get evaluated;
   T? get lastResult;
   factory Computed(T Function(ComputedStreamResolver ctx) f) => ComputedImpl(f);
 }
