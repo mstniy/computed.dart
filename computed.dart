@@ -11,7 +11,8 @@ class SubscriptionLastValue<T> {
 }
 
 class ComputedGlobalCtx {
-  static final streams = <Stream, SubscriptionLastValue>{};
+  static final slvExpando =
+      Expando<SubscriptionLastValue>('computed_slv_expando');
 }
 
 class ComputedStreamResolver {
@@ -30,14 +31,16 @@ class ComputedStreamResolver {
     } else {
       // Maintain a global cache of stream last values for any new dependencies discovered to use
       // TODO: When to unsubscribe?
-      final slv = ComputedGlobalCtx.streams.putIfAbsent(s, () {
-        final slv = SubscriptionLastValue();
+      var slv = ComputedGlobalCtx.slvExpando[s];
+
+      if (slv == null) {
+        slv = SubscriptionLastValue();
         slv.subscription = s.listen((value) {
-          slv.hasValue = true;
+          slv!.hasValue = true;
           slv.lastValue = value;
         });
-        return slv;
-      });
+        ComputedGlobalCtx.slvExpando[s] = slv;
+      }
       // Make sure we are subscribed
       _parent._dataSources.putIfAbsent(s, () {
         final slv = SubscriptionLastValue();
