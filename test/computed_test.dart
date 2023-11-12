@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:computed/computed.dart';
+import 'package:computed/src/computed.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -162,7 +163,7 @@ void main() {
     expect(checkCnt, 1);
 
     sub = c2.listen((output) {
-      expect(output, (checkCnt == 1) ? 0 : 4);
+      expect(output, 4);
       checkCnt++;
     }); // This triggers a re-computation
 
@@ -170,13 +171,13 @@ void main() {
     expect(callCnt1,
         3); // Attaching the listeners triggers a call to discover dependencies
     expect(callCnt2, 3);
-    expect(checkCnt, 2); // The listener is run with the old value
-    // TODO: Weird behaviour, fix.
+    expect(checkCnt,
+        1); // The listener is not run: no value was produced by the stream after the second listen
 
     controller.add(2); // Must trigger a re-calculation
     expect(callCnt1, 4);
     expect(callCnt2, 4);
-    expect(checkCnt, 3);
+    expect(checkCnt, 2);
   });
 
   test('exceptions raised by computations are propagated', () async {
@@ -232,5 +233,21 @@ void main() {
     } finally {
       sub.cancel();
     }
+  });
+
+  test('detaching all listeners removes the expando', () async {
+    final controller = StreamController<int>(
+        sync: true); // Use a sync controller to make debugging easier
+    final source = controller.stream.asBroadcastStream();
+
+    final c = Computed((ctx) {
+      return ctx(source);
+    });
+
+    var sub = c.listen((output) {});
+
+    sub.cancel();
+
+    expect(ComputedGlobalCtx.lvExpando[source], null);
   });
 }

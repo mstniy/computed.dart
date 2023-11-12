@@ -29,7 +29,7 @@ class ComputedStreamResolverImpl implements ComputedStreamResolver {
       s._downstreamComputations.add(this._parent);
       // Make sure the upstream has been computed
       if (s._dirty) s._evalF();
-      assert(s._evaluated);
+      assert(!s._dirty);
 
       if (s._lastWasError!) // TODO: Make this logic into a getter that throws
         throw s._lastError!;
@@ -119,8 +119,9 @@ class ComputedImpl<T> extends Stream<T> implements Computed<T> {
 
   var _dirty = true;
 
-  var _evaluated = false;
-  bool get evaluated => _evaluated;
+  @override
+  bool get evaluated => !_dirty;
+
   bool? _lastWasError;
   bool? get lastWasError => _lastWasError;
   T? _lastResult;
@@ -164,12 +165,11 @@ class ComputedImpl<T> extends Stream<T> implements Computed<T> {
   }
 
   void _evalF() {
-    _dirty = false;
     try {
       _lastResult = f(ComputedStreamResolverImpl(this));
       _lastError = null;
       _lastWasError = false;
-      _evaluated = true;
+      _dirty = false;
       // cancel subscriptions to unused streams & remove them from the context (bonus: allow the user to specify a duration before doing that)
     } on NoValueException catch (e) {
       // Not much we can do
@@ -178,7 +178,7 @@ class ComputedImpl<T> extends Stream<T> implements Computed<T> {
       _lastResult = null;
       _lastError = e;
       _lastWasError = true;
-      _evaluated = true;
+      _dirty = false;
     }
   }
 
@@ -200,7 +200,13 @@ class ComputedImpl<T> extends Stream<T> implements Computed<T> {
     for (var upComp in _upstreamComputations)
       upComp._removeDownstreamComputation(this);
     _upstreamComputations.clear();
-    for (var sub in _dataSources.values) sub.cancel();
+    for (var strSub in _dataSources.entries) {
+      strSub.value.cancel();
+      if (ComputedGlobalCtx.lvExpando[strSub.key]?.router == this) {
+        // If we are the router for this stream, remove ourselves from the expando
+        ComputedGlobalCtx.lvExpando[strSub.key] = null;
+      }
+    }
     _dataSources.clear();
   }
 
@@ -228,7 +234,7 @@ class ComputedImpl<T> extends Stream<T> implements Computed<T> {
       } on NoValueException {}
     }
     _listeners.add(sub);
-    if (_evaluated) {
+    if (!_dirty) {
       if (_lastWasError! && onError != null) {
         scheduleMicrotask(() {
           onError(_lastError!);
