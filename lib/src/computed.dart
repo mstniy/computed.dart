@@ -15,7 +15,6 @@ class LastValueRouter<T> extends LastValue<T> {
 }
 
 class ComputedGlobalCtx {
-  // TODO: Avoid storing a ref to the last value in the expando, move it to the router instead
   static final lvExpando = Expando<LastValueRouter>('computed_lv');
 }
 
@@ -31,10 +30,7 @@ class ComputedStreamResolverImpl implements ComputedStreamResolver {
       if (s._dirty) s._evalF();
       assert(!s._dirty);
 
-      if (s._lastWasError!) // TODO: Make this logic into a getter that throws
-        throw s._lastError!;
-      else
-        return s._lastResult!;
+      return s.lastResult!;
     } else {
       // Maintain a global cache of stream last values for any new dependencies discovered to use
       var lv = ComputedGlobalCtx.lvExpando[s] as LastValueRouter<T>?;
@@ -123,11 +119,12 @@ class ComputedImpl<T> extends Stream<T> implements Computed<T> {
   bool get evaluated => !_dirty;
 
   bool? _lastWasError;
-  bool? get lastWasError => _lastWasError;
   T? _lastResult;
   Object? _lastError;
-  T? get lastResult => _lastResult;
-  Object? get lastError => _lastError;
+  T? get lastResult {
+    if (_lastWasError ?? false) throw _lastError!;
+    return _lastResult;
+  }
 
   final T Function(ComputedStreamResolver ctx) f;
 
@@ -145,7 +142,8 @@ class ComputedImpl<T> extends Stream<T> implements Computed<T> {
       if (cur._downstreamComputations.isEmpty && cur._listeners.isEmpty) {
         continue;
       }
-      final prevRes = cur.lastResult;
+      final prevRes = cur
+          .lastResult; // TODO: Consider the cases where f threw/throws this time
       cur._evalF();
       final resultChanged = cur.lastResult != prevRes;
       if (resultChanged) {
