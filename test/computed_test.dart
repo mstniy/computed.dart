@@ -117,82 +117,66 @@ void main() {
     }
   });
 
-  test('attaching a listener runs computations if their results are dirty',
-      () async {
+  test('detaching all listeners disables the computation graph', () async {
     final controller = StreamController<int>(
         sync: true); // Use a sync controller to make debugging easier
     final source = controller.stream.asBroadcastStream();
 
-    var callCnt = 0;
+    var callCnt1 = 0;
+    var callCnt2 = 0;
 
-    final c = Computed((ctx) {
-      callCnt += 1;
+    final c1 = Computed((ctx) {
+      callCnt1 += 1;
       return ctx(source);
     });
 
-    var sub = c.listen((output) {
+    final c2 = Computed((ctx) {
+      callCnt2 += 1;
+      return ctx(c1) * 2;
+    });
+
+    var checkCnt = 0;
+
+    var sub = c2.listen((output) {
+      checkCnt++;
       expect(output, 0);
     });
 
-    expect(callCnt, 1);
+    expect(callCnt1, 1);
+    expect(callCnt2, 1);
+    expect(checkCnt, 0);
 
     try {
       controller.add(0);
-      expect(callCnt, 2);
+      expect(callCnt1, 2);
+      expect(callCnt2, 2);
+      await Future.value(); // Wait for the listener to fire
+      expect(checkCnt, 1);
     } finally {
       sub.cancel();
     }
 
     controller.add(1); // Must not trigger a re-calculation
-    expect(callCnt, 2);
+    expect(callCnt1, 2);
+    expect(callCnt2, 2);
+    expect(checkCnt, 1);
 
-    var checkRan = false;
-
-    sub = c.listen((output) {
-      expect(output, 1);
-      checkRan = true;
+    sub = c2.listen((output) {
+      expect(output, (checkCnt == 1) ? 0 : 4);
+      checkCnt++;
     }); // This triggers a re-computation
-    await Future.value(); // Wait for the microtask update
-    expect(callCnt, 3);
-    expect(checkRan, true);
-  });
 
-  test(
-      'attaching a listener does not run the computation if the result are not dirty',
-      () async {
-    final controller = StreamController<int>(
-        sync: true); // Use a sync controller to make debugging easier
-    final source = controller.stream.asBroadcastStream();
+    await Future.value();
+    expect(callCnt1,
+        3); // Attaching the listeners triggers a call to discover dependencies
+    expect(callCnt2, 3);
+    expect(checkCnt, 2); // The listener is run with the old value
+    // TODO: Weird behaviour, fix.
 
-    var callCnt = 0;
-
-    final c = Computed((ctx) {
-      callCnt += 1;
-      return ctx(source);
-    });
-
-    var sub = c.listen((output) {
-      expect(output, 0);
-    });
-
-    expect(callCnt, 1);
-
-    try {
-      controller.add(0);
-      expect(callCnt, 2);
-    } finally {
-      sub.cancel();
-    }
-
-    var checkRan = false;
-
-    sub = c.listen((output) {
-      expect(output, 0);
-      checkRan = true;
-    }); // No need to re-compute the result: None of the parameters of the computation has changed
-    await Future.value(); // Wait for the microtask update
-    expect(callCnt, 2);
-    expect(checkRan, true);
+    controller.add(2); // Must trigger a re-calculation
+    expect(callCnt1, 4);
+    expect(callCnt2, 4);
+    expect(checkCnt, 3);
   });
 
   test('exceptions raised by computations are propagated', () async {

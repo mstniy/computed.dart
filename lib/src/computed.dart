@@ -15,6 +15,7 @@ class LastValueRouter<T> extends LastValue<T> {
 }
 
 class ComputedGlobalCtx {
+  // TODO: Avoid storing a ref to the last value in the expando, move it to the router instead
   static final lvExpando = Expando<LastValueRouter>('computed_lv');
 }
 
@@ -26,10 +27,11 @@ class ComputedStreamResolverImpl implements ComputedStreamResolver {
       // Make sure we are subscribed
       _parent._upstreamComputations.add(s);
       s._downstreamComputations.add(this._parent);
-
-      if (!s._evaluated) s._evalF();
+      // Make sure the upstream has been computed
+      if (s._dirty) s._evalF();
       assert(s._evaluated);
-      if (s._lastWasError!)
+
+      if (s._lastWasError!) // TODO: Make this logic into a getter that throws
         throw s._lastError!;
       else
         return s._lastResult!;
@@ -114,7 +116,8 @@ class ComputedImpl<T> extends Stream<T> implements Computed<T> {
 
   final _dataSources = <Stream, StreamSubscription>{};
   final _listeners = Set<ComputedSubscription<T>>();
-  var _suppressedEvalDueToNoListener = true;
+
+  var _dirty = true;
 
   var _evaluated = false;
   bool get evaluated => _evaluated;
@@ -139,7 +142,6 @@ class ComputedImpl<T> extends Stream<T> implements Computed<T> {
       noUnsatDep.remove(cur);
       if (!resultDirty.contains(cur)) continue;
       if (cur._downstreamComputations.isEmpty && cur._listeners.isEmpty) {
-        cur._suppressedEvalDueToNoListener = true;
         continue;
       }
       final prevRes = cur.lastResult;
@@ -162,7 +164,7 @@ class ComputedImpl<T> extends Stream<T> implements Computed<T> {
   }
 
   void _evalF() {
-    _suppressedEvalDueToNoListener = false;
+    _dirty = false;
     try {
       _lastResult = f(ComputedStreamResolverImpl(this));
       _lastError = null;
@@ -191,15 +193,35 @@ class ComputedImpl<T> extends Stream<T> implements Computed<T> {
     }
   }
 
+  void _removeDataSourcesAndUpstreams() {
+    if (_upstreamComputations.isNotEmpty || _dataSources.isNotEmpty) {
+      _dirty = true; // So that we re-run the next time we are subscribed to
+    }
+    for (var upComp in _upstreamComputations)
+      upComp._removeDownstreamComputation(this);
+    _upstreamComputations.clear();
+    for (var sub in _dataSources.values) sub.cancel();
+    _dataSources.clear();
+  }
+
+  void _removeDownstreamComputation(ComputedImpl c) {
+    assert(_downstreamComputations.remove(c));
+    if (_downstreamComputations.isEmpty && _listeners.isEmpty) {
+      _removeDataSourcesAndUpstreams();
+    }
+  }
+
   void _removeListener(ComputedSubscription<T> sub) {
     _listeners.remove(sub);
-    // if no listeners and no downstream computations left, cancel subscriptions to all upstreams & remove them from the context (bonus: allow the user to specify a duration before doing that)
+    if (_downstreamComputations.isEmpty && _listeners.isEmpty) {
+      _removeDataSourcesAndUpstreams();
+    }
   }
 
   StreamSubscription<T> listen(void Function(T event)? onData,
       {Function? onError, void Function()? onDone, bool? cancelOnError}) {
     final sub = ComputedSubscription<T>(this, onData, onError);
-    if (_listeners.isEmpty && _suppressedEvalDueToNoListener) {
+    if (_dirty) {
       try {
         _evalF();
         // Might set lastResult, won't notify the listener just yet (as that is against the Stream contract)
