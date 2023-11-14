@@ -47,13 +47,50 @@ class ComputedStreamExtensionImpl<T> {
     // Make sure we are subscribed
     caller._dataSources.putIfAbsent(
         s,
-        () => s.listen((newValue) {
+        () => ComputedStreamSubscription(s.listen((newValue) {
               if (lv!.hasValue && lv.lastValue == newValue) return;
               // Update the global last value cache
               lv.hasValue = true;
               lv.lastValue = newValue;
               caller._rerunGraph();
-            })); // Handle onError (passthrough), onDone (close subscriptions to upstreams)
+            }))); // TODO: Handle onError (passthrough), onDone (close subscriptions to upstreams)
+    if (!lv.hasValue) {
+      throw NoValueException();
+    }
+    return lv.lastValue!;
+  }
+}
+
+class ComputedFutureExtensionImpl<T> {
+  final Future<T> f;
+
+  ComputedFutureExtensionImpl(this.f);
+  T get use {
+    final caller = ComputedGlobalCtx.currentComputation;
+    // TODO: Remove code duplication. Have a .addDataSource(ComputedDataSubscription) in computedimpl
+    // Call into it here
+    // Maintain a global cache of future last values for any new dependencies discovered to use
+    var lv = ComputedGlobalCtx.lvExpando[f] as LastValueRouter<T>?;
+
+    if (lv == null) {
+      lv = LastValueRouter(ComputedImpl(() => f.use));
+      ComputedGlobalCtx.lvExpando[f] = lv;
+    }
+    if (lv.router != caller) {
+      // Subscribe to the router instead
+      return lv.router.use;
+    }
+    // We are the router
+    // Make sure we are subscribed
+    caller._dataSources.putIfAbsent(
+        f,
+        () => ComputedFutureSubscription(f, (newValue) {
+              if (lv!.hasValue && lv.lastValue == newValue) return;
+              // Update the global last value cache
+              lv.hasValue = true;
+              lv.lastValue = newValue;
+              caller._rerunGraph();
+            }, (e) {})); // TODO: Handle onError (passthrough)
     if (!lv.hasValue) {
       throw NoValueException();
     }
@@ -68,7 +105,8 @@ class ComputedSubscription<T> implements StreamSubscription<T> {
   ComputedSubscription(this._node, this._onData, this._onError);
   @override
   Future<E> asFuture<E>([E? futureValue]) {
-    throw UnimplementedError(); // Doesn't make much sense in this context
+    throw UnsupportedError(
+        'asFuture not supported by Stream subscriptions to Computed'); // Doesn't make much sense in this context
   }
 
   @override
@@ -77,7 +115,7 @@ class ComputedSubscription<T> implements StreamSubscription<T> {
   }
 
   @override
-  bool get isPaused => false; ////////what is this???
+  bool get isPaused => false; // TODO: Allow Computed-s to be paused and resumed
 
   @override
   void onData(void Function(T data)? handleData) {
@@ -86,7 +124,8 @@ class ComputedSubscription<T> implements StreamSubscription<T> {
 
   @override
   void onDone(void Function()? handleDone) {
-    // Computed streams are never done
+    // TODO: Have support for this
+    throw UnimplementedError();
   }
 
   @override
@@ -96,12 +135,12 @@ class ComputedSubscription<T> implements StreamSubscription<T> {
 
   @override
   void pause([Future<void>? resumeSignal]) {
-    throw UnimplementedError(); //// what is this?????
+    throw UnimplementedError();
   }
 
   @override
   void resume() {
-    throw UnimplementedError(); //// what is this?????
+    throw UnimplementedError();
   }
 }
 
@@ -138,11 +177,78 @@ class ComputedStream<T> extends Stream<T> {
   }
 }
 
+// Very similar to StreamSubscription
+// Except only the parts Computed needs
+abstract class ComputedDataSourceSubscription<T> {
+  Future<void> cancel();
+
+  bool get isPaused;
+
+  void pause([Future<void>? resumeSignal]);
+  void resume();
+}
+
+class ComputedStreamSubscription<T>
+    implements ComputedDataSourceSubscription<T> {
+  final StreamSubscription<T> ss;
+  ComputedStreamSubscription(this.ss);
+
+  @override
+  Future<void> cancel() {
+    return ss.cancel();
+  }
+
+  @override
+  bool get isPaused => ss.isPaused;
+
+  @override
+  void pause([Future<void>? resumeSignal]) {
+    ss.pause(resumeSignal);
+  }
+
+  @override
+  void resume() {
+    ss.resume();
+  }
+}
+
+class ComputedFutureSubscription<T>
+    implements ComputedDataSourceSubscription<T> {
+  final void Function(T data) onValue;
+  final Function onError;
+
+  ComputedFutureSubscription(Future<T> f, this.onValue, this.onError) {
+    f.then(this.onValue, onError: this.onError);
+  }
+
+  @override
+  Future<void> cancel() {
+    // We don't need to do anything here, as the router will already have lost all its downstream computations
+    return Future.value();
+  }
+
+  @override
+  // TODO: implement isPaused
+  bool get isPaused => throw UnimplementedError();
+
+  @override
+  void pause([Future<void>? resumeSignal]) {
+    // TODO: implement pause
+    throw UnimplementedError();
+  }
+
+  @override
+  void resume() {
+    // TODO: implement resume
+    throw UnimplementedError();
+  }
+}
+
 class ComputedImpl<T> implements Computed<T> {
   final _upstreamComputations = <ComputedImpl>{};
   final _downstreamComputations = <ComputedImpl>{};
 
-  final _dataSources = <Stream, StreamSubscription>{};
+  final _dataSources = <Object, ComputedDataSourceSubscription>{};
   final _listeners = Set<ComputedSubscription<T>>();
 
   var _dirty = true;

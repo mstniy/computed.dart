@@ -20,3 +20,7 @@ abstract class Computed<T> {
 extension ComputedStreamExtension<T> on Stream<T> {
   T get use => ComputedStreamExtensionImpl<T>(this).use;
 }
+
+extension ComputedFutureExtension<T> on Future<T> {
+  T get use => ComputedFutureExtensionImpl<T>(this).use;
+}

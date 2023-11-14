@@ -259,4 +259,49 @@ void main() {
       expect(e.message, '`use` is only allowed inside Computed expressions.');
     }
   });
+
+  test('can use futures as data sources', () async {
+    final completer = Completer<int>();
+    final future = completer.future;
+
+    final x2 = Computed(() => future.use * 2);
+    final x3 = Computed(() => x2.use * future.use);
+
+    var callCnt = 0;
+
+    final sub = x3.asStream.listen((event) {
+      callCnt++;
+      expect(event, 8);
+    });
+
+    try {
+      completer.complete(2);
+      await Future.value();
+      expect(callCnt, 1);
+    } finally {
+      sub.cancel();
+    }
+  });
+
+  test('can cancel futures', () async {
+    final completer = Completer<int>();
+    final future = completer.future;
+
+    final x = Computed(() {
+      future.use;
+      fail('Must not run the computation');
+    });
+
+    final sub = x.asStream.listen((event) {
+      fail('Must not call the listener');
+    });
+
+    sub.cancel();
+
+    completer.complete(0);
+
+    await Future.value();
+
+    // Nothing should be run
+  });
 }
