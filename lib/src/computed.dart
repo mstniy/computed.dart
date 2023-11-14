@@ -30,8 +30,12 @@ class ComputedStreamExtensionImpl<T> {
   ComputedStreamExtensionImpl(this.s);
   T get use {
     final caller = GlobalCtx.currentComputation;
-    return caller.useDataSource(s, () => s.use,
-        (onData) => StreamDataSourceSubscription(s.listen(onData)));
+    return caller.useDataSource(
+        s,
+        () => s.use,
+        (onData) => StreamDataSourceSubscription(s.listen(onData)),
+        false,
+        null);
   }
 }
 
@@ -44,8 +48,9 @@ class ComputedFutureExtensionImpl<T> {
     return caller.useDataSource(
         f,
         () => f.use,
-        (onData) => FutureDataSourceSubscription<T>(
-            f, onData, (e) {})); // TODO: Handle onError (passthrough)
+        (onData) => FutureDataSourceSubscription<T>(f, onData, (e) {}),
+        false,
+        null); // TODO: Handle onError (passthrough)
   }
 }
 
@@ -216,13 +221,19 @@ class ComputedImpl<T> implements Computed<T> {
 
   ComputedImpl(this.f);
 
-  DT useDataSource<DT>(Object dataSource, DT Function() dataSourceUse,
-      DataSourceSubscription Function(void Function(DT data) onData) dss) {
+  DT useDataSource<DT>(
+      Object dataSource,
+      DT Function() dataSourceUse,
+      DataSourceSubscription Function(void Function(DT data) onData) dss,
+      bool hasCurrentValue,
+      DT? currentValue) {
     // Maintain a global cache of future last values for any new dependencies discovered to use
     var lv = GlobalCtx.lvExpando[dataSource] as LastValueRouter<DT>?;
 
     if (lv == null) {
       lv = LastValueRouter(ComputedImpl(dataSourceUse));
+      lv.hasValue = hasCurrentValue;
+      lv.lastValue = currentValue;
       GlobalCtx.lvExpando[dataSource] = lv;
     }
     if (lv.router != this) {
