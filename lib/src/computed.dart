@@ -32,32 +32,8 @@ class ComputedStreamExtensionImpl<T> {
   ComputedStreamExtensionImpl(this.s);
   T get use {
     final caller = GlobalCtx.currentComputation;
-    // Maintain a global cache of stream last values for any new dependencies discovered to use
-    var lv = GlobalCtx.lvExpando[s] as LastValueRouter<T>?;
-
-    if (lv == null) {
-      lv = LastValueRouter(ComputedImpl(() => s.use));
-      GlobalCtx.lvExpando[s] = lv;
-    }
-    if (lv.router != caller) {
-      // Subscribe to the router instead
-      return lv.router.use;
-    }
-    // We are the router
-    // Make sure we are subscribed
-    caller._dataSources.putIfAbsent(
-        s,
-        () => StreamDataSourceSubscription(s.listen((newValue) {
-              if (lv!.hasValue && lv.lastValue == newValue) return;
-              // Update the global last value cache
-              lv.hasValue = true;
-              lv.lastValue = newValue;
-              caller._rerunGraph();
-            }))); // TODO: Handle onError (passthrough), onDone (close subscriptions to upstreams)
-    if (!lv.hasValue) {
-      throw NoValueException();
-    }
-    return lv.lastValue!;
+    return caller.useDataSource(s, () => s.use,
+        (onData) => StreamDataSourceSubscription(s.listen(onData)));
   }
 }
 
@@ -67,34 +43,11 @@ class ComputedFutureExtensionImpl<T> {
   ComputedFutureExtensionImpl(this.f);
   T get use {
     final caller = GlobalCtx.currentComputation;
-    // TODO: Remove code duplication. Have a .addDataSource(ComputedDataSubscription) in computedimpl
-    // Call into it here
-    // Maintain a global cache of future last values for any new dependencies discovered to use
-    var lv = GlobalCtx.lvExpando[f] as LastValueRouter<T>?;
-
-    if (lv == null) {
-      lv = LastValueRouter(ComputedImpl(() => f.use));
-      GlobalCtx.lvExpando[f] = lv;
-    }
-    if (lv.router != caller) {
-      // Subscribe to the router instead
-      return lv.router.use;
-    }
-    // We are the router
-    // Make sure we are subscribed
-    caller._dataSources.putIfAbsent(
+    return caller.useDataSource(
         f,
-        () => FutureDataSourceSubscription(f, (newValue) {
-              if (lv!.hasValue && lv.lastValue == newValue) return;
-              // Update the global last value cache
-              lv.hasValue = true;
-              lv.lastValue = newValue;
-              caller._rerunGraph();
-            }, (e) {})); // TODO: Handle onError (passthrough)
-    if (!lv.hasValue) {
-      throw NoValueException();
-    }
-    return lv.lastValue!;
+        () => f.use,
+        (onData) => FutureDataSourceSubscription<T>(
+            f, onData, (e) {})); // TODO: Handle onError (passthrough)
   }
 }
 
@@ -124,7 +77,7 @@ class ComputedStreamSubscription<T> implements StreamSubscription<T> {
 
   @override
   void onDone(void Function()? handleDone) {
-    // TODO: Have support for this
+    // TODO: Have support for done signals
     throw UnimplementedError();
   }
 
@@ -266,6 +219,38 @@ class ComputedImpl<T> implements Computed<T> {
   final T Function() f;
 
   ComputedImpl(this.f);
+
+  DT useDataSource<DT>(Object dataSource, DT Function() dataSourceUse,
+      DataSourceSubscription Function(void Function(DT data) onData) dss) {
+    // Maintain a global cache of future last values for any new dependencies discovered to use
+    var lv = GlobalCtx.lvExpando[dataSource] as LastValueRouter<DT>?;
+
+    if (lv == null) {
+      lv = LastValueRouter(ComputedImpl(dataSourceUse));
+      GlobalCtx.lvExpando[dataSource] = lv;
+    }
+    if (lv.router != this) {
+      // Subscribe to the router instead
+      return lv.router.use;
+    }
+    // We are the router
+    // Make sure we are subscribed
+    _dataSources.putIfAbsent(
+        dataSource,
+        () => dss((newValue) {
+              if (lv!.hasValue && lv.lastValue == newValue) return;
+              // Update the global last value cache
+              lv.hasValue = true;
+              lv.lastValue = newValue;
+
+              _rerunGraph();
+            }));
+
+    if (!lv.hasValue) {
+      throw NoValueException();
+    }
+    return lv.lastValue!;
+  }
 
   void _rerunGraph() {
     final numUnsatDep = <ComputedImpl, int>{};
