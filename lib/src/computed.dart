@@ -14,7 +14,7 @@ class LastValueRouter<T> extends LastValue<T> {
   LastValueRouter(this.router);
 }
 
-class ComputedGlobalCtx {
+class GlobalCtx {
   static ComputedImpl? _currentComputation;
   static ComputedImpl get currentComputation {
     if (_currentComputation == null) {
@@ -31,13 +31,13 @@ class ComputedStreamExtensionImpl<T> {
 
   ComputedStreamExtensionImpl(this.s);
   T get use {
-    final caller = ComputedGlobalCtx.currentComputation;
+    final caller = GlobalCtx.currentComputation;
     // Maintain a global cache of stream last values for any new dependencies discovered to use
-    var lv = ComputedGlobalCtx.lvExpando[s] as LastValueRouter<T>?;
+    var lv = GlobalCtx.lvExpando[s] as LastValueRouter<T>?;
 
     if (lv == null) {
       lv = LastValueRouter(ComputedImpl(() => s.use));
-      ComputedGlobalCtx.lvExpando[s] = lv;
+      GlobalCtx.lvExpando[s] = lv;
     }
     if (lv.router != caller) {
       // Subscribe to the router instead
@@ -47,7 +47,7 @@ class ComputedStreamExtensionImpl<T> {
     // Make sure we are subscribed
     caller._dataSources.putIfAbsent(
         s,
-        () => ComputedStreamSubscription(s.listen((newValue) {
+        () => StreamDataSourceSubscription(s.listen((newValue) {
               if (lv!.hasValue && lv.lastValue == newValue) return;
               // Update the global last value cache
               lv.hasValue = true;
@@ -66,15 +66,15 @@ class ComputedFutureExtensionImpl<T> {
 
   ComputedFutureExtensionImpl(this.f);
   T get use {
-    final caller = ComputedGlobalCtx.currentComputation;
+    final caller = GlobalCtx.currentComputation;
     // TODO: Remove code duplication. Have a .addDataSource(ComputedDataSubscription) in computedimpl
     // Call into it here
     // Maintain a global cache of future last values for any new dependencies discovered to use
-    var lv = ComputedGlobalCtx.lvExpando[f] as LastValueRouter<T>?;
+    var lv = GlobalCtx.lvExpando[f] as LastValueRouter<T>?;
 
     if (lv == null) {
       lv = LastValueRouter(ComputedImpl(() => f.use));
-      ComputedGlobalCtx.lvExpando[f] = lv;
+      GlobalCtx.lvExpando[f] = lv;
     }
     if (lv.router != caller) {
       // Subscribe to the router instead
@@ -84,7 +84,7 @@ class ComputedFutureExtensionImpl<T> {
     // Make sure we are subscribed
     caller._dataSources.putIfAbsent(
         f,
-        () => ComputedFutureSubscription(f, (newValue) {
+        () => FutureDataSourceSubscription(f, (newValue) {
               if (lv!.hasValue && lv.lastValue == newValue) return;
               // Update the global last value cache
               lv.hasValue = true;
@@ -98,11 +98,11 @@ class ComputedFutureExtensionImpl<T> {
   }
 }
 
-class ComputedSubscription<T> implements StreamSubscription<T> {
+class ComputedStreamSubscription<T> implements StreamSubscription<T> {
   final ComputedImpl<T> _node;
   void Function(T event)? _onData;
   Function? _onError;
-  ComputedSubscription(this._node, this._onData, this._onError);
+  ComputedStreamSubscription(this._node, this._onData, this._onError);
   @override
   Future<E> asFuture<E>([E? futureValue]) {
     throw UnsupportedError(
@@ -152,7 +152,7 @@ class ComputedStream<T> extends Stream<T> {
   @override
   StreamSubscription<T> listen(void Function(T event)? onData,
       {Function? onError, void Function()? onDone, bool? cancelOnError}) {
-    final sub = ComputedSubscription<T>(_parent, onData, onError);
+    final sub = ComputedStreamSubscription<T>(_parent, onData, onError);
     if (_parent._dirty) {
       try {
         _parent._evalF();
@@ -179,7 +179,7 @@ class ComputedStream<T> extends Stream<T> {
 
 // Very similar to StreamSubscription
 // Except only the parts Computed needs
-abstract class ComputedDataSourceSubscription<T> {
+abstract class DataSourceSubscription<T> {
   Future<void> cancel();
 
   bool get isPaused;
@@ -188,10 +188,9 @@ abstract class ComputedDataSourceSubscription<T> {
   void resume();
 }
 
-class ComputedStreamSubscription<T>
-    implements ComputedDataSourceSubscription<T> {
+class StreamDataSourceSubscription<T> implements DataSourceSubscription<T> {
   final StreamSubscription<T> ss;
-  ComputedStreamSubscription(this.ss);
+  StreamDataSourceSubscription(this.ss);
 
   @override
   Future<void> cancel() {
@@ -212,18 +211,18 @@ class ComputedStreamSubscription<T>
   }
 }
 
-class ComputedFutureSubscription<T>
-    implements ComputedDataSourceSubscription<T> {
+class FutureDataSourceSubscription<T> implements DataSourceSubscription<T> {
   final void Function(T data) onValue;
   final Function onError;
 
-  ComputedFutureSubscription(Future<T> f, this.onValue, this.onError) {
+  FutureDataSourceSubscription(Future<T> f, this.onValue, this.onError) {
     f.then(this.onValue, onError: this.onError);
   }
 
   @override
   Future<void> cancel() {
-    // We don't need to do anything here, as the router will already have lost all its downstream computations
+    // We don't need to do anything here.
+    // There is no way to cancel a Future and the router will already have lost all its downstream computations.
     return Future.value();
   }
 
@@ -248,8 +247,8 @@ class ComputedImpl<T> implements Computed<T> {
   final _upstreamComputations = <ComputedImpl>{};
   final _downstreamComputations = <ComputedImpl>{};
 
-  final _dataSources = <Object, ComputedDataSourceSubscription>{};
-  final _listeners = Set<ComputedSubscription<T>>();
+  final _dataSources = <Object, DataSourceSubscription>{};
+  final _listeners = Set<ComputedStreamSubscription<T>>();
 
   var _dirty = true;
 
@@ -302,7 +301,7 @@ class ComputedImpl<T> implements Computed<T> {
 
   void _evalF() {
     try {
-      ComputedGlobalCtx._currentComputation = this;
+      GlobalCtx._currentComputation = this;
       _lastResult = f();
       _lastError = null;
       _lastWasError = false;
@@ -317,7 +316,7 @@ class ComputedImpl<T> implements Computed<T> {
       _lastWasError = true;
       _dirty = false;
     } finally {
-      ComputedGlobalCtx._currentComputation = null;
+      GlobalCtx._currentComputation = null;
     }
   }
 
@@ -341,9 +340,9 @@ class ComputedImpl<T> implements Computed<T> {
     _upstreamComputations.clear();
     for (var strSub in _dataSources.entries) {
       strSub.value.cancel();
-      if (ComputedGlobalCtx.lvExpando[strSub.key]?.router == this) {
+      if (GlobalCtx.lvExpando[strSub.key]?.router == this) {
         // If we are the router for this stream, remove ourselves from the expando
-        ComputedGlobalCtx.lvExpando[strSub.key] = null;
+        GlobalCtx.lvExpando[strSub.key] = null;
       }
     }
     _dataSources.clear();
@@ -356,7 +355,7 @@ class ComputedImpl<T> implements Computed<T> {
     }
   }
 
-  void _removeListener(ComputedSubscription<T> sub) {
+  void _removeListener(ComputedStreamSubscription<T> sub) {
     _listeners.remove(sub);
     if (_downstreamComputations.isEmpty && _listeners.isEmpty) {
       _removeDataSourcesAndUpstreams();
@@ -364,7 +363,7 @@ class ComputedImpl<T> implements Computed<T> {
   }
 
   T get use {
-    final caller = ComputedGlobalCtx.currentComputation;
+    final caller = GlobalCtx.currentComputation;
     // Make sure the caller is subscribed
     caller._upstreamComputations.add(this);
     this._downstreamComputations.add(caller);

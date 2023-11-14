@@ -248,7 +248,7 @@ void main() {
 
     sub.cancel();
 
-    expect(ComputedGlobalCtx.lvExpando[source], null);
+    expect(GlobalCtx.lvExpando[source], null);
   });
 
   test('cannot use `use` outside Computed expressions', () {
