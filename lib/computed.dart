@@ -2,13 +2,14 @@ import 'dart:async';
 
 import 'src/computed.dart';
 
-abstract class Computed<T> {
-  /// Whether the value in [lastResult], or the exception it throws, is up-to-date.
-  bool get evaluated;
+class NoValueException {}
 
-  /// The latest result of this computation.
+abstract class Computed<T> {
+  /// The current result of this computation.
   /// If the computation threw, throws the same exception.
-  T? get lastResult;
+  /// If the value of a data source is missing, throws [NoValueException]
+  /// Note that this accessor will run the computation if its result is not cached.
+  T get value;
 
   factory Computed(T Function() f) => ComputedImpl(f);
 

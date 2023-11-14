@@ -2,8 +2,6 @@ import 'dart:async';
 
 import '../computed.dart';
 
-class NoValueException {}
-
 class LastValue<T> {
   bool hasValue = false;
   T? lastValue;
@@ -205,15 +203,13 @@ class ComputedImpl<T> implements Computed<T> {
 
   var _dirty = true;
 
-  @override
-  bool get evaluated => !_dirty;
-
   bool? _lastWasError;
   T? _lastResult;
   Object? _lastError;
-  T? get lastResult {
+  T get value {
+    if (_dirty) _evalF();
     if (_lastWasError ?? false) throw _lastError!;
-    return _lastResult;
+    return _lastResult!;
   }
 
   final T Function() f;
@@ -265,9 +261,9 @@ class ComputedImpl<T> implements Computed<T> {
         continue;
       }
       final prevRes = cur
-          .lastResult; // TODO: Consider the cases where f threw/throws this time
+          ._lastResult; // TODO: Consider the cases where f threw/throws this time
       cur._evalF();
-      final resultChanged = cur.lastResult != prevRes;
+      final resultChanged = cur._lastResult != prevRes;
       if (resultChanged) {
         cur._notifyListeners();
       }
@@ -356,7 +352,7 @@ class ComputedImpl<T> implements Computed<T> {
     if (_dirty) _evalF();
     assert(!_dirty);
 
-    return lastResult!;
+    return value;
   }
 
   Stream<T> get asStream {
