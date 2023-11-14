@@ -292,6 +292,7 @@ class ComputedImpl<T> implements Computed<T> {
   }
 
   void _evalF() {
+    final oldComputation = GlobalCtx._currentComputation;
     try {
       GlobalCtx._currentComputation = this;
       _lastResult = f();
@@ -308,7 +309,7 @@ class ComputedImpl<T> implements Computed<T> {
       _lastWasError = true;
       _dirty = false;
     } finally {
-      GlobalCtx._currentComputation = null;
+      GlobalCtx._currentComputation = oldComputation;
     }
   }
 
