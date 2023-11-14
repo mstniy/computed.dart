@@ -2,11 +2,7 @@ import 'dart:async';
 
 import 'src/computed.dart';
 
-abstract class ComputedStreamResolver {
-  T call<T>(Stream<T> s);
-}
-
-abstract class Computed<T> extends Stream<T> {
+abstract class Computed<T> {
   /// Whether the value in [lastResult], or the exception it throws, is up-to-date.
   bool get evaluated;
 
@@ -14,5 +10,13 @@ abstract class Computed<T> extends Stream<T> {
   /// If the computation threw, throws the same exception.
   T? get lastResult;
 
-  factory Computed(T Function(ComputedStreamResolver ctx) f) => ComputedImpl(f);
+  factory Computed(T Function() f) => ComputedImpl(f);
+
+  Stream<T> get asStream;
+
+  T get use;
+}
+
+extension ComputedStreamExtension<T> on Stream<T> {
+  T get use => ComputedStreamExtensionImpl<T>(this).use;
 }

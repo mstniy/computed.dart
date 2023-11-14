@@ -6,7 +6,7 @@ import 'package:test/test.dart';
 
 void main() {
   test('unlistened computations are not computed', () {
-    Computed((ctx) => fail('must not be computed'));
+    Computed(() => fail('must not be computed'));
   });
   test('computations can use streams', () {
     final controller = StreamController<int>(
@@ -15,7 +15,7 @@ void main() {
 
     int? lastRes;
 
-    final sub = Computed((ctx) => ctx(source) * 2).listen((event) {
+    final sub = Computed(() => source.use * 2).asStream.listen((event) {
       lastRes = event;
     });
 
@@ -36,9 +36,9 @@ void main() {
 
     int? lastRes;
 
-    final x2 = Computed((ctx) => ctx(source) * 2);
+    final x2 = Computed(() => source.use * 2);
 
-    final sub = Computed((ctx) => ctx(x2) + 1).listen((event) {
+    final sub = Computed(() => x2.use + 1).asStream.listen((event) {
       lastRes = event;
     });
 
@@ -59,14 +59,14 @@ void main() {
 
     int? lastRes;
 
-    final x2 = Computed<int>((ctx) => ctx(source) * ctx(source));
+    final x2 = Computed<int>(() => source.use * source.use);
 
     var callCnt = 0;
 
-    final sub = Computed((ctx) {
+    final sub = Computed(() {
       callCnt += 1;
-      return ctx(x2);
-    }).listen((event) {
+      return x2.use;
+    }).asStream.listen((event) {
       lastRes = event;
     });
 
@@ -97,13 +97,13 @@ void main() {
 
       final outputs = <int>[];
 
-      final x2 = Computed((ctx) => ctx(source) * 2);
+      final x2 = Computed(() => source.use * 2);
 
       final x2_x = streamFirst
-          ? Computed<int>((ctx) => ctx(source) + ctx(x2))
-          : Computed<int>((ctx) => ctx(x2) + ctx(source));
+          ? Computed<int>(() => source.use + x2.use)
+          : Computed<int>(() => x2.use + source.use);
 
-      final sub = x2_x.listen((output) {
+      final sub = x2_x.asStream.listen((output) {
         outputs.add(output);
       });
 
@@ -126,19 +126,19 @@ void main() {
     var callCnt1 = 0;
     var callCnt2 = 0;
 
-    final c1 = Computed((ctx) {
+    final c1 = Computed(() {
       callCnt1 += 1;
-      return ctx(source);
+      return source.use;
     });
 
-    final c2 = Computed((ctx) {
+    final c2 = Computed(() {
       callCnt2 += 1;
-      return ctx(c1) * 2;
+      return c1.use * 2;
     });
 
     var checkCnt = 0;
 
-    var sub = c2.listen((output) {
+    var sub = c2.asStream.listen((output) {
       checkCnt++;
       expect(output, 0);
     });
@@ -162,7 +162,7 @@ void main() {
     expect(callCnt2, 2);
     expect(checkCnt, 1);
 
-    sub = c2.listen((output) {
+    sub = c2.asStream.listen((output) {
       expect(output, 4);
       checkCnt++;
     }); // This triggers a re-computation
@@ -183,17 +183,17 @@ void main() {
   test('exceptions raised by computations are propagated', () async {
     var callCnt = 0;
 
-    final c1 = Computed<int>((ctx) {
+    final c1 = Computed<int>(() {
       callCnt++;
       throw 42;
     });
 
-    final c2 = Computed((ctx) => ctx(c1));
+    final c2 = Computed(() => c1.use);
 
     var checkFlag = false;
 
     for (var i = 0; i < 2; i++) {
-      final sub = c2.listen((output) {
+      final sub = c2.asStream.listen((output) {
         fail('must not reach here');
       }, onError: (e) {
         checkFlag = true;
@@ -214,14 +214,14 @@ void main() {
   test('constant computations work', () async {
     var callCnt = 0;
 
-    final c1 = Computed<int>((ctx) {
+    final c1 = Computed<int>(() {
       callCnt++;
       return 42;
     });
 
     var checkFlag = false;
 
-    final sub = c1.listen((event) {
+    final sub = c1.asStream.listen((event) {
       checkFlag = true;
       expect(event, 42);
     });
@@ -240,14 +240,23 @@ void main() {
         sync: true); // Use a sync controller to make debugging easier
     final source = controller.stream.asBroadcastStream();
 
-    final c = Computed((ctx) {
-      return ctx(source);
+    final c = Computed(() {
+      return source.use;
     });
 
-    var sub = c.listen((output) {});
+    var sub = c.asStream.listen((output) {});
 
     sub.cancel();
 
     expect(ComputedGlobalCtx.lvExpando[source], null);
+  });
+
+  test('cannot use `use` outside Computed expressions', () {
+    final x = Stream.empty();
+    try {
+      x.use;
+    } on StateError catch (e) {
+      expect(e.message, '`use` is only allowed inside Computed expressions.');
+    }
   });
 }

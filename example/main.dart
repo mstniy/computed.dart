@@ -8,20 +8,19 @@ void main() async {
       sync: true); // Use a sync controller to make debugging easier
   final source = controller.stream.asBroadcastStream();
 
-  final anyNegative =
-      Computed((ctx) => ctx(source).any((element) => element < 0));
+  final anyNegative = Computed(() => source.use.any((element) => element < 0));
 
-  final maybeReversed = Computed((ctx) =>
-      ctx(anyNegative) ? ctx(source).reversed.toBuiltList() : ctx(source));
+  final maybeReversed = Computed(
+      () => anyNegative.use ? source.use.reversed.toBuiltList() : source.use);
 
-  final append0 = Computed((ctx) {
-    return ctx(maybeReversed).rebuild((p0) => p0.add(0));
+  final append0 = Computed(() {
+    return maybeReversed.use.rebuild((p0) => p0.add(0));
   });
 
-  append0.listen((value) => print(value));
+  append0.asStream.listen((value) => print(value));
 
   // ignore: unused_local_variable
-  final unused = Computed((ctx) {
+  final unused = Computed(() {
     while (true) {
       print("Never prints, this computation is never used.");
     }

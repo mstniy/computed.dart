@@ -15,50 +15,49 @@ class LastValueRouter<T> extends LastValue<T> {
 }
 
 class ComputedGlobalCtx {
+  static ComputedImpl? _currentComputation;
+  static ComputedImpl get currentComputation {
+    if (_currentComputation == null) {
+      throw StateError("`use` is only allowed inside Computed expressions.");
+    }
+    return _currentComputation!;
+  }
+
   static final lvExpando = Expando<LastValueRouter>('computed_lv');
 }
 
-class ComputedStreamResolverImpl implements ComputedStreamResolver {
-  final ComputedImpl _parent;
-  ComputedStreamResolverImpl(this._parent);
-  T call<T>(Stream<T> s) {
-    if (s is ComputedImpl<T>) {
-      // Make sure we are subscribed
-      _parent._upstreamComputations.add(s);
-      s._downstreamComputations.add(this._parent);
-      // Make sure the upstream has been computed
-      if (s._dirty) s._evalF();
-      assert(!s._dirty);
+class ComputedStreamExtensionImpl<T> {
+  final Stream<T> s;
 
-      return s.lastResult!;
-    } else {
-      // Maintain a global cache of stream last values for any new dependencies discovered to use
-      var lv = ComputedGlobalCtx.lvExpando[s] as LastValueRouter<T>?;
+  ComputedStreamExtensionImpl(this.s);
+  T get use {
+    final caller = ComputedGlobalCtx.currentComputation;
+    // Maintain a global cache of stream last values for any new dependencies discovered to use
+    var lv = ComputedGlobalCtx.lvExpando[s] as LastValueRouter<T>?;
 
-      if (lv == null) {
-        lv = LastValueRouter(ComputedImpl((ctx) => ctx(s)));
-        ComputedGlobalCtx.lvExpando[s] = lv;
-      }
-      if (lv.router != this._parent) {
-        // Subscribe to the router instead
-        return call(lv.router);
-      }
-      // We are the router
-      // Make sure we are subscribed
-      _parent._dataSources.putIfAbsent(
-          s,
-          () => s.listen((newValue) {
-                if (lv!.hasValue && lv.lastValue == newValue) return;
-                // Update the global last value cache
-                lv.hasValue = true;
-                lv.lastValue = newValue;
-                _parent._rerunGraph();
-              })); // Handle onError (passthrough), onDone (close subscriptions to upstreams)
-      if (!lv.hasValue) {
-        throw NoValueException();
-      }
-      return lv.lastValue!;
+    if (lv == null) {
+      lv = LastValueRouter(ComputedImpl(() => s.use));
+      ComputedGlobalCtx.lvExpando[s] = lv;
     }
+    if (lv.router != caller) {
+      // Subscribe to the router instead
+      return lv.router.use;
+    }
+    // We are the router
+    // Make sure we are subscribed
+    caller._dataSources.putIfAbsent(
+        s,
+        () => s.listen((newValue) {
+              if (lv!.hasValue && lv.lastValue == newValue) return;
+              // Update the global last value cache
+              lv.hasValue = true;
+              lv.lastValue = newValue;
+              caller._rerunGraph();
+            })); // Handle onError (passthrough), onDone (close subscriptions to upstreams)
+    if (!lv.hasValue) {
+      throw NoValueException();
+    }
+    return lv.lastValue!;
   }
 }
 
@@ -106,7 +105,40 @@ class ComputedSubscription<T> implements StreamSubscription<T> {
   }
 }
 
-class ComputedImpl<T> extends Stream<T> implements Computed<T> {
+class ComputedStream<T> extends Stream<T> {
+  ComputedImpl<T> _parent;
+
+  ComputedStream(this._parent);
+
+  @override
+  StreamSubscription<T> listen(void Function(T event)? onData,
+      {Function? onError, void Function()? onDone, bool? cancelOnError}) {
+    final sub = ComputedSubscription<T>(_parent, onData, onError);
+    if (_parent._dirty) {
+      try {
+        _parent._evalF();
+        // Might set lastResult, won't notify the listener just yet (as that is against the Stream contract)
+      } on NoValueException {}
+    }
+    _parent._listeners.add(sub);
+    if (!_parent._dirty) {
+      if (_parent._lastWasError! && onError != null) {
+        final lastError = _parent._lastError!;
+        scheduleMicrotask(() {
+          onError(lastError);
+        });
+      } else if (!_parent._lastWasError! && onData != null) {
+        final lastResult = _parent._lastResult!;
+        scheduleMicrotask(() {
+          onData(lastResult);
+        });
+      }
+    }
+    return sub;
+  }
+}
+
+class ComputedImpl<T> implements Computed<T> {
   final _upstreamComputations = <ComputedImpl>{};
   final _downstreamComputations = <ComputedImpl>{};
 
@@ -126,7 +158,7 @@ class ComputedImpl<T> extends Stream<T> implements Computed<T> {
     return _lastResult;
   }
 
-  final T Function(ComputedStreamResolver ctx) f;
+  final T Function() f;
 
   ComputedImpl(this.f);
 
@@ -164,7 +196,8 @@ class ComputedImpl<T> extends Stream<T> implements Computed<T> {
 
   void _evalF() {
     try {
-      _lastResult = f(ComputedStreamResolverImpl(this));
+      ComputedGlobalCtx._currentComputation = this;
+      _lastResult = f();
       _lastError = null;
       _lastWasError = false;
       _dirty = false;
@@ -177,6 +210,8 @@ class ComputedImpl<T> extends Stream<T> implements Computed<T> {
       _lastError = e;
       _lastWasError = true;
       _dirty = false;
+    } finally {
+      ComputedGlobalCtx._currentComputation = null;
     }
   }
 
@@ -222,27 +257,19 @@ class ComputedImpl<T> extends Stream<T> implements Computed<T> {
     }
   }
 
-  StreamSubscription<T> listen(void Function(T event)? onData,
-      {Function? onError, void Function()? onDone, bool? cancelOnError}) {
-    final sub = ComputedSubscription<T>(this, onData, onError);
-    if (_dirty) {
-      try {
-        _evalF();
-        // Might set lastResult, won't notify the listener just yet (as that is against the Stream contract)
-      } on NoValueException {}
-    }
-    _listeners.add(sub);
-    if (!_dirty) {
-      if (_lastWasError! && onError != null) {
-        scheduleMicrotask(() {
-          onError(_lastError!);
-        });
-      } else if (!_lastWasError! && onData != null) {
-        scheduleMicrotask(() {
-          onData(_lastResult!);
-        });
-      }
-    }
-    return sub;
+  T get use {
+    final caller = ComputedGlobalCtx.currentComputation;
+    // Make sure the caller is subscribed
+    caller._upstreamComputations.add(this);
+    this._downstreamComputations.add(caller);
+    // Make sure we are computed
+    if (_dirty) _evalF();
+    assert(!_dirty);
+
+    return lastResult!;
+  }
+
+  Stream<T> get asStream {
+    return ComputedStream(this);
   }
 }
