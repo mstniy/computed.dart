@@ -17,7 +17,7 @@ void main() {
 
     final sub = Computed(() => source.use * 2).asStream.listen((event) {
       lastRes = event;
-    });
+    }, onError: (e) => fail(e.toString()));
 
     try {
       controller.add(0);
@@ -40,7 +40,7 @@ void main() {
 
     final sub = Computed(() => x2.use + 1).asStream.listen((event) {
       lastRes = event;
-    });
+    }, onError: (e) => fail(e.toString()));
 
     try {
       controller.add(0);
@@ -68,7 +68,7 @@ void main() {
       return x2.use;
     }).asStream.listen((event) {
       lastRes = event;
-    });
+    }, onError: (e) => fail(e.toString()));
 
     expect(callCnt, 1);
 
@@ -107,7 +107,7 @@ void main() {
 
       final sub = x2_x.asStream.listen((output) {
         outputs.add(output);
-      });
+      }, onError: (e) => fail(e.toString()));
 
       try {
         controller.add(0);
@@ -143,7 +143,7 @@ void main() {
     var sub = c2.asStream.listen((output) {
       checkCnt++;
       expect(output, 0);
-    });
+    }, onError: (e) => fail(e.toString()));
 
     expect(callCnt1, 1);
     expect(callCnt2, 1);
@@ -167,7 +167,7 @@ void main() {
     sub = c2.asStream.listen((output) {
       expect(output, 4);
       checkCnt++;
-    }); // This triggers a re-computation
+    }, onError: (e) => fail(e.toString())); // This triggers a re-computation
 
     await Future.value();
     expect(callCnt1,
@@ -227,7 +227,7 @@ void main() {
       expect(checkFlag, false);
       checkFlag = true;
       expect(event, 42);
-    });
+    }, onError: (e) => fail(e.toString()));
 
     try {
       await Future.value(); // Wait for the update
@@ -243,7 +243,7 @@ void main() {
       expect(checkFlag, false);
       checkFlag = true;
       expect(event, 42);
-    });
+    }, onError: (e) => fail(e.toString()));
 
     try {
       await Future.value(); // Wait for the update
@@ -263,7 +263,8 @@ void main() {
       return source.use;
     });
 
-    var sub = c.asStream.listen((output) {});
+    var sub =
+        c.asStream.listen((output) {}, onError: (e) => fail(e.toString()));
 
     sub.cancel();
 
@@ -291,7 +292,7 @@ void main() {
     final sub = x3.asStream.listen((event) {
       callCnt++;
       expect(event, 8);
-    });
+    }, onError: (e) => fail(e.toString()));
 
     try {
       completer.complete(2);
@@ -313,7 +314,7 @@ void main() {
 
     final sub = x.asStream.listen((event) {
       fail('Must not call the listener');
-    });
+    }, onError: (e) => fail(e.toString()));
 
     sub.cancel();
 
@@ -329,7 +330,9 @@ void main() {
     final c = Computed(() => ctr++);
 
     try {
-      c.asStream.listen((event) {});
+      c.asStream.listen((event) {
+        fail('Must not call listener');
+      }, onError: (e) => fail(e.toString()));
       fail('Must assert');
     } on AssertionError catch (e) {
       expect(
@@ -360,7 +363,7 @@ void main() {
     var sub = c.asStream.listen((output) {
       listenerCallCnt++;
       expect(output, expectation);
-    });
+    }, onError: (e) => fail(e.toString()));
 
     try {
       c.fix(42);
@@ -411,5 +414,117 @@ void main() {
     }
 
     expect(callCnt, 4);
+  });
+
+  test('computations can use and return null', () {
+    final controller = StreamController<int?>(
+        sync: true); // Use a sync controller to make debugging easier
+    final source = controller.stream.asBroadcastStream();
+
+    var c1cnt = 0;
+    var c2cnt = 0;
+
+    final c1 = Computed(() {
+      c1cnt++;
+      return source.use;
+    });
+    final c2 = Computed(() {
+      c2cnt++;
+      return c1.use;
+    });
+
+    var subCnt = 0;
+    int? expected;
+
+    final sub = c2.asStream.listen((event) {
+      subCnt++;
+      expect(event, expected);
+    }, onError: (e) => fail(e.toString()));
+
+    expect(c1cnt, 1);
+    expect(c2cnt, 1);
+    expect(subCnt, 0);
+
+    try {
+      expected = null;
+      controller.add(null);
+      expect(c1cnt, 3);
+      expect(c2cnt, 3);
+      expect(subCnt, 1);
+      expected = 0;
+      controller.add(0);
+      expect(c1cnt, 5);
+      expect(c2cnt, 5);
+      expect(subCnt, 2);
+      expected = null;
+      controller.add(null);
+      expect(c1cnt, 7);
+      expect(c2cnt, 7);
+      expect(subCnt, 3);
+      controller.add(null);
+      expect(c1cnt, 7);
+      expect(c2cnt, 7);
+      expect(subCnt, 3);
+    } finally {
+      sub.cancel();
+    }
+  });
+
+  test('exceptions are not memoized', () {
+    final controller = StreamController<int>(
+        sync: true); // Use a sync controller to make debugging easier
+    final source = controller.stream.asBroadcastStream();
+
+    var c1cnt = 0;
+    var c2cnt = 0;
+
+    final c1 = Computed(() {
+      c1cnt++;
+      if (source.use % 2 == 0) throw 42;
+      return source.use;
+    });
+    final c2 = Computed(() {
+      c2cnt++;
+      return c1.use;
+    });
+
+    var subCnt = 0;
+    bool expectThrow = false;
+
+    final sub = c2.asStream.listen((event) {
+      subCnt++;
+      expect(expectThrow, false);
+    }, onError: (e) {
+      subCnt++;
+      expect(expectThrow, true);
+    });
+
+    expect(c1cnt, 1);
+    expect(c2cnt, 1);
+    expect(subCnt, 0);
+
+    try {
+      expectThrow = true;
+      controller.add(0);
+      expect(c1cnt, 2);
+      expect(c2cnt, 2);
+      expect(subCnt, 1);
+      controller.add(2);
+      expect(c1cnt, 3);
+      expect(c2cnt, 3);
+      expect(subCnt, 2);
+      expectThrow = false;
+      controller.add(1);
+      expect(c1cnt, 5);
+      expect(c2cnt, 5);
+      expect(subCnt, 3);
+      expectThrow = true;
+      controller.add(0);
+      expect(c1cnt, 6);
+      expect(c2cnt, 6);
+      expect(subCnt, 4);
+    } finally {
+      sub.cancel();
+    }
   });
 }
