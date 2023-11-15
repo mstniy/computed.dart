@@ -340,4 +340,76 @@ void main() {
       fail('Unexpected exception');
     }
   });
+
+  test('fix works', () async {
+    final controller = StreamController<int>(
+        sync: true); // Use a sync controller to make debugging easier
+    // Omit the broadcast stream here.
+    // It makes the tests easier to debug,
+    // but in this case shadows whether the computation is still
+    // subscribed to the stream.
+    final source = controller.stream;
+
+    final c = Computed(() {
+      return source.use;
+    });
+
+    var listenerCallCnt = 0;
+    var expectation = 42;
+
+    var sub = c.asStream.listen((output) {
+      listenerCallCnt++;
+      expect(output, expectation);
+    });
+
+    try {
+      c.fix(42);
+      expect(listenerCallCnt, 1);
+      c.fix(42);
+      expect(listenerCallCnt, 1);
+      expectation = 43;
+      c.fix(43);
+      expect(listenerCallCnt, 2);
+      expect(controller.hasListener, true);
+    } finally {
+      sub.cancel();
+    }
+
+    expect(controller.hasListener, false);
+  });
+
+  test('fixException works', () async {
+    final c1 = Computed(() {
+      return 0;
+    });
+
+    var callCnt = 0;
+    var mustThrow = false;
+
+    final c2 = Computed(() {
+      callCnt++;
+      if (mustThrow) {
+        try {
+          c1.use;
+          fail('c1 must throw');
+        } catch (e) {
+          expect(e, 42);
+        }
+      } else {
+        c1.use;
+      }
+    });
+
+    var sub =
+        c2.asStream.listen((output) {}, onError: (e) => fail(e.toString()));
+
+    try {
+      mustThrow = true;
+      c1.fixException(42);
+    } finally {
+      sub.cancel();
+    }
+
+    expect(callCnt, 4);
+  });
 }

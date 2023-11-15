@@ -123,7 +123,7 @@ class ComputedStream<T> extends Stream<T> {
           onError(lastError);
         });
       } else if (!_parent._lastWasError! && onData != null) {
-        final lastResult = _parent._lastResult!;
+        final lastResult = _parent._lastResult as T;
         scheduleMicrotask(() {
           onData(lastResult);
         });
@@ -214,10 +214,10 @@ class ComputedImpl<T> implements Computed<T> {
   T get value {
     if (_dirty) _evalF();
     if (_lastWasError ?? false) throw _lastError!;
-    return _lastResult!;
+    return _lastResult as T;
   }
 
-  final T Function() f;
+  T Function() f;
 
   ComputedImpl(this.f);
 
@@ -256,7 +256,21 @@ class ComputedImpl<T> implements Computed<T> {
     if (!lv.hasValue) {
       throw NoValueException();
     }
-    return lv.lastValue!;
+    return lv.lastValue as DT;
+  }
+
+  @override
+  void fix(T value) {
+    f = () => value;
+    if (_dirty || (_lastWasError ?? true) || _lastResult != value) {
+      _rerunGraph();
+    }
+  }
+
+  @override
+  void fixException(Object e) {
+    f = () => throw e;
+    _rerunGraph();
   }
 
   void _rerunGraph() {
@@ -271,15 +285,18 @@ class ComputedImpl<T> implements Computed<T> {
       if (cur._downstreamComputations.isEmpty && cur._listeners.isEmpty) {
         continue;
       }
-      final prevRes = cur
-          ._lastResult; // TODO: Consider the cases where f threw/throws this time
+      final prevRes = cur._lastResult;
+      // Never memoize exceptions
+      final wasDirtyOrException = cur._dirty || (cur._lastWasError ?? true);
       cur._evalF();
       final resultChanged = cur._lastResult != prevRes;
-      if (resultChanged) {
+      final shouldNotify =
+          wasDirtyOrException || (cur._lastWasError ?? true) || resultChanged;
+      if (shouldNotify) {
         cur._notifyListeners();
       }
       for (var down in cur._downstreamComputations) {
-        if (resultChanged) resultDirty.add(down);
+        if (shouldNotify) resultDirty.add(down);
         final nud =
             (numUnsatDep[down] ?? down._upstreamComputations.length) - 1;
         if (nud == 0) {
@@ -302,6 +319,7 @@ class ComputedImpl<T> implements Computed<T> {
       _lastWasError = false;
       _dirty = false;
       // cancel subscriptions to unused streams & remove them from the context (bonus: allow the user to specify a duration before doing that)
+      // except if this computation has been [fix] ed.
     } on NoValueException catch (e) {
       // Not much we can do
       throw e;
@@ -320,7 +338,7 @@ class ComputedImpl<T> implements Computed<T> {
   void _notifyListeners() {
     if (_lastError == null) {
       for (var listener in _listeners)
-        if (listener._onData != null) listener._onData!(_lastResult!);
+        if (listener._onData != null) listener._onData!(_lastResult as T);
     } else {
       // Exception
       for (var listener in _listeners)
