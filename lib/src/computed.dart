@@ -296,6 +296,8 @@ class ComputedImpl<T> implements Computed<T> {
     try {
       GlobalCtx._currentComputation = this;
       _lastResult = f();
+      assert(f() == _lastResult,
+          "Computed expressions must be purely functional. Please use listeners for side effects.");
       _lastError = null;
       _lastWasError = false;
       _dirty = false;
@@ -303,6 +305,8 @@ class ComputedImpl<T> implements Computed<T> {
     } on NoValueException catch (e) {
       // Not much we can do
       throw e;
+    } on Error catch (e) {
+      throw e; // Do not propagate errors
     } catch (e) {
       _lastResult = null;
       _lastError = e;

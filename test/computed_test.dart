@@ -70,19 +70,21 @@ void main() {
       lastRes = event;
     });
 
+    expect(callCnt, 1);
+
     try {
       controller.add(0);
       expect(lastRes, 0);
-      expect(callCnt, 2);
-      controller.add(1);
-      expect(lastRes, 1);
       expect(callCnt, 3);
       controller.add(1);
       expect(lastRes, 1);
-      expect(callCnt, 3);
+      expect(callCnt, 5);
+      controller.add(1);
+      expect(lastRes, 1);
+      expect(callCnt, 5);
       controller.add(-1);
       expect(lastRes, 1);
-      expect(callCnt, 3);
+      expect(callCnt, 5);
     } finally {
       sub.cancel();
     }
@@ -149,8 +151,8 @@ void main() {
 
     try {
       controller.add(0);
-      expect(callCnt1, 2);
-      expect(callCnt2, 2);
+      expect(callCnt1, 3);
+      expect(callCnt2, 3);
       await Future.value(); // Wait for the listener to fire
       expect(checkCnt, 1);
     } finally {
@@ -158,8 +160,8 @@ void main() {
     }
 
     controller.add(1); // Must not trigger a re-calculation
-    expect(callCnt1, 2);
-    expect(callCnt2, 2);
+    expect(callCnt1, 3);
+    expect(callCnt2, 3);
     expect(checkCnt, 1);
 
     sub = c2.asStream.listen((output) {
@@ -169,14 +171,14 @@ void main() {
 
     await Future.value();
     expect(callCnt1,
-        3); // Attaching the listeners triggers a call to discover dependencies
-    expect(callCnt2, 3);
+        4); // Attaching the listeners triggers a call to discover dependencies
+    expect(callCnt2, 4);
     expect(checkCnt,
         1); // The listener is not run: no value was produced by the stream after the second listen
 
     controller.add(2); // Must trigger a re-calculation
-    expect(callCnt1, 4);
-    expect(callCnt2, 4);
+    expect(callCnt1, 6);
+    expect(callCnt2, 6);
     expect(checkCnt, 2);
   });
 
@@ -221,7 +223,8 @@ void main() {
 
     var checkFlag = false;
 
-    final sub = c1.asStream.listen((event) {
+    var sub = c1.asStream.listen((event) {
+      expect(checkFlag, false);
       checkFlag = true;
       expect(event, 42);
     });
@@ -229,7 +232,23 @@ void main() {
     try {
       await Future.value(); // Wait for the update
       expect(checkFlag, true);
-      expect(callCnt, 1);
+      expect(callCnt, 2);
+    } finally {
+      sub.cancel();
+    }
+
+    checkFlag = false;
+
+    sub = c1.asStream.listen((event) {
+      expect(checkFlag, false);
+      checkFlag = true;
+      expect(event, 42);
+    });
+
+    try {
+      await Future.value(); // Wait for the update
+      expect(checkFlag, true);
+      expect(callCnt, 2); // The constant does not get re-computed
     } finally {
       sub.cancel();
     }
@@ -303,5 +322,22 @@ void main() {
     await Future.value();
 
     // Nothing should be run
+  });
+
+  test('asserts on detected side effects', () {
+    var ctr = 0;
+    final c = Computed(() => ctr++);
+
+    try {
+      c.asStream.listen((event) {});
+      fail('Must assert');
+    } on AssertionError catch (e) {
+      expect(
+          e.message,
+          contains(
+              "Computed expressions must be purely functional. Please use listeners for side effects."));
+    } catch (e) {
+      fail('Unexpected exception');
+    }
   });
 }
