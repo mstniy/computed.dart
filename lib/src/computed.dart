@@ -199,7 +199,7 @@ class FutureDataSourceSubscription<T> implements DataSourceSubscription<T> {
   }
 }
 
-class ComputedImpl<T> implements Computed<T> {
+class ComputedImpl<T> with Computed<T> {
   var _upstreamComputations = <ComputedImpl>{};
   final _downstreamComputations = <ComputedImpl>{};
 
@@ -218,8 +218,9 @@ class ComputedImpl<T> implements Computed<T> {
   }
 
   T Function() f;
+  final T Function() origF;
 
-  ComputedImpl(this.f);
+  ComputedImpl(this.f) : origF = f;
 
   DT useDataSource<DT>(
       Object dataSource,
@@ -260,18 +261,14 @@ class ComputedImpl<T> implements Computed<T> {
   }
 
   @override
-  void fix(T value) {
-    f = () => value;
-    _removeDataSourcesAndUpstreams();
-    if (_dirty || (_lastWasError ?? true) || _lastResult != value) {
-      _rerunGraph();
-    }
+  void mock(T Function() mock) {
+    f = mock;
+    _rerunGraph();
   }
 
   @override
-  void fixException(Object e) {
-    f = () => throw e;
-    _removeDataSourcesAndUpstreams();
+  void unmock() {
+    f = origF;
     _rerunGraph();
   }
 
@@ -290,7 +287,12 @@ class ComputedImpl<T> implements Computed<T> {
       final prevRes = cur._lastResult;
       // Never memoize exceptions
       final wasDirtyOrException = cur._dirty || (cur._lastWasError ?? true);
-      cur._evalF();
+      try {
+        cur._evalF();
+      } on NoValueException {
+        // Do not evaluate the children/notify the listeners
+        continue;
+      }
       final resultChanged = cur._lastResult != prevRes;
       final shouldNotify =
           wasDirtyOrException || (cur._lastWasError ?? true) || resultChanged;
@@ -299,12 +301,18 @@ class ComputedImpl<T> implements Computed<T> {
       }
       for (var down in cur._downstreamComputations) {
         if (shouldNotify) resultDirty.add(down);
-        final nud =
-            (numUnsatDep[down] ?? down._upstreamComputations.length) - 1;
+        var nud = numUnsatDep[down];
+        if (nud == null) {
+          nud = 0;
+          for (var up in down._upstreamComputations) {
+            nud = nud! + (up._dataSources.isEmpty ? 1 : 0);
+          }
+        }
+        if (cur._dataSources.isEmpty) nud = nud! - 1;
         if (nud == 0) {
           noUnsatDep.add(down);
         } else {
-          numUnsatDep[down] = nud;
+          numUnsatDep[down] = nud!;
         }
       }
     }

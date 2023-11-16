@@ -20,19 +20,29 @@ abstract class Computed<T> {
 
   /// Fixes the result of this computation to the given value.
   ///
-  /// If this computation has not produced its first result yet,
-  /// or its last result is not equal to [value], its listeners will be notified.
-  /// Note that there is no way to "un-fix" a computation, but [fix] can be
-  /// called at a later time with another value.
+  /// See [mock].
   @visibleForTesting
-  void fix(T value);
+  void fix(T value) {
+    mock(() => value);
+  }
 
   /// Fixes the result of this computation to the given exception.
   ///
-  /// The listeners of this computation will receive the given exception.
-  /// See [fix]
+  /// See [mock].
   @visibleForTesting
-  void fixException(Object e);
+  void fixException(Object e) {
+    mock(() => throw e);
+  }
+
+  /// Replaces the original [f] with [mock].
+  ///
+  /// This will trigger a re-computation.
+  @visibleForTesting
+  void mock(T Function() mock);
+
+  /// Replaces [f] with the original, undoing [fix], [fixException] and [mock].
+  @visibleForTesting
+  void unmock();
 
   Stream<T> get asStream;
 

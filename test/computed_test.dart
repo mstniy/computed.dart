@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 
 import 'package:computed/computed.dart';
 import 'package:computed/src/computed.dart';
@@ -345,7 +344,7 @@ void main() {
     }
   });
 
-  test('fix works', () async {
+  test('fix and unmock works', () async {
     final controller = StreamController<int>(
         sync: true); // Use a sync controller to make debugging easier
     final source = controller.stream.asBroadcastStream();
@@ -374,6 +373,15 @@ void main() {
       controller.add(0);
       // Does not trigger a re-computation, as c has already been fixed
       expect(listenerCallCnt, 2);
+
+      c.unmock();
+      // Does not trigger a call of the listener,
+      // as the source has not produced any value yet.
+      expect(listenerCallCnt, 2);
+
+      expectation = 1;
+      controller.add(1);
+      expect(listenerCallCnt, 3);
     } finally {
       sub.cancel();
     }
@@ -590,6 +598,54 @@ void main() {
 
       controller.add(3);
       expect(cnt, 5);
+      expect(subCnt, 2);
+    } finally {
+      sub.cancel();
+    }
+  });
+
+  test('can add new dependencies on subsequent calls', () async {
+    final controller1 = StreamController<int>(
+        sync: true); // Use a sync controller to make debugging easier
+    final source1 = controller1.stream.asBroadcastStream();
+
+    final controller2 = StreamController<int>(
+        sync: true); // Use a sync controller to make debugging easier
+    final source2 = controller2.stream.asBroadcastStream();
+
+    var dependOnSource2 = false;
+
+    var cnt = 0;
+
+    final c = Computed(() {
+      cnt++;
+      var sum = source1.use;
+      if (dependOnSource2) sum += source2.use;
+      return sum;
+    });
+
+    var subCnt = 0;
+    var expectation = 0;
+
+    final sub = c.asStream.listen((event) {
+      subCnt++;
+      expect(event, expectation);
+    }, onError: (e) => fail(e.toString()));
+
+    try {
+      controller1.add(0);
+      expect(cnt, 3);
+      expect(subCnt, 1);
+
+      dependOnSource2 = true;
+      controller1.add(1);
+      expect(cnt,
+          4); // Attempted evaluation, failed with NoValueException on source2
+      expect(subCnt, 1);
+
+      expectation = 3;
+      controller2.add(2);
+      expect(cnt, 6);
       expect(subCnt, 2);
     } finally {
       sub.cancel();
