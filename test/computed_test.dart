@@ -527,4 +527,27 @@ void main() {
       sub.cancel();
     }
   });
+
+  test('cyclic dependency during initial computation throws CyclicUseException',
+      () async {
+    late Computed<int> b;
+    final a = Computed(() => b.use);
+    b = Computed(() => a.use);
+
+    var flag = false;
+
+    final sub = b.asStream.listen((event) {
+      fail('What?');
+    }, onError: (e) {
+      flag = true;
+      expect(e, isA<CyclicUseException>());
+    });
+
+    try {
+      await Future.value();
+      expect(flag, true);
+    } finally {
+      sub.cancel();
+    }
+  });
 }

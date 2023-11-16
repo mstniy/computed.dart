@@ -3,7 +3,11 @@ import 'package:meta/meta.dart';
 
 import 'src/computed.dart';
 
-class NoValueException {}
+class NoValueException implements Exception {}
+
+/// Thrown by [Computed.use] if this usage
+/// would cause a cyclic dependency.
+class CyclicUseException implements Exception {}
 
 abstract class Computed<T> {
   /// The current result of this computation.
@@ -33,6 +37,12 @@ abstract class Computed<T> {
 
   Stream<T> get asStream;
 
+  /// Gets the current value of this computation, if one exists, and subscribes to it.
+  ///
+  /// Can only be used inside computations.
+  /// Throws [NoValueException] if a data source [use]d by this
+  /// computation or another computation [use]d by it has no value yet.
+  /// Throws [CyclicUseException] if this usage would cause a cyclic dependency.
   T get use;
 }
 

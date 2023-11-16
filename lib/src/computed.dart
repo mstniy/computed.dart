@@ -312,37 +312,37 @@ class ComputedImpl<T> implements Computed<T> {
     final oldComputation = GlobalCtx._currentComputation;
     try {
       GlobalCtx._currentComputation = this;
+      _dirty = false;
+      _lastWasError = true;
+      _lastError = CyclicUseException();
       _lastResult = f();
       assert(f() == _lastResult,
           "Computed expressions must be purely functional. Please use listeners for side effects.");
-      _lastError = null;
       _lastWasError = false;
-      _dirty = false;
       // cancel subscriptions to unused streams & remove them from the context (bonus: allow the user to specify a duration before doing that)
       // except if this computation has been [fix] ed.
-    } on NoValueException catch (e) {
+    } on NoValueException {
       // Not much we can do
-      throw e;
-    } on Error catch (e) {
-      throw e; // Do not propagate errors
+      _dirty = true;
+      rethrow;
+    } on Error {
+      _dirty = true;
+      rethrow; // Do not propagate errors
     } catch (e) {
-      _lastResult = null;
       _lastError = e;
-      _lastWasError = true;
-      _dirty = false;
     } finally {
       GlobalCtx._currentComputation = oldComputation;
     }
   }
 
   void _notifyListeners() {
-    if (_lastError == null) {
-      for (var listener in _listeners)
-        if (listener._onData != null) listener._onData!(_lastResult as T);
-    } else {
+    if (_lastWasError!) {
       // Exception
       for (var listener in _listeners)
         if (listener._onError != null) listener._onError!(_lastError);
+    } else {
+      for (var listener in _listeners)
+        if (listener._onData != null) listener._onData!(_lastResult as T);
     }
   }
 
@@ -382,9 +382,6 @@ class ComputedImpl<T> implements Computed<T> {
     // Make sure the caller is subscribed
     caller._upstreamComputations.add(this);
     this._downstreamComputations.add(caller);
-    // Make sure we are computed
-    if (_dirty) _evalF();
-    assert(!_dirty);
 
     return value;
   }
