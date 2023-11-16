@@ -200,10 +200,10 @@ class FutureDataSourceSubscription<T> implements DataSourceSubscription<T> {
 }
 
 class ComputedImpl<T> implements Computed<T> {
-  final _upstreamComputations = <ComputedImpl>{};
+  var _upstreamComputations = <ComputedImpl>{};
   final _downstreamComputations = <ComputedImpl>{};
 
-  final _dataSources = <Object, DataSourceSubscription>{};
+  var _dataSources = <Object, DataSourceSubscription>{};
   final _listeners = Set<ComputedStreamSubscription<T>>();
 
   var _dirty = true;
@@ -262,6 +262,7 @@ class ComputedImpl<T> implements Computed<T> {
   @override
   void fix(T value) {
     f = () => value;
+    _removeDataSourcesAndUpstreams();
     if (_dirty || (_lastWasError ?? true) || _lastResult != value) {
       _rerunGraph();
     }
@@ -270,6 +271,7 @@ class ComputedImpl<T> implements Computed<T> {
   @override
   void fixException(Object e) {
     f = () => throw e;
+    _removeDataSourcesAndUpstreams();
     _rerunGraph();
   }
 
@@ -311,25 +313,33 @@ class ComputedImpl<T> implements Computed<T> {
   void _evalF() {
     final oldComputation = GlobalCtx._currentComputation;
     try {
-      GlobalCtx._currentComputation = this;
-      _dirty = false;
-      _lastWasError = true;
-      _lastError = CyclicUseException();
-      _lastResult = f();
-      assert(f() == _lastResult,
-          "Computed expressions must be purely functional. Please use listeners for side effects.");
-      _lastWasError = false;
-      // cancel subscriptions to unused streams & remove them from the context (bonus: allow the user to specify a duration before doing that)
-      // except if this computation has been [fix] ed.
-    } on NoValueException {
-      // Not much we can do
-      _dirty = true;
-      rethrow;
-    } on Error {
-      _dirty = true;
-      rethrow; // Do not propagate errors
-    } catch (e) {
-      _lastError = e;
+      final oldUpstreamComputations = _upstreamComputations;
+      _upstreamComputations = {};
+      try {
+        GlobalCtx._currentComputation = this;
+        _dirty = false;
+        _lastWasError = true;
+        _lastError = CyclicUseException();
+        _lastResult = f();
+        assert(f() == _lastResult,
+            "Computed expressions must be purely functional. Please use listeners for side effects.");
+        _lastWasError = false;
+      } on NoValueException {
+        // Not much we can do
+        _dirty = true;
+        rethrow;
+      } on Error {
+        _dirty = true;
+        rethrow; // Do not propagate errors
+      } catch (e) {
+        _lastError = e;
+      } finally {
+        final oldDiffNew =
+            oldUpstreamComputations.difference(_upstreamComputations);
+        for (var up in oldDiffNew) {
+          up._removeDownstreamComputation(this);
+        }
+      }
     } finally {
       GlobalCtx._currentComputation = oldComputation;
     }

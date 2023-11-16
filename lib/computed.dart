@@ -20,7 +20,6 @@ abstract class Computed<T> {
 
   /// Fixes the result of this computation to the given value.
   ///
-  /// Maintains connections to upstream computations/data sources.
   /// If this computation has not produced its first result yet,
   /// or its last result is not equal to [value], its listeners will be notified.
   /// Note that there is no way to "un-fix" a computation, but [fix] can be

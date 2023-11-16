@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:computed/computed.dart';
 import 'package:computed/src/computed.dart';
@@ -347,11 +348,7 @@ void main() {
   test('fix works', () async {
     final controller = StreamController<int>(
         sync: true); // Use a sync controller to make debugging easier
-    // Omit the broadcast stream here.
-    // It makes the tests easier to debug,
-    // but in this case shadows whether the computation is still
-    // subscribed to the stream.
-    final source = controller.stream;
+    final source = controller.stream.asBroadcastStream();
 
     final c = Computed(() {
       return source.use;
@@ -373,12 +370,13 @@ void main() {
       expectation = 43;
       c.fix(43);
       expect(listenerCallCnt, 2);
-      expect(controller.hasListener, true);
+
+      controller.add(0);
+      // Does not trigger a re-computation, as c has already been fixed
+      expect(listenerCallCnt, 2);
     } finally {
       sub.cancel();
     }
-
-    expect(controller.hasListener, false);
   });
 
   test('fixException works', () async {
@@ -546,6 +544,53 @@ void main() {
     try {
       await Future.value();
       expect(flag, true);
+    } finally {
+      sub.cancel();
+    }
+  });
+
+  test('abandoned dependencies are dropped', () {
+    final controller = StreamController<int>(
+        sync: true); // Use a sync controller to make debugging easier
+    final source = controller.stream.asBroadcastStream();
+
+    var dependOnSource = true;
+
+    var cnt = 0;
+
+    final c = Computed(() {
+      cnt++;
+      if (dependOnSource)
+        return source.use;
+      else
+        return 1;
+    });
+
+    var subCnt = 0;
+    var expectation = 0;
+
+    final sub = c.asStream.listen((event) {
+      subCnt++;
+      expect(event, expectation);
+    }, onError: (e) => fail(e.toString()));
+
+    try {
+      controller.add(0);
+      expect(cnt, 3);
+      expect(subCnt, 1);
+
+      dependOnSource = false;
+      expectation = 1;
+      controller.add(2);
+      expect(cnt, 5);
+      expect(subCnt, 2);
+
+      // From this point on c is regarded as a constant
+      // Thus, adding items to the stream does not trigger a re-computation
+
+      controller.add(3);
+      expect(cnt, 5);
+      expect(subCnt, 2);
     } finally {
       sub.cancel();
     }
