@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:meta/meta.dart';
+
 import '../computed.dart';
 
 class LastValue<T> {
@@ -109,14 +111,14 @@ class ComputedStream<T> extends Stream<T> {
   StreamSubscription<T> listen(void Function(T event)? onData,
       {Function? onError, void Function()? onDone, bool? cancelOnError}) {
     final sub = ComputedStreamSubscription<T>(_parent, onData, onError);
-    if (_parent._dirty) {
+    if (_parent._novalue) {
       try {
         _parent._evalF();
         // Might set lastResult, won't notify the listener just yet (as that is against the Stream contract)
       } on NoValueException {}
     }
     _parent._listeners.add(sub);
-    if (!_parent._dirty) {
+    if (!_parent._novalue) {
       if (_parent._lastWasError! && onError != null) {
         final lastError = _parent._lastError!;
         scheduleMicrotask(() {
@@ -206,13 +208,14 @@ class ComputedImpl<T> with Computed<T> {
   var _dataSources = <Object, DataSourceSubscription>{};
   final _listeners = Set<ComputedStreamSubscription<T>>();
 
-  var _dirty = true;
+  var _novalue = true;
+  var _dirty = false;
 
   bool? _lastWasError;
   T? _lastResult;
   Object? _lastError;
   T get value {
-    if (_dirty) _evalF();
+    if (_novalue || _dirty) _evalF();
     if (_lastWasError ?? false) throw _lastError!;
     return _lastResult as T;
   }
@@ -250,6 +253,7 @@ class ComputedImpl<T> with Computed<T> {
               // Update the global last value cache
               lv.hasValue = true;
               lv.lastValue = newValue;
+              _dirty = true;
 
               _rerunGraph();
             }));
@@ -263,49 +267,57 @@ class ComputedImpl<T> with Computed<T> {
   @override
   void mock(T Function() mock) {
     f = mock;
+    _dirty = true;
     _rerunGraph();
   }
 
   @override
   void unmock() {
     f = origF;
+    _dirty = true;
     _rerunGraph();
   }
 
   void _rerunGraph() {
     final numUnsatDep = <ComputedImpl, int>{};
-    final resultDirty = <ComputedImpl>{this};
     final noUnsatDep = <ComputedImpl>{this};
+    final done = <ComputedImpl>{};
 
     while (noUnsatDep.isNotEmpty) {
       final cur = noUnsatDep.first;
       noUnsatDep.remove(cur);
-      if (!resultDirty.contains(cur)) continue;
-      if (cur._downstreamComputations.isEmpty && cur._listeners.isEmpty) {
-        continue;
-      }
-      final prevRes = cur._lastResult;
-      // Never memoize exceptions
-      final wasDirtyOrException = cur._dirty || (cur._lastWasError ?? true);
-      try {
-        cur._evalF();
-      } on NoValueException {
-        // Do not evaluate the children/notify the listeners
-        continue;
-      }
-      final resultChanged = cur._lastResult != prevRes;
-      final shouldNotify =
-          wasDirtyOrException || (cur._lastWasError ?? true) || resultChanged;
-      if (shouldNotify) {
-        cur._notifyListeners();
+      if (done.contains(cur)) continue;
+      if (cur._novalue || cur._dirty) {
+        if (cur._downstreamComputations.isEmpty && cur._listeners.isEmpty) {
+          continue;
+        }
+        final prevRes = cur._lastResult;
+        // Never memoize exceptions
+        final wasNoValueOrException =
+            cur._novalue || (cur._lastWasError ?? true);
+        try {
+          cur._evalF();
+        } on NoValueException {
+          // Do not evaluate the children/notify the listeners
+          continue;
+        }
+        final resultChanged = cur._lastResult != prevRes;
+        final shouldNotify = wasNoValueOrException ||
+            (cur._lastWasError ?? true) ||
+            resultChanged;
+        if (shouldNotify) {
+          cur._notifyListeners();
+        }
       }
       for (var down in cur._downstreamComputations) {
-        if (shouldNotify) resultDirty.add(down);
         var nud = numUnsatDep[down];
         if (nud == null) {
           nud = 0;
           for (var up in down._upstreamComputations) {
-            nud = nud! + (up._dataSources.isEmpty ? 1 : 0);
+            nud = nud! +
+                (up._dataSources.isEmpty
+                    ? 1
+                    : ((up._novalue || up._dirty) ? 1 : 0));
           }
         }
         if (cur._dataSources.isEmpty) nud = nud! - 1;
@@ -315,6 +327,7 @@ class ComputedImpl<T> with Computed<T> {
           numUnsatDep[down] = nud!;
         }
       }
+      done.add(cur);
     }
   }
 
@@ -322,9 +335,13 @@ class ComputedImpl<T> with Computed<T> {
     final oldComputation = GlobalCtx._currentComputation;
     try {
       final oldUpstreamComputations = _upstreamComputations;
+      final prevRes = _lastResult;
+      // Never memoize exceptions
+      final wasNoValueOrException = _novalue || (_lastWasError ?? true);
       _upstreamComputations = {};
       try {
         GlobalCtx._currentComputation = this;
+        _novalue = false;
         _dirty = false;
         _lastWasError = true;
         _lastError = CyclicUseException();
@@ -334,10 +351,10 @@ class ComputedImpl<T> with Computed<T> {
         _lastWasError = false;
       } on NoValueException {
         // Not much we can do
-        _dirty = true;
+        _novalue = true;
         rethrow;
       } on Error {
-        _dirty = true;
+        _novalue = true;
         rethrow; // Do not propagate errors
       } catch (e) {
         _lastError = e;
@@ -346,6 +363,15 @@ class ComputedImpl<T> with Computed<T> {
             oldUpstreamComputations.difference(_upstreamComputations);
         for (var up in oldDiffNew) {
           up._removeDownstreamComputation(this);
+        }
+        final shouldNotify = wasNoValueOrException ||
+            (_lastWasError ?? true) ||
+            (_lastResult != prevRes);
+
+        if (shouldNotify) {
+          for (var down in _downstreamComputations) {
+            down._dirty = true;
+          }
         }
       }
     } finally {
@@ -366,7 +392,7 @@ class ComputedImpl<T> with Computed<T> {
 
   void _removeDataSourcesAndUpstreams() {
     if (_upstreamComputations.isNotEmpty || _dataSources.isNotEmpty) {
-      _dirty = true; // So that we re-run the next time we are subscribed to
+      _novalue = true; // So that we re-run the next time we are subscribed to
     }
     for (var upComp in _upstreamComputations)
       upComp._removeDownstreamComputation(this);

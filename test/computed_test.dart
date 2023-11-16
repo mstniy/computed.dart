@@ -10,7 +10,7 @@ void main() {
   });
   test('computations can use streams', () {
     final controller = StreamController<int>(
-        sync: true); // Use a sync controller to make debugging easier
+        sync: true); // Use a broadcast stream to make debugging easier
     final source = controller.stream.asBroadcastStream();
 
     int? lastRes;
@@ -31,7 +31,7 @@ void main() {
 
   test('computations can use other computations', () {
     final controller = StreamController<int>(
-        sync: true); // Use a sync controller to make debugging easier
+        sync: true); // Use a broadcast stream to make debugging easier
     final source = controller.stream.asBroadcastStream();
 
     int? lastRes;
@@ -54,7 +54,7 @@ void main() {
 
   test('computations are memoized', () {
     final controller = StreamController<int>(
-        sync: true); // Use a sync controller to make debugging easier
+        sync: true); // Use a broadcast stream to make debugging easier
     final source = controller.stream.asBroadcastStream();
 
     int? lastRes;
@@ -94,7 +94,7 @@ void main() {
     for (var streamFirst in [false, true]) {
       // Run the test twice to make sure the order of operations doesn't matter
       final controller = StreamController<int>(
-          sync: true); // Use a sync controller to make debugging easier
+          sync: true); // Use a broadcast stream to make debugging easier
       final source = controller.stream.asBroadcastStream();
 
       final outputs = <int>[];
@@ -120,9 +120,59 @@ void main() {
     }
   });
 
+  test('respects topological order on upstream updates (bigger)', () {
+    // Test with different combinations of orderings
+    for (var a in [false, true]) {
+      for (var b in [false, true]) {
+        final controller1 = StreamController<int>.broadcast(
+            sync: true); // Use a broadcast stream to make debugging easier
+        final source1 = controller1.stream.asBroadcastStream();
+
+        final controller2 = StreamController<int>.broadcast(
+            sync: true); // Use a broadcast stream to make debugging easier
+        final source2 = controller2.stream.asBroadcastStream();
+
+        final c1 = Computed(() {
+          final x = source1.use + source2.use;
+          return x;
+        });
+        final c2 =
+            Computed(() => a ? (c1.use + source1.use) : (source1.use + c1.use));
+        final c3 =
+            Computed(() => b ? (c1.use + source2.use) : (source2.use + c1.use));
+
+        final outputs2 = <int>[];
+        final outputs3 = <int>[];
+
+        final sub2 = c2.asStream.listen((output) {
+          outputs2.add(output);
+        }, onError: (e) => fail(e.toString()));
+
+        final sub3 = c3.asStream.listen((output) {
+          outputs3.add(output);
+        }, onError: (e) => fail(e.toString()));
+
+        try {
+          controller1.add(0);
+          expect(outputs2, orderedEquals([]));
+          expect(outputs3, orderedEquals([]));
+          controller2.add(1);
+          expect(outputs2, orderedEquals([1]));
+          expect(outputs3, orderedEquals([2]));
+          controller1.add(2);
+          expect(outputs2, orderedEquals([1, 5]));
+          expect(outputs3, orderedEquals([2, 4]));
+        } finally {
+          sub2.cancel();
+          sub3.cancel();
+        }
+      }
+    }
+  });
+
   test('detaching all listeners disables the computation graph', () async {
     final controller = StreamController<int>(
-        sync: true); // Use a sync controller to make debugging easier
+        sync: true); // Use a broadcast stream to make debugging easier
     final source = controller.stream.asBroadcastStream();
 
     var callCnt1 = 0;
@@ -256,7 +306,7 @@ void main() {
 
   test('detaching all listeners removes the expando', () async {
     final controller = StreamController<int>(
-        sync: true); // Use a sync controller to make debugging easier
+        sync: true); // Use a broadcast stream to make debugging easier
     final source = controller.stream.asBroadcastStream();
 
     final c = Computed(() {
@@ -346,7 +396,7 @@ void main() {
 
   test('fix and unmock works', () async {
     final controller = StreamController<int>(
-        sync: true); // Use a sync controller to make debugging easier
+        sync: true); // Use a broadcast stream to make debugging easier
     final source = controller.stream.asBroadcastStream();
 
     final c = Computed(() {
@@ -424,7 +474,7 @@ void main() {
 
   test('computations can use and return null', () {
     final controller = StreamController<int?>(
-        sync: true); // Use a sync controller to make debugging easier
+        sync: true); // Use a broadcast stream to make debugging easier
     final source = controller.stream.asBroadcastStream();
 
     var c1cnt = 0;
@@ -478,7 +528,7 @@ void main() {
 
   test('exceptions are not memoized', () {
     final controller = StreamController<int>(
-        sync: true); // Use a sync controller to make debugging easier
+        sync: true); // Use a broadcast stream to make debugging easier
     final source = controller.stream.asBroadcastStream();
 
     var c1cnt = 0;
@@ -559,7 +609,7 @@ void main() {
 
   test('abandoned dependencies are dropped', () {
     final controller = StreamController<int>(
-        sync: true); // Use a sync controller to make debugging easier
+        sync: true); // Use a broadcast stream to make debugging easier
     final source = controller.stream.asBroadcastStream();
 
     var dependOnSource = true;
@@ -606,11 +656,11 @@ void main() {
 
   test('can add new dependencies on subsequent calls', () async {
     final controller1 = StreamController<int>(
-        sync: true); // Use a sync controller to make debugging easier
+        sync: true); // Use a broadcast stream to make debugging easier
     final source1 = controller1.stream.asBroadcastStream();
 
     final controller2 = StreamController<int>(
-        sync: true); // Use a sync controller to make debugging easier
+        sync: true); // Use a broadcast stream to make debugging easier
     final source2 = controller2.stream.asBroadcastStream();
 
     var dependOnSource2 = false;
