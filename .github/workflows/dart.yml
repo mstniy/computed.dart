@@ -14,7 +14,9 @@ jobs:
       - uses: dart-lang/setup-dart@v1
 
       - name: Install dependencies
-        run: dart pub get
+        run: |
+          dart pub get
+          dart pub global activate coverage
 
       - name: Verify formatting
         run: dart format --output=none --set-exit-if-changed .
@@ -23,4 +25,4 @@ jobs:
         run: dart analyze
 
       - name: Run tests
-        run: dart test
+        run: dart pub global run coverage:test_with_coverage
