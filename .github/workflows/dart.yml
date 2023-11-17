@@ -26,3 +26,9 @@ jobs:
 
       - name: Run tests
         run: dart pub global run coverage:test_with_coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
