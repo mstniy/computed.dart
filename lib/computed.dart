@@ -3,12 +3,7 @@ import 'package:meta/meta.dart';
 
 import 'src/computed.dart';
 
-class NoValueException implements Exception {}
-
-/// Thrown by [Computed.use] if this usage
-/// would cause a cyclic dependency.
-class CyclicUseException implements Exception {}
-
+/// Reactive computation with a return type of [T]
 abstract class Computed<T> {
   /// The current result of this computation.
   /// If this computation threw, throws the same exception.
@@ -62,3 +57,11 @@ extension ComputedStreamExtension<T> on Stream<T> {
 extension ComputedFutureExtension<T> on Future<T> {
   T get use => ComputedFutureExtensionImpl<T>(this).use;
 }
+
+/// Thrown when a data source [use]d by a computation
+/// has not produced a value yet.
+class NoValueException implements Exception {}
+
+/// Thrown by [Computed.use] if this usage
+/// would cause a cyclic dependency.
+class CyclicUseException implements Exception {}
