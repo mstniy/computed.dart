@@ -5,13 +5,12 @@ import 'src/computed.dart';
 
 /// Reactive computation with a return type of [T]
 abstract class Computed<T> {
-  /// The current result of this computation.
-  /// If this computation threw, throws the same exception.
-  /// If the value of a data source is missing, throws [NoValueException]
-  /// Note that this accessor will run this computation if its result is not cached.
-  T get value;
-
   factory Computed(T Function() f) => ComputedImpl(f);
+  factory Computed.withSelf(T Function(Computed<T> self) f) {
+    Computed<T>? c;
+    c = ComputedImpl(() => f(c!));
+    return c;
+  }
 
   /// Fixes the result of this computation to the given value.
   ///
@@ -50,10 +49,26 @@ abstract class Computed<T> {
   /// computation or another computation [use]d by it has no value yet.
   /// Throws [CyclicUseException] if this usage would cause a cyclic dependency.
   T get use;
+
+  /// Returns the result of this computation during the previous run of the current computation, if one exists.
+  /// If called on the current computaition, returns its last result which was different to those before it.
+  ///
+  /// This will never trigger a re-computation.
+  /// Can only be used inside computations.
+  /// Throws [NoValueException] if the current computation did not [use] this computation
+  /// during its previous run.
+  T get prev;
 }
 
 extension ComputedStreamExtension<T> on Stream<T> {
   T get use => ComputedStreamExtensionImpl<T>(this).use;
+
+  /// Returns the value of this stream during the last run of the current computation which returned a different value.
+  ///
+  /// Can only be used inside computations.
+  /// Throws [NoValueException] if the current computation did not [use] this stream
+  /// during its previous run.
+  T get prev => ComputedStreamExtensionImpl<T>(this).prev;
 }
 
 extension ComputedFutureExtension<T> on Future<T> {
