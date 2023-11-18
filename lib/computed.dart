@@ -44,6 +44,8 @@ abstract class Computed<T> {
   /// Gets the current value of this computation, if one exists, and subscribes to it.
   ///
   /// Can only be used inside computations.
+  /// If this computation threw an exception other than [NoValueException],
+  /// throws it.
   /// Throws [NoValueException] if a data source [use]d by this
   /// computation or another computation [use]d by it has no value yet.
   /// Throws [CyclicUseException] if this usage would cause a cyclic dependency.
