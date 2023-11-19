@@ -3,7 +3,10 @@ import 'package:meta/meta.dart';
 
 import 'src/computed.dart';
 
-/// Reactive computation with a return type of [T]
+/// Reactive computation with a return type of [T].
+///
+/// Note that the equality operator [==] should be meaningful for [T],
+/// as it is used for memoization.
 abstract class Computed<T> {
   factory Computed(T Function() f) => ComputedImpl(f);
   factory Computed.withSelf(T Function(Computed<T> self) f) {
@@ -51,23 +54,25 @@ abstract class Computed<T> {
   T get use;
 
   /// Returns the result of this computation during the previous run of the current computation, if one exists.
-  /// If called on the current computaition, returns its last result which was different to those before it.
+  /// If called on the current computation, returns its last result which was different to the previous one.
   ///
   /// This will never trigger a re-computation.
   /// Can only be used inside computations.
   /// Throws [NoValueException] if the current computation did not [use] this computation
   /// during its previous run.
+  /// Note that [prev] does not subscribe to this computation. To do that, see [use].
   T get prev;
 }
 
 extension ComputedStreamExtension<T> on Stream<T> {
   T get use => ComputedStreamExtensionImpl<T>(this).use;
 
-  /// Returns the value of this stream during the last run of the current computation which returned a different value.
+  /// Returns the value of this stream during the last run of the current computation which returned a different value to the previous one.
   ///
   /// Can only be used inside computations.
   /// Throws [NoValueException] if the current computation did not [use] this stream
   /// during its previous run.
+  /// Note that [prev] does not subscribe to this stream. To do that, see [use].
   T get prev => ComputedStreamExtensionImpl<T>(this).prev;
 }
 
