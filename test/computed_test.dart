@@ -386,23 +386,24 @@ void main() {
     });
   });
 
-  test('asserts on detected side effects', () {
+  test('asserts on detected side effects', () async {
     var ctr = 0;
     final c = Computed(() => ctr++);
 
-    try {
-      c.asStream.listen((event) {
-        fail('Must not call listener');
-      }, onError: (e) => fail(e.toString()));
-      fail('Must assert');
-    } on AssertionError catch (e) {
+    var flag = false;
+
+    final sub = c.asStream.listen((event) {
+      fail('Must not call listener');
+    }, onError: (e) {
+      flag = true;
       expect(
           e.message,
           contains(
               "Computed expressions must be purely functional. Please use listeners for side effects."));
-    } catch (e) {
-      fail('Unexpected exception');
-    }
+    });
+    await Future.value();
+    sub.cancel();
+    expect(flag, true);
   });
 
   group('mocks', () {

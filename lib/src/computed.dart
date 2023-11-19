@@ -438,8 +438,6 @@ class ComputedImpl<T> with Computed<T> {
       } on NoValueException {
         // Not much we can do
         rethrow;
-      } on Error {
-        rethrow; // Do not propagate errors
       } catch (e) {
         _lastResult = _ValueOrException.exc(e);
       } finally {
