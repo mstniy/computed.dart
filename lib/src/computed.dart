@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'package:meta/meta.dart';
 
 import '../computed.dart';
+import 'data_source_subscription.dart';
 
 class _UpdateToken {
   _UpdateToken();
@@ -56,188 +58,29 @@ class GlobalCtx {
   // For each data source, have a "router", which is a computation that returns the
   // value, or throws the error, produced by the data source.
   // This allows most of the logic to only deal with upstream computations.
+  @visibleForTesting
   static final routerExpando = Expando<_RouterValueOrException>('computed');
 
   static _UpdateToken? _currentUpdate;
 }
 
-class ComputedStreamExtensionImpl<T> {
-  final Stream<T> s;
-
-  ComputedStreamExtensionImpl(this.s);
-  T get use {
-    final caller = GlobalCtx.currentComputation;
-    return caller.useDataSource(
-        s,
-        () => s.use,
-        (onData) => StreamDataSourceSubscription(s.listen(onData)),
-        false,
-        null);
-  }
-
-  T get prev {
-    final caller = GlobalCtx.currentComputation;
-    return caller.dataSourcePrev(s);
-  }
-}
-
-class ComputedFutureExtensionImpl<T> {
-  final Future<T> f;
-
-  ComputedFutureExtensionImpl(this.f);
-  T get use {
-    final caller = GlobalCtx.currentComputation;
-    return caller.useDataSource(
-        f,
-        () => f.use,
-        (onData) => FutureDataSourceSubscription<T>(f, onData, (e) {}),
-        false,
-        null); // TODO: Handle onError (passthrough)
-  }
-}
-
-class ComputedStreamSubscription<T> implements StreamSubscription<T> {
-  final ComputedImpl<T> _node;
+class ComputedListenerSubscription<T> {
+  ComputedImpl<T> _node;
   void Function(T event)? _onData;
   Function? _onError;
-  ComputedStreamSubscription(this._node, this._onData, this._onError);
-  @override
-  Future<E> asFuture<E>([E? futureValue]) {
-    throw UnsupportedError(
-        'asFuture not supported by Stream subscriptions to Computed'); // Doesn't make much sense in this context
-  }
 
-  @override
+  ComputedListenerSubscription(this._node, this._onData, this._onError);
+
   Future<void> cancel() async {
     _node._removeListener(this);
   }
 
-  @override
-  bool get isPaused => false; // TODO: Allow Computed-s to be paused and resumed
-
-  @override
   void onData(void Function(T data)? handleData) {
     _onData = handleData;
   }
 
-  @override
-  void onDone(void Function()? handleDone) {
-    // TODO: Have support for done signals
-    throw UnimplementedError();
-  }
-
-  @override
   void onError(Function? handleError) {
     _onError = handleError;
-  }
-
-  @override
-  void pause([Future<void>? resumeSignal]) {
-    throw UnimplementedError();
-  }
-
-  @override
-  void resume() {
-    throw UnimplementedError();
-  }
-}
-
-class ComputedStream<T> extends Stream<T> {
-  ComputedImpl<T> _parent;
-
-  ComputedStream(this._parent);
-
-  @override
-  StreamSubscription<T> listen(void Function(T event)? onData,
-      {Function? onError, void Function()? onDone, bool? cancelOnError}) {
-    final sub = ComputedStreamSubscription<T>(_parent, onData, onError);
-    if (_parent._novalue) {
-      try {
-        _parent._evalF();
-        // Might set lastResult, won't notify the listener just yet (as that is against the Stream contract)
-      } on NoValueException {}
-    }
-    _parent._listeners.add(sub);
-    if (!_parent._novalue) {
-      if (!_parent._lastResult!._isValue && onError != null) {
-        final lastError = _parent._lastResult!._exc!;
-        scheduleMicrotask(() {
-          onError(lastError);
-        });
-      } else if (_parent._lastResult!._isValue && onData != null) {
-        final lastResult = _parent._lastResult!._value as T;
-        scheduleMicrotask(() {
-          onData(lastResult);
-        });
-      }
-    }
-    return sub;
-  }
-}
-
-// Very similar to StreamSubscription
-// Except only the parts Computed needs
-abstract class DataSourceSubscription<T> {
-  Future<void> cancel();
-
-  bool get isPaused;
-
-  void pause([Future<void>? resumeSignal]);
-  void resume();
-}
-
-class StreamDataSourceSubscription<T> implements DataSourceSubscription<T> {
-  final StreamSubscription<T> ss;
-  StreamDataSourceSubscription(this.ss);
-
-  @override
-  Future<void> cancel() {
-    return ss.cancel();
-  }
-
-  @override
-  bool get isPaused => ss.isPaused;
-
-  @override
-  void pause([Future<void>? resumeSignal]) {
-    ss.pause(resumeSignal);
-  }
-
-  @override
-  void resume() {
-    ss.resume();
-  }
-}
-
-class FutureDataSourceSubscription<T> implements DataSourceSubscription<T> {
-  final void Function(T data) onValue;
-  final Function onError;
-
-  FutureDataSourceSubscription(Future<T> f, this.onValue, this.onError) {
-    f.then(this.onValue, onError: this.onError);
-  }
-
-  @override
-  Future<void> cancel() {
-    // We don't need to do anything here.
-    // There is no way to cancel a Future and the router will already have lost all its downstream computations.
-    return Future.value();
-  }
-
-  @override
-  // TODO: implement isPaused
-  bool get isPaused => throw UnimplementedError();
-
-  @override
-  void pause([Future<void>? resumeSignal]) {
-    // TODO: implement pause
-    throw UnimplementedError();
-  }
-
-  @override
-  void resume() {
-    // TODO: implement resume
-    throw UnimplementedError();
   }
 }
 
@@ -248,7 +91,7 @@ class ComputedImpl<T> with Computed<T> {
   final _downstreamComputations = <ComputedImpl>{};
 
   _DataSourceAndSubscription<T>? _dss;
-  final _listeners = Set<ComputedStreamSubscription<T>>();
+  final _listeners = Set<ComputedListenerSubscription<T>>();
 
   bool get _novalue => _lastResult == null;
   _UpdateToken? _lastUpdate;
@@ -273,10 +116,10 @@ class ComputedImpl<T> with Computed<T> {
     }
   }
 
-  T Function() f;
-  final T Function() origF;
+  T Function() _f;
+  final T Function() _origF;
 
-  ComputedImpl(this.f) : origF = f;
+  ComputedImpl(this._f) : _origF = _f;
 
   void _onDataSourceData(T data) {
     if (_dss == null) return;
@@ -288,6 +131,32 @@ class ComputedImpl<T> with Computed<T> {
     rvoe._voe = _ValueOrException<T>.value(data);
 
     _rerunGraph();
+  }
+
+  ComputedListenerSubscription<T> listen(
+      void Function(T event)? onData, Function? onError) {
+    final sub = ComputedListenerSubscription<T>(this, onData, onError);
+    if (_novalue) {
+      try {
+        _evalF();
+        // Might set lastResult, won't notify the listener just yet (as that is against the Stream contract)
+      } on NoValueException {}
+    }
+    _listeners.add(sub);
+    if (!_novalue) {
+      if (!_lastResult!._isValue && onError != null) {
+        final lastError = _lastResult!._exc!;
+        scheduleMicrotask(() {
+          onError(lastError);
+        });
+      } else if (_lastResult!._isValue && onData != null) {
+        final lastResult = _lastResult!._value as T;
+        scheduleMicrotask(() {
+          onData(lastResult);
+        });
+      }
+    }
+    return sub;
   }
 
   DT useDataSource<DT>(
@@ -337,13 +206,13 @@ class ComputedImpl<T> with Computed<T> {
 
   @override
   void mock(T Function() mock) {
-    f = mock;
+    _f = mock;
     _rerunGraph();
   }
 
   @override
   void unmock() {
-    f = origF;
+    _f = _origF;
     _rerunGraph();
   }
 
@@ -431,8 +300,8 @@ class ComputedImpl<T> with Computed<T> {
       _curUpstreamComputations = {};
       try {
         GlobalCtx._currentComputation = this;
-        final newResult = _ValueOrException.value(f());
-        assert(f() == newResult._value,
+        final newResult = _ValueOrException.value(_f());
+        assert(_f() == newResult._value,
             "Computed expressions must be purely functional. Please use listeners for side effects.");
         _lastResult = newResult;
       } on NoValueException {
@@ -507,7 +376,7 @@ class ComputedImpl<T> with Computed<T> {
     }
   }
 
-  void _removeListener(ComputedStreamSubscription<T> sub) {
+  void _removeListener(ComputedListenerSubscription<T> sub) {
     _listeners.remove(sub);
     if (_downstreamComputations.isEmpty && _listeners.isEmpty) {
       _removeDataSourcesAndUpstreams();
@@ -533,10 +402,5 @@ class ComputedImpl<T> with Computed<T> {
 
     if (_lastResult == null) throw NoValueException();
     return _lastResult!.value;
-  }
-
-  @override
-  Stream<T> get asStream {
-    return ComputedStream(this);
   }
 }

@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'package:computed/src/computed_stream.dart';
 import 'package:meta/meta.dart';
 
 import 'src/computed.dart';
+import 'src/future_extension.dart';
+import 'src/stream_extension.dart';
 
 /// Reactive computation with a return type of [T].
 ///
@@ -41,8 +44,6 @@ abstract class Computed<T> {
   @visibleForTesting
   void unmock();
 
-  Stream<T> get asStream;
-
   /// Gets the current value of this computation, if one exists, and subscribes to it.
   ///
   /// Can only be used inside computations.
@@ -64,8 +65,12 @@ abstract class Computed<T> {
   T get prev;
 }
 
-extension ComputedStreamExtension<T> on Stream<T> {
-  T get use => ComputedStreamExtensionImpl<T>(this).use;
+extension ComputedStreamExtension<T> on Computed<T> {
+  Stream<T> get asStream => ComputedStream<T>(this);
+}
+
+extension StreamComputedExtension<T> on Stream<T> {
+  T get use => StreamComputedExtensionImpl<T>(this).use;
 
   /// Returns the value of this stream during the last run of the current computation which returned a different value to the previous one.
   ///
@@ -73,11 +78,11 @@ extension ComputedStreamExtension<T> on Stream<T> {
   /// Throws [NoValueException] if the current computation did not [use] this stream
   /// during its previous run.
   /// Note that [prev] does not subscribe to this stream. To do that, see [use].
-  T get prev => ComputedStreamExtensionImpl<T>(this).prev;
+  T get prev => StreamComputedExtensionImpl<T>(this).prev;
 }
 
-extension ComputedFutureExtension<T> on Future<T> {
-  T get use => ComputedFutureExtensionImpl<T>(this).use;
+extension FutureComputedExtension<T> on Future<T> {
+  T get use => FutureComputedExtensionImpl<T>(this).use;
 }
 
 /// Thrown when a data source [use]d by a computation
