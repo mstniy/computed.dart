@@ -694,7 +694,7 @@ void main() {
   });
 
   group('prev', () {
-    test('stream .prev works', () async {
+    test('works on streams', () async {
       final controller1 = StreamController<int>.broadcast(
           sync: true); // Use a broadcast stream to make debugging easier
       final source1 = controller1.stream;
@@ -731,7 +731,7 @@ void main() {
       }
     });
 
-    test('prev on memoized computations', () async {
+    test('works on streams (bigger)', () async {
       final controller1 = StreamController<int>.broadcast(
           sync: true); // Use a broadcast stream to make debugging easier
       final source1 = controller1.stream;
@@ -782,7 +782,7 @@ void main() {
       }
     });
 
-    test('prev on computations whose value did not change', () async {
+    test('in computations whose value did not change', () async {
       final controller = StreamController<int>.broadcast(
           sync: true); // Use a broadcast stream to make debugging easier
       final source = controller.stream;
@@ -821,6 +821,48 @@ void main() {
         controller.add(-1); // Note that (-1)^2 == 1^2
         expect(subCnt, 2);
         controller.add(0);
+        expect(subCnt, 3);
+      } finally {
+        sub.cancel();
+      }
+    });
+
+    test('works on computations', () {
+      final controller = StreamController<int>.broadcast(
+          sync: true); // Use a broadcast stream to make debugging easier
+      final source = controller.stream;
+
+      int? expectation; // If null, expect NoValueError
+
+      final c = Computed(() {
+        return source.use * source.use;
+      });
+
+      final c2 = Computed(() {
+        try {
+          expect(c.prev, expectation);
+        } on NoValueException {
+          expect(expectation, null);
+        }
+        return c.use;
+      });
+
+      var subCnt = 0;
+
+      final sub = c2.asStream.listen((event) {
+        subCnt++;
+      }, onError: (e) => fail(e.toString()));
+
+      try {
+        controller.add(0);
+        expect(subCnt, 1);
+        expectation = 0;
+        controller.add(1);
+        expect(subCnt, 2);
+        controller.add(-1); // (-1)^2 == 1^2
+        expect(subCnt, 2);
+        expectation = 1; // And not -1
+        controller.add(2);
         expect(subCnt, 3);
       } finally {
         sub.cancel();
