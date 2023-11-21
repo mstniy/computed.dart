@@ -19,7 +19,7 @@ class _ComputedStreamSubscription<T> implements StreamSubscription<T> {
   }
 
   @override
-  bool get isPaused => false; // TODO: Allow Computed-s to be paused and resumed
+  bool get isPaused => false;
 
   @override
   void onData(void Function(T data)? handleData) {
@@ -28,7 +28,6 @@ class _ComputedStreamSubscription<T> implements StreamSubscription<T> {
 
   @override
   void onDone(void Function()? handleDone) {
-    // TODO: Have support for done signals
     throw UnimplementedError();
   }
 
@@ -56,7 +55,6 @@ class ComputedStream<T> extends Stream<T> {
   @override
   StreamSubscription<T> listen(void Function(T event)? onData,
       {Function? onError, void Function()? onDone, bool? cancelOnError}) {
-    // TODO: Support cancelOnError
     return _ComputedStreamSubscription(_parent.listen(onData, onError));
   }
 }
