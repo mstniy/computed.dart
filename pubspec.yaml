@@ -3,7 +3,7 @@ description: Straightforward, reliable, performant and testable reactive state m
 
 repository: https://github.com/mstniy/computed.dart
 
-version: 0.0.1
+version: 0.1.0
 
 environment:
   sdk: ">=2.16.0 <3.0.0"
