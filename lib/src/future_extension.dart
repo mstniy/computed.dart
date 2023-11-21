@@ -11,9 +11,10 @@ class FutureComputedExtensionImpl<T> {
     return caller.useDataSource(
         f,
         () => f.use,
-        (onData) => _FutureDataSourceSubscription<T>(f, onData, (e) {}),
+        (onData, onError) =>
+            _FutureDataSourceSubscription<T>(f, onData, onError),
         false,
-        null); // TODO: Handle onError (passthrough)
+        null);
   }
 }
 

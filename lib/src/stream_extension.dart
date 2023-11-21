@@ -13,7 +13,8 @@ class StreamComputedExtensionImpl<T> {
     return caller.useDataSource(
         s,
         () => s.use,
-        (onData) => _StreamDataSourceSubscription(s.listen(onData)),
+        (onData, onError) =>
+            _StreamDataSourceSubscription(s.listen(onData, onError: onError)),
         false,
         null);
   }

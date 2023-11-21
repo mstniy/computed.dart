@@ -125,10 +125,20 @@ class ComputedImpl<T> with Computed<T> {
     if (_dss == null) return;
     final rvoe =
         GlobalCtx.routerExpando[_dss!._ds] as _RouterValueOrException<T>;
-    // TODO: Consider exceptions
-    if (rvoe._voe != null && rvoe._voe!._value == data) return;
+    if (rvoe._voe != null && rvoe._voe!._isValue && rvoe._voe!._value == data)
+      return;
     // Update the global last value cache
     rvoe._voe = _ValueOrException<T>.value(data);
+
+    _rerunGraph();
+  }
+
+  void _onDataSourceError(Object err) {
+    if (_dss == null) return;
+    final rvoe =
+        GlobalCtx.routerExpando[_dss!._ds] as _RouterValueOrException<T>;
+    // Update the global last value cache
+    rvoe._voe = _ValueOrException<T>.exc(err);
 
     _rerunGraph();
   }
@@ -162,7 +172,9 @@ class ComputedImpl<T> with Computed<T> {
   DT useDataSource<DT>(
       Object dataSource,
       DT Function() dataSourceUse,
-      DataSourceSubscription<DT> Function(void Function(DT data) onData) dss,
+      DataSourceSubscription<DT> Function(
+              void Function(DT data) onData, Function(Object e) onError)
+          dss,
       bool hasCurrentValue,
       DT? currentValue) {
     var rvoe =
@@ -183,7 +195,7 @@ class ComputedImpl<T> with Computed<T> {
     if (_dss == null) {
       _dss = _DataSourceAndSubscription<T>(
           dataSource,
-          dss((data) => _onDataSourceData(data as T))
+          dss((data) => _onDataSourceData(data as T), _onDataSourceError)
               as DataSourceSubscription<T>);
     }
 
@@ -279,10 +291,7 @@ class ComputedImpl<T> with Computed<T> {
       final comp = compVOE.key;
       if (comp._lastResult == null) continue;
       final voe = compVOE.value;
-      if (voe == null ||
-          !voe._isValue ||
-          !comp._lastResult!._isValue ||
-          voe._value != comp._lastResult!._value) {
+      if (voe == null || voe.shouldNotify(comp._lastResult!)) {
         _evalF();
         return;
       }

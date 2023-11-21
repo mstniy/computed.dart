@@ -8,25 +8,153 @@ void main() {
   test('unlistened computations are not computed', () {
     Computed(() => fail('must not be computed'));
   });
-  test('computations can use streams', () {
-    final controller = StreamController<int>.broadcast(
-        sync: true); // Use a broadcast stream to make debugging easier
-    final source = controller.stream;
 
-    int? lastRes;
+  group('streams', () {
+    test('can be used in computations', () {
+      final controller = StreamController<int>.broadcast(
+          sync: true); // Use a broadcast stream to make debugging easier
+      final source = controller.stream;
 
-    final sub = Computed(() => source.use * 2).asStream.listen((event) {
-      lastRes = event;
-    }, onError: (e) => fail(e.toString()));
+      int? lastRes;
 
-    try {
-      controller.add(0);
-      expect(lastRes, 0);
-      controller.add(1);
-      expect(lastRes, 2);
-    } finally {
+      final sub = Computed(() => source.use * 2).asStream.listen((event) {
+        lastRes = event;
+      }, onError: (e) => fail(e.toString()));
+
+      try {
+        controller.add(0);
+        expect(lastRes, 0);
+        controller.add(1);
+        expect(lastRes, 2);
+      } finally {
+        sub.cancel();
+      }
+    });
+
+    test('can pass errors to computations', () {
+      final controller = StreamController<int>.broadcast(
+          sync: true); // Use a broadcast stream to make debugging easier
+      final source = controller.stream;
+
+      Object? expectation; // If null, don't expect an exception
+
+      var subCnt = 0;
+
+      final c = Computed(() {
+        try {
+          source.use;
+          expect(expectation, null);
+        } on NoValueException {
+          // Do not run the exception expect in this case
+          rethrow;
+        } catch (e) {
+          expect(e, expectation);
+        }
+        return subCnt; // To keep the listener call from getting memoized away
+      });
+
+      final sub = c.asStream.listen((event) {
+        subCnt++;
+      }, onError: (e) => fail(e.toString()));
+
+      try {
+        controller.add(0);
+        expect(subCnt, 1);
+        expectation = 1;
+        controller.addError(1);
+        expect(subCnt, 2);
+        // Exceptions are never memoized
+        controller.addError(1);
+        expect(subCnt, 3);
+        expectation = 2;
+        controller.addError(2);
+        expect(subCnt, 4);
+        expectation = null;
+        controller.add(3);
+        expect(subCnt, 5);
+        controller.add(3);
+        expect(subCnt, 5);
+      } finally {
+        sub.cancel();
+      }
+    });
+  });
+
+  group('futures', () {
+    test('can be used as data sources', () async {
+      final completer = Completer<int>();
+      final future = completer.future;
+
+      final x2 = Computed(() => future.use * 2);
+      final x3 = Computed(() => x2.use * future.use);
+
+      var callCnt = 0;
+
+      final sub = x3.asStream.listen((event) {
+        callCnt++;
+        expect(event, 8);
+      }, onError: (e) => fail(e.toString()));
+
+      try {
+        completer.complete(2);
+        await Future.value();
+        expect(callCnt, 1);
+      } finally {
+        sub.cancel();
+      }
+    });
+
+    test('can pass rejections to computations', () async {
+      final completer = Completer<int>();
+      final future = completer.future;
+
+      final c = Computed(() {
+        try {
+          future.use;
+          fail("Must have thrown");
+        } on NoValueException {
+          rethrow;
+        } catch (e) {
+          expect(e, 1);
+        }
+      });
+
+      var callCnt = 0;
+
+      final sub = c.asStream.listen((event) {
+        callCnt++;
+      }, onError: (e) => fail(e.toString()));
+
+      try {
+        completer.completeError(1);
+        await Future.value(0);
+        expect(callCnt, 1);
+      } finally {
+        sub.cancel();
+      }
+    });
+
+    test('can be cancelled', () async {
+      final completer = Completer<int>();
+      final future = completer.future;
+
+      final x = Computed(() {
+        future.use;
+        fail('Must not run the computation');
+      });
+
+      final sub = x.asStream.listen((event) {
+        fail('Must not call the listener');
+      }, onError: (e) => fail(e.toString()));
+
       sub.cancel();
-    }
+
+      completer.complete(0);
+
+      await Future.value();
+
+      // Nothing should be run
+    });
   });
 
   test('computations can use other computations', () {
@@ -337,53 +465,6 @@ void main() {
       expect(e.message,
           "`use` and `prev` are only allowed inside Computed expressions.");
     }
-  });
-
-  group('futures', () {
-    test('can be used as data sources', () async {
-      final completer = Completer<int>();
-      final future = completer.future;
-
-      final x2 = Computed(() => future.use * 2);
-      final x3 = Computed(() => x2.use * future.use);
-
-      var callCnt = 0;
-
-      final sub = x3.asStream.listen((event) {
-        callCnt++;
-        expect(event, 8);
-      }, onError: (e) => fail(e.toString()));
-
-      try {
-        completer.complete(2);
-        await Future.value();
-        expect(callCnt, 1);
-      } finally {
-        sub.cancel();
-      }
-    });
-
-    test('can be cancelled', () async {
-      final completer = Completer<int>();
-      final future = completer.future;
-
-      final x = Computed(() {
-        future.use;
-        fail('Must not run the computation');
-      });
-
-      final sub = x.asStream.listen((event) {
-        fail('Must not call the listener');
-      }, onError: (e) => fail(e.toString()));
-
-      sub.cancel();
-
-      completer.complete(0);
-
-      await Future.value();
-
-      // Nothing should be run
-    });
   });
 
   test('asserts on detected side effects', () async {
@@ -899,6 +980,61 @@ void main() {
         expectation = 0;
         controller1.add(1);
         expect(subCnt, 2);
+      } finally {
+        sub.cancel();
+      }
+    });
+
+    test('throws for data sources which threw during the last computation',
+        () async {
+      final controller1 = StreamController<int>.broadcast(
+          sync: true); // Use a broadcast stream to make debugging easier
+      final source1 = controller1.stream;
+
+      bool expectError = false;
+      int? valueExpectation;
+      Matcher? errorMatcher;
+
+      var subCnt = 0;
+
+      final c = Computed(() {
+        try {
+          source1.use; // Subscribe to it
+        } on NoValueException {
+          rethrow;
+        } catch (e) {
+          // Swallow, we are testing [prev] behaviour
+        }
+        try {
+          final res = source1.prev;
+          expect(expectError, false);
+          expect(res, valueExpectation);
+        } catch (e) {
+          // Note that this also catches NoValueException, that is intended
+          expect(expectError, true);
+          expect(e, errorMatcher);
+        }
+        return subCnt; // To keep the listener call from being memoized away
+      });
+
+      final sub = c.asStream.listen((event) {
+        subCnt++;
+      }, onError: (e) => fail(e.toString()));
+
+      try {
+        expect(subCnt, 0);
+        expectError = true;
+        errorMatcher = isA<NoValueException>();
+        controller1.add(0);
+        expect(subCnt, 1);
+        expectError = false;
+        valueExpectation = 0;
+        controller1.addError(1);
+        expect(subCnt, 2);
+        expectError = true;
+        errorMatcher = equals(1);
+        controller1.add(2);
+        expect(subCnt, 3);
       } finally {
         sub.cancel();
       }
