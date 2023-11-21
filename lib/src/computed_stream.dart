@@ -48,7 +48,7 @@ class _ComputedStreamSubscription<T> implements StreamSubscription<T> {
 }
 
 class ComputedStream<T> extends Stream<T> {
-  ComputedImpl<T> _parent;
+  final ComputedImpl<T> _parent;
 
   ComputedStream(Computed<T> parent) : _parent = parent as ComputedImpl<T>;
 

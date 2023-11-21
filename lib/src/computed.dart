@@ -9,7 +9,7 @@ class _UpdateToken {
 }
 
 class _ValueOrException<T> {
-  bool _isValue;
+  final bool _isValue;
   Object? _exc;
   T? _value;
 
@@ -65,7 +65,7 @@ class GlobalCtx {
 }
 
 class ComputedListenerSubscription<T> {
-  ComputedImpl<T> _node;
+  final ComputedImpl<T> _node;
   void Function(T event)? _onData;
   Function? _onError;
 
@@ -91,7 +91,7 @@ class ComputedImpl<T> with Computed<T> {
   final _downstreamComputations = <ComputedImpl>{};
 
   _DataSourceAndSubscription<T>? _dss;
-  final _listeners = Set<ComputedListenerSubscription<T>>();
+  final _listeners = <ComputedListenerSubscription<T>>{};
 
   bool get _novalue => _lastResult == null;
   _UpdateToken? _lastUpdate;
@@ -103,8 +103,9 @@ class ComputedImpl<T> with Computed<T> {
   @override
   T get prev {
     final caller = GlobalCtx.currentComputation;
-    if (caller._novalue)
+    if (caller._novalue) {
       throw NoValueException(); // Even if we are on the caller's memoization table
+    }
     if (caller == this) {
       if (_prevResult == null) throw NoValueException();
       return _prevResult!.value;
@@ -125,8 +126,9 @@ class ComputedImpl<T> with Computed<T> {
     if (_dss == null) return;
     final rvoe =
         GlobalCtx.routerExpando[_dss!._ds] as _RouterValueOrException<T>;
-    if (rvoe._voe != null && rvoe._voe!._isValue && rvoe._voe!._value == data)
+    if (rvoe._voe != null && rvoe._voe!._isValue && rvoe._voe!._value == data) {
       return;
+    }
     // Update the global last value cache
     rvoe._voe = _ValueOrException<T>.value(data);
 
@@ -150,7 +152,9 @@ class ComputedImpl<T> with Computed<T> {
       try {
         _evalF();
         // Might set lastResult, won't notify the listener just yet (as that is against the Stream contract)
-      } on NoValueException {}
+      } on NoValueException {
+        // It is fine if we don't have a value yet
+      }
     }
     _listeners.add(sub);
     if (!_novalue) {
@@ -182,7 +186,7 @@ class ComputedImpl<T> with Computed<T> {
 
     if (rvoe == null) {
       rvoe = _RouterValueOrException(ComputedImpl(dataSourceUse),
-          hasCurrentValue ? _ValueOrException.value(currentValue!) : null);
+          hasCurrentValue ? _ValueOrException.value(currentValue as DT) : null);
       GlobalCtx.routerExpando[dataSource] = rvoe;
     }
 
@@ -192,12 +196,10 @@ class ComputedImpl<T> with Computed<T> {
     }
     // We are the router (thus, DT == T)
     // Make sure we are subscribed
-    if (_dss == null) {
-      _dss = _DataSourceAndSubscription<T>(
-          dataSource,
-          dss((data) => _onDataSourceData(data as T), _onDataSourceError)
-              as DataSourceSubscription<T>);
-    }
+    _dss ??= _DataSourceAndSubscription<T>(
+        dataSource,
+        dss((data) => _onDataSourceData(data as T), _onDataSourceError)
+            as DataSourceSubscription<T>);
 
     if (rvoe._voe == null) {
       throw NoValueException();
@@ -206,8 +208,9 @@ class ComputedImpl<T> with Computed<T> {
   }
 
   DT dataSourcePrev<DT>(Object dataSource) {
-    if (_novalue)
+    if (_novalue) {
       throw NoValueException(); // Even if the data source is in our memoization table
+    }
     final rvoe =
         GlobalCtx.routerExpando[dataSource] as _RouterValueOrException<DT>?;
     if (rvoe == null) throw NoValueException();
@@ -246,10 +249,11 @@ class ComputedImpl<T> with Computed<T> {
           }
           if (cur._lastUpdate != GlobalCtx._currentUpdate) {
             try {
-              if (cur == this)
+              if (cur == this) {
                 _evalF();
-              else
+              } else {
                 cur._maybeEvalF();
+              }
             } on NoValueException {
               // Do not evaluate the children
               continue;
@@ -352,12 +356,15 @@ class ComputedImpl<T> with Computed<T> {
   void _notifyListeners() {
     if (!_lastResult!._isValue) {
       // Exception
-      for (var listener in _listeners)
+      for (var listener in _listeners) {
         if (listener._onError != null) listener._onError!(_lastResult!._exc!);
+      }
     } else {
-      for (var listener in _listeners)
-        if (listener._onData != null)
+      for (var listener in _listeners) {
+        if (listener._onData != null) {
           listener._onData!(_lastResult!._value as T);
+        }
+      }
     }
   }
 
@@ -367,8 +374,9 @@ class ComputedImpl<T> with Computed<T> {
           null; // So that we re-run the next time we are subscribed to
       _lastResultfulUpstreamComputations = null;
     }
-    for (var upComp in _lastUpstreamComputations.keys)
+    for (var upComp in _lastUpstreamComputations.keys) {
       upComp._removeDownstreamComputation(this);
+    }
     _lastUpstreamComputations = {};
     if (_dss != null) {
       _dss!._dss.cancel();

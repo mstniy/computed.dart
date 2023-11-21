@@ -230,11 +230,11 @@ void main() {
 
         final x2 = Computed(() => source.use * 2);
 
-        final x2_x = streamFirst
+        final x2Plusx = streamFirst
             ? Computed<int>(() => source.use + x2.use)
             : Computed<int>(() => x2.use + source.use);
 
-        final sub = x2_x.asStream.listen((output) {
+        final sub = x2Plusx.asStream.listen((output) {
           outputs.add(output);
         }, onError: (e) => fail(e.toString()));
 
@@ -690,10 +690,11 @@ void main() {
 
     final c = Computed(() {
       cnt++;
-      if (dependOnSource)
+      if (dependOnSource) {
         return source.use;
-      else
+      } else {
         return 1;
+      }
     });
 
     var subCnt = 0;
