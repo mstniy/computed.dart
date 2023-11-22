@@ -4,7 +4,7 @@ import '../computed.dart';
 import 'computed.dart';
 
 class _ComputedStreamSubscription<T> implements StreamSubscription<T> {
-  final ComputedListenerSubscription<T> _sub;
+  final ComputedSubscription<T> _sub;
   _ComputedStreamSubscription(this._sub);
 
   @override

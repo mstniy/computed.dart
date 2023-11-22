@@ -18,6 +18,9 @@ abstract class Computed<T> {
     return c;
   }
 
+  ComputedSubscription<T> listen(
+      void Function(T event)? onData, Function? onError);
+
   /// Fixes the result of this computation to the given value.
   ///
   /// See [mock].
@@ -62,6 +65,18 @@ abstract class Computed<T> {
   /// during its previous run.
   /// Note that [prev] does not subscribe to this computation. To do that, see [use].
   T get prev;
+}
+
+/// The result of [Computed.listen].
+abstract class ComputedSubscription<T> {
+  /// Changes the data handler for this subscription.
+  void onData(void Function(T data)? handleData);
+
+  /// Changes the error handler for this subscription.
+  void onError(Function? handleError);
+
+  /// Cancels this subscription.
+  void cancel();
 }
 
 extension ComputedStreamExtension<T> on Computed<T> {

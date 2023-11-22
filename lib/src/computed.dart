@@ -45,6 +45,29 @@ class _DataSourceAndSubscription<T> {
   _DataSourceAndSubscription(this._ds, this._dss);
 }
 
+class _ComputedSubscriptionImpl<T> implements ComputedSubscription<T> {
+  final ComputedImpl<T> _node;
+  void Function(T event)? _onData;
+  Function? _onError;
+
+  _ComputedSubscriptionImpl(this._node, this._onData, this._onError);
+
+  @override
+  void cancel() {
+    _node._removeListener(this);
+  }
+
+  @override
+  void onData(void Function(T data)? handleData) {
+    _onData = handleData;
+  }
+
+  @override
+  void onError(Function? handleError) {
+    _onError = handleError;
+  }
+}
+
 class GlobalCtx {
   static ComputedImpl? _currentComputation;
   static ComputedImpl get currentComputation {
@@ -64,26 +87,6 @@ class GlobalCtx {
   static _UpdateToken? _currentUpdate;
 }
 
-class ComputedListenerSubscription<T> {
-  final ComputedImpl<T> _node;
-  void Function(T event)? _onData;
-  Function? _onError;
-
-  ComputedListenerSubscription(this._node, this._onData, this._onError);
-
-  Future<void> cancel() async {
-    _node._removeListener(this);
-  }
-
-  void onData(void Function(T data)? handleData) {
-    _onData = handleData;
-  }
-
-  void onError(Function? handleError) {
-    _onError = handleError;
-  }
-}
-
 class ComputedImpl<T> with Computed<T> {
   Map<ComputedImpl, _ValueOrException?>? _lastResultfulUpstreamComputations;
   var _lastUpstreamComputations = <ComputedImpl, _ValueOrException?>{};
@@ -91,7 +94,7 @@ class ComputedImpl<T> with Computed<T> {
   final _downstreamComputations = <ComputedImpl>{};
 
   _DataSourceAndSubscription<T>? _dss;
-  final _listeners = <ComputedListenerSubscription<T>>{};
+  final _listeners = <_ComputedSubscriptionImpl<T>>{};
 
   bool get _novalue => _lastResult == null;
   _UpdateToken? _lastUpdate;
@@ -145,9 +148,10 @@ class ComputedImpl<T> with Computed<T> {
     _rerunGraph();
   }
 
-  ComputedListenerSubscription<T> listen(
+  @override
+  ComputedSubscription<T> listen(
       void Function(T event)? onData, Function? onError) {
-    final sub = ComputedListenerSubscription<T>(this, onData, onError);
+    final sub = _ComputedSubscriptionImpl<T>(this, onData, onError);
     if (_novalue) {
       try {
         _evalF();
@@ -393,7 +397,7 @@ class ComputedImpl<T> with Computed<T> {
     }
   }
 
-  void _removeListener(ComputedListenerSubscription<T> sub) {
+  void _removeListener(ComputedSubscription<T> sub) {
     _listeners.remove(sub);
     if (_downstreamComputations.isEmpty && _listeners.isEmpty) {
       _removeDataSourcesAndUpstreams();
