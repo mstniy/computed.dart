@@ -44,11 +44,10 @@ abstract class Computed<T> {
   @visibleForTesting
   void unmock();
 
-  /// Gets the current value of this computation, if one exists, and subscribes to it.
+  /// Returns the current value of this computation, if one exists, and subscribes to it.
   ///
   /// Can only be used inside computations.
-  /// If this computation threw an exception other than [NoValueException],
-  /// throws it.
+  /// If this computation threw an exception, throws it.
   /// Throws [NoValueException] if a data source [use]d by this
   /// computation or another computation [use]d by it has no value yet.
   /// Throws [CyclicUseException] if this usage would cause a cyclic dependency.
@@ -70,6 +69,11 @@ extension ComputedStreamExtension<T> on Computed<T> {
 }
 
 extension StreamComputedExtension<T> on Stream<T> {
+  /// Returns the current value of this stream and subscribes to it.
+  ///
+  /// Can only be used inside computations.
+  /// If the last item in the stream is an error, throws it.
+  /// Throws [NoValueException] if the stream does not have a known value yet.
   T get use => StreamComputedExtensionImpl<T>(this).use;
 
   /// Returns the value of this stream during the last run of the current computation which returned a different value to the previous one.
@@ -82,6 +86,11 @@ extension StreamComputedExtension<T> on Stream<T> {
 }
 
 extension FutureComputedExtension<T> on Future<T> {
+  /// Returns the result of this future. Subscribes to it if it has not been resolved yet.
+  ///
+  /// Can only be used inside computations.
+  /// If the future gets resolved with an error, throws it.
+  /// Throws [NoValueException] if this future has not been resolved yet.
   T get use => FutureComputedExtensionImpl<T>(this).use;
 }
 
