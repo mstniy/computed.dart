@@ -1182,6 +1182,58 @@ void main() {
     });
 
     test(
+        'throws for data sources which did not have a value during the last computation',
+        () async {
+      final controller1 = StreamController<int>.broadcast(
+          sync: true); // Use a broadcast stream to make debugging easier
+      final source1 = controller1.stream;
+
+      bool expectError = false;
+      int? valueExpectation;
+      Matcher? errorMatcher;
+
+      var subCnt = 0;
+
+      final c = Computed(() {
+        try {
+          source1.use; // Subscribe to it
+        } on NoValueException {
+          // Swallow
+        }
+        try {
+          final res = source1.prev;
+          expect(expectError, false);
+          expect(res, valueExpectation);
+        } catch (e) {
+          // Note that this also catches NoValueException, that is intended
+          expect(expectError, true);
+          expect(e, errorMatcher);
+        }
+        return subCnt; // To keep the listener call from being memoized away
+      });
+
+      expectError = true;
+      errorMatcher = isA<NoValueException>();
+
+      final sub = c.listen((event) {
+        subCnt++;
+      }, (e) => fail(e.toString()));
+
+      try {
+        await Future.value();
+        expect(subCnt, 1);
+        controller1.add(0);
+        expect(subCnt, 2);
+        expectError = false;
+        valueExpectation = 0;
+        controller1.add(1);
+        expect(subCnt, 3);
+      } finally {
+        sub.cancel();
+      }
+    });
+
+    test(
         'throws for data sources not subscribed to during the previous computation',
         () async {
       final controller1 = StreamController<int>.broadcast(

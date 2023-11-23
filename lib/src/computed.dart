@@ -108,9 +108,6 @@ class ComputedImpl<T> with Computed<T> {
   @override
   T get prev {
     final caller = GlobalCtx.currentComputation;
-    if (caller._novalue) {
-      throw NoValueException(); // Even if we are on the caller's memoization table
-    }
     if (caller == this) {
       if (_prevResult == null) throw NoValueException();
       return _prevResult!.value;
@@ -191,9 +188,8 @@ class ComputedImpl<T> with Computed<T> {
         GlobalCtx._routerExpando[dataSource] as _RouterValueOrException<DT>?;
 
     if (rvoe == null) {
-      final voe =
-          hasCurrentValue ? _ValueOrException.value(currentValue as DT) : null;
-      rvoe = _RouterValueOrException(ComputedImpl(dataSourceUse), voe);
+      rvoe = _RouterValueOrException(ComputedImpl(dataSourceUse),
+          hasCurrentValue ? _ValueOrException.value(currentValue as DT) : null);
       GlobalCtx._routerExpando[dataSource] = rvoe;
     }
 
@@ -213,15 +209,12 @@ class ComputedImpl<T> with Computed<T> {
   }
 
   DT dataSourcePrev<DT>(Object dataSource) {
-    if (_novalue) {
-      throw NoValueException(); // Even if the data source is in our memoization table
-    }
     final rvoe =
         GlobalCtx._routerExpando[dataSource] as _RouterValueOrException<DT>?;
-    if (rvoe == null) throw NoValueException();
-    final memoizedVOE = _lastResultfulUpstreamComputations![rvoe._router];
-    if (memoizedVOE == null) throw NoValueException();
-    return memoizedVOE.value;
+    if (rvoe == null) {
+      throw NoValueException();
+    }
+    return rvoe._router.prev;
   }
 
   @override
