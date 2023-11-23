@@ -80,7 +80,12 @@ abstract class ComputedSubscription<T> {
 }
 
 extension ComputedStreamExtension<T> on Computed<T> {
-  Stream<T> get asStream => ComputedStream<T>(this);
+  /// Returns the result of the computation as a [Stream].
+  Stream<T> get asStream => ComputedStreamExtensionImpl<T>(this).asStream;
+
+  /// Returns the result of the computation as a broadcast [Stream].
+  Stream<T> get asBroadcastStream =>
+      ComputedStreamExtensionImpl<T>(this).asBroadcastStream;
 }
 
 extension StreamComputedExtension<T> on Stream<T> {

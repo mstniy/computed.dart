@@ -10,16 +10,16 @@ void main() {
   });
 
   group('streams', () {
-    test('can be used in computations', () {
+    test('can be used as data source', () async {
       final controller = StreamController<int>.broadcast(
           sync: true); // Use a broadcast stream to make debugging easier
       final source = controller.stream;
 
       int? lastRes;
 
-      final sub = Computed(() => source.use * 2).asStream.listen((event) {
+      final sub = Computed(() => source.use * 2).listen((event) {
         lastRes = event;
-      }, onError: (e) => fail(e.toString()));
+      }, (e) => fail(e.toString()));
 
       try {
         controller.add(0);
@@ -28,6 +28,66 @@ void main() {
         expect(lastRes, 2);
       } finally {
         sub.cancel();
+      }
+    });
+
+    test('can be used as listeners', () async {
+      final controller = StreamController<int>.broadcast(
+          sync: true); // Use a broadcast stream to make debugging easier
+      final source = controller.stream;
+
+      for (var isBroadcast in [false, true]) {
+        bool? lastWasError;
+        int? lastRes;
+        Object? lastError;
+        var ctr = 0;
+
+        final c = Computed(() => source.use * 2);
+
+        final stream = isBroadcast ? c.asBroadcastStream : c.asStream;
+
+        final sub = stream.listen((event) {
+          ctr++;
+          lastWasError = false;
+          lastRes = event;
+        }, onError: (e) {
+          ctr++;
+          lastWasError = true;
+          lastError = e;
+        });
+
+        try {
+          await Future.value(); // Sanity check
+          expect(ctr, 0);
+          controller.add(0);
+          await Future
+              .value(); // As Stream-s call their listeners in the next tick
+          expect(ctr, 1);
+          expect(lastWasError, false);
+          expect(lastRes, 0);
+          controller.add(1);
+          await Future.value();
+          expect(ctr, 2);
+          expect(lastRes, 2);
+          controller.addError(2);
+          await Future.value();
+          expect(ctr, 3);
+          expect(lastWasError, true);
+          expect(lastError, 2);
+          await Future.value(); // Sanity check
+          expect(ctr, 3);
+        } finally {
+          sub.cancel();
+        }
+
+        try {
+          stream.listen((event) {});
+          if (!isBroadcast) fail("should have thrown");
+        } on StateError catch (e) {
+          expect(isBroadcast, false);
+          // The returned stream is not a broadcast stream
+          expect(e.message, contains('Stream has already been listened to.'));
+        }
       }
     });
 
@@ -53,9 +113,9 @@ void main() {
         return subCnt; // To keep the listener call from getting memoized away
       });
 
-      final sub = c.asStream.listen((event) {
+      final sub = c.listen((event) {
         subCnt++;
-      }, onError: (e) => fail(e.toString()));
+      }, (e) => fail(e.toString()));
 
       try {
         controller.add(0);
@@ -90,10 +150,10 @@ void main() {
 
       var callCnt = 0;
 
-      final sub = x3.asStream.listen((event) {
+      final sub = x3.listen((event) {
         callCnt++;
         expect(event, 8);
-      }, onError: (e) => fail(e.toString()));
+      }, (e) => fail(e.toString()));
 
       try {
         completer.complete(2);
@@ -121,9 +181,9 @@ void main() {
 
       var callCnt = 0;
 
-      final sub = c.asStream.listen((event) {
+      final sub = c.listen((event) {
         callCnt++;
-      }, onError: (e) => fail(e.toString()));
+      }, (e) => fail(e.toString()));
 
       try {
         completer.completeError(1);
@@ -143,9 +203,9 @@ void main() {
         fail('Must not run the computation');
       });
 
-      final sub = x.asStream.listen((event) {
+      final sub = x.listen((event) {
         fail('Must not call the listener');
-      }, onError: (e) => fail(e.toString()));
+      }, (e) => fail(e.toString()));
 
       sub.cancel();
 
@@ -166,9 +226,9 @@ void main() {
 
     final x2 = Computed(() => source.use * 2);
 
-    final sub = Computed(() => x2.use + 1).asStream.listen((event) {
+    final sub = Computed(() => x2.use + 1).listen((event) {
       lastRes = event;
-    }, onError: (e) => fail(e.toString()));
+    }, (e) => fail(e.toString()));
 
     try {
       controller.add(0);
@@ -194,9 +254,9 @@ void main() {
     final sub = Computed(() {
       callCnt += 1;
       return x2.use;
-    }).asStream.listen((event) {
+    }).listen((event) {
       lastRes = event;
-    }, onError: (e) => fail(e.toString()));
+    }, (e) => fail(e.toString()));
 
     expect(callCnt, 1);
 
@@ -234,9 +294,9 @@ void main() {
             ? Computed<int>(() => source.use + x2.use)
             : Computed<int>(() => x2.use + source.use);
 
-        final sub = x2Plusx.asStream.listen((output) {
+        final sub = x2Plusx.listen((output) {
           outputs.add(output);
-        }, onError: (e) => fail(e.toString()));
+        }, (e) => fail(e.toString()));
 
         try {
           controller.add(0);
@@ -273,13 +333,13 @@ void main() {
           final outputs2 = <int>[];
           final outputs3 = <int>[];
 
-          final sub2 = c2.asStream.listen((output) {
+          final sub2 = c2.listen((output) {
             outputs2.add(output);
-          }, onError: (e) => fail(e.toString()));
+          }, (e) => fail(e.toString()));
 
-          final sub3 = c3.asStream.listen((output) {
+          final sub3 = c3.listen((output) {
             outputs3.add(output);
-          }, onError: (e) => fail(e.toString()));
+          }, (e) => fail(e.toString()));
 
           try {
             controller1.add(0);
@@ -320,10 +380,10 @@ void main() {
 
     var checkCnt = 0;
 
-    var sub = c2.asStream.listen((output) {
+    var sub = c2.listen((output) {
       checkCnt++;
       expect(output, 0);
-    }, onError: (e) => fail(e.toString()));
+    }, (e) => fail(e.toString()));
 
     expect(callCnt1, 1);
     expect(callCnt2, 1);
@@ -344,10 +404,10 @@ void main() {
     expect(callCnt2, 3);
     expect(checkCnt, 1);
 
-    sub = c2.asStream.listen((output) {
+    sub = c2.listen((output) {
       expect(output, 4);
       checkCnt++;
-    }, onError: (e) => fail(e.toString())); // This triggers a re-computation
+    }, (e) => fail(e.toString())); // This triggers a re-computation
 
     await Future.value();
     expect(callCnt1,
@@ -373,9 +433,9 @@ void main() {
 
     var checkFlag = false;
 
-    final sub = c2.asStream.listen((output) {
+    final sub = c2.listen((output) {
       fail('must not reach here');
-    }, onError: (e) {
+    }, (e) {
       checkFlag = true;
       expect(e, 42);
     });
@@ -400,11 +460,11 @@ void main() {
 
     var checkFlag = false;
 
-    var sub = c1.asStream.listen((event) {
+    var sub = c1.listen((event) {
       expect(checkFlag, false);
       checkFlag = true;
       expect(event, 42);
-    }, onError: (e) => fail(e.toString()));
+    }, (e) => fail(e.toString()));
 
     try {
       await Future.value(); // Wait for the update
@@ -416,11 +476,11 @@ void main() {
 
     checkFlag = false;
 
-    sub = c1.asStream.listen((event) {
+    sub = c1.listen((event) {
       expect(checkFlag, false);
       checkFlag = true;
       expect(event, 42);
-    }, onError: (e) => fail(e.toString()));
+    }, (e) => fail(e.toString()));
 
     try {
       await Future.value(); // Wait for the update
@@ -440,8 +500,7 @@ void main() {
       return source.use;
     });
 
-    var sub =
-        c.asStream.listen((output) {}, onError: (e) => fail(e.toString()));
+    var sub = c.listen((output) {}, (e) => fail(e.toString()));
 
     sub.cancel();
 
@@ -473,9 +532,9 @@ void main() {
 
     var flag = false;
 
-    final sub = c.asStream.listen((event) {
+    final sub = c.listen((event) {
       fail('Must not call listener');
-    }, onError: (e) {
+    }, (e) {
       flag = true;
       expect(
           e.message,
@@ -500,10 +559,10 @@ void main() {
       var listenerCallCnt = 0;
       var expectation = 42;
 
-      var sub = c.asStream.listen((output) {
+      var sub = c.listen((output) {
         listenerCallCnt++;
         expect(output, expectation);
-      }, onError: (e) => fail(e.toString()));
+      }, (e) => fail(e.toString()));
 
       try {
         c.fix(42);
@@ -553,8 +612,7 @@ void main() {
         }
       });
 
-      var sub =
-          c2.asStream.listen((output) {}, onError: (e) => fail(e.toString()));
+      var sub = c2.listen((output) {}, (e) => fail(e.toString()));
 
       try {
         mustThrow = true;
@@ -587,10 +645,10 @@ void main() {
     var subCnt = 0;
     int? expected;
 
-    final sub = c2.asStream.listen((event) {
+    final sub = c2.listen((event) {
       subCnt++;
       expect(event, expected);
-    }, onError: (e) => fail(e.toString()));
+    }, (e) => fail(e.toString()));
 
     expect(c1cnt, 1);
     expect(c2cnt, 1);
@@ -642,10 +700,10 @@ void main() {
     var subCnt = 0;
     bool expectThrow = false;
 
-    final sub = c2.asStream.listen((event) {
+    final sub = c2.listen((event) {
       subCnt++;
       expect(expectThrow, false);
-    }, onError: (e) {
+    }, (e) {
       subCnt++;
       expect(expectThrow, true);
     });
@@ -700,10 +758,10 @@ void main() {
     var subCnt = 0;
     var expectation = 0;
 
-    final sub = c.asStream.listen((event) {
+    final sub = c.listen((event) {
       subCnt++;
       expect(event, expectation);
-    }, onError: (e) => fail(e.toString()));
+    }, (e) => fail(e.toString()));
 
     try {
       controller.add(0);
@@ -750,10 +808,10 @@ void main() {
     var subCnt = 0;
     var expectation = 0;
 
-    final sub = c.asStream.listen((event) {
+    final sub = c.listen((event) {
       subCnt++;
       expect(event, expectation);
-    }, onError: (e) => fail(e.toString()));
+    }, (e) => fail(e.toString()));
 
     try {
       controller1.add(0);
@@ -796,9 +854,9 @@ void main() {
 
         var subCnt = 0;
 
-        final sub = c.asStream.listen((event) {
+        final sub = c.listen((event) {
           subCnt++;
-        }, onError: (e) => fail(e.toString()));
+        }, (e) => fail(e.toString()));
 
         try {
           expect(subCnt, 0);
@@ -841,9 +899,9 @@ void main() {
 
       var subCnt = 0;
 
-      final sub = c.asStream.listen((event) {
+      final sub = c.listen((event) {
         subCnt++;
-      }, onError: (e) => fail(e.toString()));
+      }, (e) => fail(e.toString()));
 
       try {
         expect(subCnt, 0);
@@ -883,9 +941,9 @@ void main() {
 
       var subCnt = 0;
 
-      final sub = c.asStream.listen((event) {
+      final sub = c.listen((event) {
         subCnt++;
-      }, onError: (e) => fail(e.toString()));
+      }, (e) => fail(e.toString()));
 
       try {
         expect(subCnt, 0);
@@ -931,9 +989,9 @@ void main() {
 
       var subCnt = 0;
 
-      final sub = c2.asStream.listen((event) {
+      final sub = c2.listen((event) {
         subCnt++;
-      }, onError: (e) => fail(e.toString()));
+      }, (e) => fail(e.toString()));
 
       try {
         controller.add(0);
@@ -970,9 +1028,9 @@ void main() {
 
       var subCnt = 0;
 
-      final sub = c.asStream.listen((event) {
+      final sub = c.listen((event) {
         subCnt++;
-      }, onError: (e) => fail(e.toString()));
+      }, (e) => fail(e.toString()));
 
       try {
         expect(subCnt, 0);
@@ -1018,9 +1076,9 @@ void main() {
         return subCnt; // To keep the listener call from being memoized away
       });
 
-      final sub = c.asStream.listen((event) {
+      final sub = c.listen((event) {
         subCnt++;
-      }, onError: (e) => fail(e.toString()));
+      }, (e) => fail(e.toString()));
 
       try {
         expect(subCnt, 0);
@@ -1073,9 +1131,9 @@ void main() {
 
       var subCnt = 0;
 
-      final sub = c.asStream.listen((event) {
+      final sub = c.listen((event) {
         subCnt++;
-      }, onError: (e) => fail(e.toString()));
+      }, (e) => fail(e.toString()));
 
       try {
         controller1.add(0);
@@ -1121,8 +1179,7 @@ void main() {
         }
       });
 
-      final sub =
-          c.asStream.listen((event) {}, onError: (e) => fail(e.toString()));
+      final sub = c.listen((event) {}, (e) => fail(e.toString()));
 
       try {
         expect(flag, true);
@@ -1140,9 +1197,9 @@ void main() {
 
       var flag = false;
 
-      final sub = b.asStream.listen((event) {
+      final sub = b.listen((event) {
         fail('What?');
-      }, onError: (e) {
+      }, (e) {
         flag = true;
         expect(e, isA<CyclicUseException>());
       });
@@ -1170,10 +1227,10 @@ void main() {
 
       b = Computed(() => a.use);
 
-      final sub = b.asStream.listen((event) {
+      final sub = b.listen((event) {
         cnt1++;
         expect(event, 1);
-      }, onError: (e) {
+      }, (e) {
         expect(e, isA<CyclicUseException>());
         cnt2++;
       });

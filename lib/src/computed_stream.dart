@@ -3,58 +3,35 @@ import 'dart:async';
 import '../computed.dart';
 import 'computed.dart';
 
-class _ComputedStreamSubscription<T> implements StreamSubscription<T> {
-  final ComputedSubscription<T> _sub;
-  _ComputedStreamSubscription(this._sub);
-
-  @override
-  Future<E> asFuture<E>([E? futureValue]) {
-    throw UnsupportedError(
-        'asFuture not supported by Stream subscriptions to Computed'); // Doesn't make much sense in this context
-  }
-
-  @override
-  Future<void> cancel() async {
-    _sub.cancel();
-  }
-
-  @override
-  bool get isPaused => false;
-
-  @override
-  void onData(void Function(T data)? handleData) {
-    _sub.onData(handleData);
-  }
-
-  @override
-  void onDone(void Function()? handleDone) {
-    throw UnimplementedError();
-  }
-
-  @override
-  void onError(Function? handleError) {
-    _sub.onError(handleError);
-  }
-
-  @override
-  void pause([Future<void>? resumeSignal]) {
-    throw UnimplementedError();
-  }
-
-  @override
-  void resume() {
-    throw UnimplementedError();
-  }
-}
-
-class ComputedStream<T> extends Stream<T> {
+class ComputedStreamExtensionImpl<T> {
   final ComputedImpl<T> _parent;
+  StreamController<T>? _controller;
+  ComputedSubscription<T>? _computedSubscription;
 
-  ComputedStream(Computed<T> parent) : _parent = parent as ComputedImpl<T>;
+  ComputedStreamExtensionImpl(Computed<T> parent)
+      : _parent = parent as ComputedImpl<T>;
 
-  @override
-  StreamSubscription<T> listen(void Function(T event)? onData,
-      {Function? onError, void Function()? onDone, bool? cancelOnError}) {
-    return _ComputedStreamSubscription(_parent.listen(onData, onError));
+  Stream<T> get asStream {
+    _controller ??=
+        StreamController<T>(onListen: _onListen, onCancel: _onCancel);
+    return _controller!.stream;
+    // No onPause and onResume, as Computed doesn't support these.
+  }
+
+  Stream<T> get asBroadcastStream {
+    _controller ??=
+        StreamController<T>.broadcast(onListen: _onListen, onCancel: _onCancel);
+    return _controller!.stream;
+    // No onPause and onResume, as Computed doesn't support these.
+  }
+
+  void _onListen() {
+    _computedSubscription ??= _parent.listen((event) => _controller!.add(event),
+        (error) => _controller!.addError(error));
+  }
+
+  void _onCancel() {
+    _computedSubscription?.cancel();
+    _computedSubscription = null;
   }
 }
