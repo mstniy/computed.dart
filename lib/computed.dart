@@ -103,6 +103,18 @@ extension StreamComputedExtension<T> on Stream<T> {
   /// during its previous run.
   /// Note that [prev] does not subscribe to this stream. To do that, see [use].
   T get prev => StreamComputedExtensionImpl<T>(this).prev;
+
+  /// Makes computations listening on this stream behave as if it emmitted the given value.
+  @visibleForTesting
+  void mockEmit(T value) {
+    StreamComputedExtensionImpl<T>(this).mockEmit(value);
+  }
+
+  /// Makes computations listening on this stream behave as if it emmitted the given error.
+  @visibleForTesting
+  void mockEmitException(Object e) {
+    StreamComputedExtensionImpl<T>(this).mockEmitException(e);
+  }
 }
 
 extension FutureComputedExtension<T> on Future<T> {

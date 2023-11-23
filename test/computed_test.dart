@@ -31,6 +31,48 @@ void main() {
       }
     });
 
+    test('mockEmit[Exception] works', () async {
+      final source = Stream.empty();
+
+      int ctr = 0;
+      bool? lastWasError;
+      int? lastRes;
+      Object? lastError;
+
+      final sub = Computed(() => source.use).listen((event) {
+        ctr++;
+        lastWasError = false;
+        lastRes = event;
+      }, (e) {
+        ctr++;
+        lastWasError = true;
+        lastError = e;
+      });
+
+      try {
+        source.mockEmit(0);
+        expect(ctr, 1);
+        expect(lastWasError, false);
+        expect(lastRes, 0);
+        source.mockEmit(0);
+        expect(ctr, 1);
+        source.mockEmit(1);
+        expect(ctr, 2);
+        expect(lastWasError, false);
+        expect(lastRes, 1);
+        source.mockEmitException(2);
+        expect(ctr, 3);
+        expect(lastWasError, true);
+        expect(lastError, 2);
+        source.mockEmitException(2);
+        expect(ctr, 4);
+        expect(lastWasError, true);
+        expect(lastError, 2);
+      } finally {
+        sub.cancel();
+      }
+    });
+
     test('can be used as listeners', () async {
       final controller = StreamController<int>.broadcast(
           sync: true); // Use a broadcast stream to make debugging easier
@@ -504,7 +546,7 @@ void main() {
 
     sub.cancel();
 
-    expect(GlobalCtx.routerExpando[source], null);
+    expect(GlobalCtx.routerFor(source), null);
   });
 
   test('cannot call use/prev outside computations', () {

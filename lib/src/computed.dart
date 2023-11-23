@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:meta/meta.dart';
 
 import '../computed.dart';
 import 'data_source_subscription.dart';
@@ -78,11 +77,14 @@ class GlobalCtx {
     return _currentComputation!;
   }
 
+  static ComputedImpl? routerFor(dynamic ds) {
+    return _routerExpando[ds]?._router;
+  }
+
   // For each data source, have a "router", which is a computation that returns the
   // value, or throws the error, produced by the data source.
   // This allows most of the logic to only deal with upstream computations.
-  @visibleForTesting
-  static final routerExpando = Expando<_RouterValueOrException>('computed');
+  static final _routerExpando = Expando<_RouterValueOrException>('computed');
 
   static _UpdateToken? _currentUpdate;
 }
@@ -125,10 +127,10 @@ class ComputedImpl<T> with Computed<T> {
 
   ComputedImpl(this._f) : _origF = _f;
 
-  void _onDataSourceData(T data) {
+  void onDataSourceData(T data) {
     if (_dss == null) return;
     final rvoe =
-        GlobalCtx.routerExpando[_dss!._ds] as _RouterValueOrException<T>;
+        GlobalCtx._routerExpando[_dss!._ds] as _RouterValueOrException<T>;
     if (rvoe._voe != null && rvoe._voe!._isValue && rvoe._voe!._value == data) {
       return;
     }
@@ -138,10 +140,10 @@ class ComputedImpl<T> with Computed<T> {
     _rerunGraph();
   }
 
-  void _onDataSourceError(Object err) {
+  void onDataSourceError(Object err) {
     if (_dss == null) return;
     final rvoe =
-        GlobalCtx.routerExpando[_dss!._ds] as _RouterValueOrException<T>;
+        GlobalCtx._routerExpando[_dss!._ds] as _RouterValueOrException<T>;
     // Update the global last value cache
     rvoe._voe = _ValueOrException<T>.exc(err);
 
@@ -180,18 +182,16 @@ class ComputedImpl<T> with Computed<T> {
   DT useDataSource<DT>(
       Object dataSource,
       DT Function() dataSourceUse,
-      DataSourceSubscription<DT> Function(
-              void Function(DT data) onData, Function(Object e) onError)
-          dss,
+      DataSourceSubscription<DT> Function(ComputedImpl<DT> router) dss,
       bool hasCurrentValue,
       DT? currentValue) {
     var rvoe =
-        GlobalCtx.routerExpando[dataSource] as _RouterValueOrException<DT>?;
+        GlobalCtx._routerExpando[dataSource] as _RouterValueOrException<DT>?;
 
     if (rvoe == null) {
       rvoe = _RouterValueOrException(ComputedImpl(dataSourceUse),
           hasCurrentValue ? _ValueOrException.value(currentValue as DT) : null);
-      GlobalCtx.routerExpando[dataSource] = rvoe;
+      GlobalCtx._routerExpando[dataSource] = rvoe;
     }
 
     if (rvoe._router != this) {
@@ -201,9 +201,7 @@ class ComputedImpl<T> with Computed<T> {
     // We are the router (thus, DT == T)
     // Make sure we are subscribed
     _dss ??= _DataSourceAndSubscription<T>(
-        dataSource,
-        dss((data) => _onDataSourceData(data as T), _onDataSourceError)
-            as DataSourceSubscription<T>);
+        dataSource, dss(this as ComputedImpl<DT>) as DataSourceSubscription<T>);
 
     if (rvoe._voe == null) {
       throw NoValueException();
@@ -216,7 +214,7 @@ class ComputedImpl<T> with Computed<T> {
       throw NoValueException(); // Even if the data source is in our memoization table
     }
     final rvoe =
-        GlobalCtx.routerExpando[dataSource] as _RouterValueOrException<DT>?;
+        GlobalCtx._routerExpando[dataSource] as _RouterValueOrException<DT>?;
     if (rvoe == null) throw NoValueException();
     final memoizedVOE = _lastResultfulUpstreamComputations![rvoe._router];
     if (memoizedVOE == null) throw NoValueException();
@@ -385,7 +383,7 @@ class ComputedImpl<T> with Computed<T> {
     if (_dss != null) {
       _dss!._dss.cancel();
       // Remove ourselves from the expando
-      GlobalCtx.routerExpando[_dss!._ds] = null;
+      GlobalCtx._routerExpando[_dss!._ds] = null;
       _dss = null;
     }
   }

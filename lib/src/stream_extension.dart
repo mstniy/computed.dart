@@ -13,8 +13,9 @@ class StreamComputedExtensionImpl<T> {
     return caller.useDataSource(
         s,
         () => s.use,
-        (onData, onError) =>
-            _StreamDataSourceSubscription(s.listen(onData, onError: onError)),
+        (router) => _StreamDataSourceSubscription(s.listen(
+            (data) => router.onDataSourceData(data),
+            onError: (e) => router.onDataSourceError(e))),
         false,
         null);
   }
@@ -22,6 +23,14 @@ class StreamComputedExtensionImpl<T> {
   T get prev {
     final caller = GlobalCtx.currentComputation;
     return caller.dataSourcePrev(s);
+  }
+
+  void mockEmit(T value) {
+    GlobalCtx.routerFor(s)?.onDataSourceData(value);
+  }
+
+  void mockEmitException(Object e) {
+    GlobalCtx.routerFor(s)?.onDataSourceError(e);
   }
 }
 

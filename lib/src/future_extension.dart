@@ -8,22 +8,15 @@ class FutureComputedExtensionImpl<T> {
   FutureComputedExtensionImpl(this.f);
   T get use {
     final caller = GlobalCtx.currentComputation;
-    return caller.useDataSource(
-        f,
-        () => f.use,
-        (onData, onError) =>
-            _FutureDataSourceSubscription<T>(f, onData, onError),
-        false,
-        null);
+    return caller.useDataSource(f, () => f.use,
+        (router) => _FutureDataSourceSubscription<T>(f, router), false, null);
   }
 }
 
 class _FutureDataSourceSubscription<T> implements DataSourceSubscription<T> {
-  final void Function(T data) onValue;
-  final Function onError;
-
-  _FutureDataSourceSubscription(Future<T> f, this.onValue, this.onError) {
-    f.then(this.onValue, onError: this.onError);
+  _FutureDataSourceSubscription(Future<T> f, ComputedImpl<T> router) {
+    f.then((value) => router.onDataSourceData(value),
+        onError: (e) => router.onDataSourceError(e));
   }
 
   @override
