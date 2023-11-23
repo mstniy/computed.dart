@@ -31,7 +31,7 @@ void main() {
       }
     });
 
-    test('mockEmit[Exception] works', () async {
+    test('mockEmit[Error] works', () async {
       final source = Stream.empty();
 
       int ctr = 0;
@@ -60,11 +60,11 @@ void main() {
         expect(ctr, 2);
         expect(lastWasError, false);
         expect(lastRes, 1);
-        source.mockEmitException(2);
+        source.mockEmitError(2);
         expect(ctr, 3);
         expect(lastWasError, true);
         expect(lastError, 2);
-        source.mockEmitException(2);
+        source.mockEmitError(2);
         expect(ctr, 4);
         expect(lastWasError, true);
         expect(lastError, 2);
@@ -672,7 +672,7 @@ void main() {
       }
     });
 
-    test('fixException works', () async {
+    test('fixThrow works', () async {
       final c1 = Computed(() {
         return 0;
       });
@@ -698,7 +698,7 @@ void main() {
 
       try {
         mustThrow = true;
-        c1.fixException(42);
+        c1.fixThrow(42);
       } finally {
         sub.cancel();
       }

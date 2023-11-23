@@ -29,11 +29,11 @@ abstract class Computed<T> {
     mock(() => value);
   }
 
-  /// Fixes the result of this computation to the given exception.
+  /// Fixes this computation to throw the given object.
   ///
   /// See [mock].
   @visibleForTesting
-  void fixException(Object e) {
+  void fixThrow(Object e) {
     mock(() => throw e);
   }
 
@@ -43,7 +43,7 @@ abstract class Computed<T> {
   @visibleForTesting
   void mock(T Function() mock);
 
-  /// Replaces [f] with the original, undoing [fix], [fixException] and [mock].
+  /// Replaces [f] with the original, undoing [fix], [fixThrow] and [mock].
   @visibleForTesting
   void unmock();
 
@@ -112,8 +112,8 @@ extension StreamComputedExtension<T> on Stream<T> {
 
   /// Makes computations listening on this stream behave as if it emmitted the given error.
   @visibleForTesting
-  void mockEmitException(Object e) {
-    StreamComputedExtensionImpl<T>(this).mockEmitException(e);
+  void mockEmitError(Object e) {
+    StreamComputedExtensionImpl<T>(this).mockEmitError(e);
   }
 }
 

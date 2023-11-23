@@ -29,7 +29,7 @@ class StreamComputedExtensionImpl<T> {
     GlobalCtx.routerFor(s)?.onDataSourceData(value);
   }
 
-  void mockEmitException(Object e) {
+  void mockEmitError(Object e) {
     GlobalCtx.routerFor(s)?.onDataSourceError(e);
   }
 }
