@@ -117,7 +117,9 @@ class ComputedImpl<T> with Computed<T> {
     } else {
       if (caller._lastResult == null) throw NoValueException();
       final voe = caller._lastResultfulUpstreamComputations![this];
-      if (voe == null) throw NoValueException();
+      if (voe == null) {
+        throw NoValueException();
+      }
       return voe.value;
     }
   }
@@ -189,8 +191,9 @@ class ComputedImpl<T> with Computed<T> {
         GlobalCtx._routerExpando[dataSource] as _RouterValueOrException<DT>?;
 
     if (rvoe == null) {
-      rvoe = _RouterValueOrException(ComputedImpl(dataSourceUse),
-          hasCurrentValue ? _ValueOrException.value(currentValue as DT) : null);
+      final voe =
+          hasCurrentValue ? _ValueOrException.value(currentValue as DT) : null;
+      rvoe = _RouterValueOrException(ComputedImpl(dataSourceUse), voe);
       GlobalCtx._routerExpando[dataSource] = rvoe;
     }
 

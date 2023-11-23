@@ -259,6 +259,46 @@ void main() {
     });
   });
 
+  test('computation listeners can be changed', () {
+    final controller = StreamController<int>.broadcast(
+        sync: true); // Use a broadcast stream to make debugging easier
+    final source = controller.stream;
+
+    final c = Computed(() => source.use);
+
+    final sub = c.listen((event) {
+      fail("Must not run");
+    }, (e) => fail("Must not run"));
+
+    try {
+      int ctr = 0;
+      bool? lastWasError;
+      int? lastValue;
+      Object? lastError;
+      sub.onData((data) {
+        ctr++;
+        lastWasError = false;
+        lastValue = data;
+      });
+      sub.onError((e) {
+        ctr++;
+        lastWasError = true;
+        lastError = e;
+      });
+
+      controller.add(0);
+      expect(ctr, 1);
+      expect(lastWasError, false);
+      expect(lastValue, 0);
+      controller.addError(1);
+      expect(ctr, 2);
+      expect(lastWasError, true);
+      expect(lastError, 1);
+    } finally {
+      sub.cancel();
+    }
+  });
+
   test('computations can use other computations', () {
     final controller = StreamController<int>.broadcast(
         sync: true); // Use a broadcast stream to make debugging easier
