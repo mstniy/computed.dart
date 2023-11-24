@@ -360,6 +360,67 @@ void main() {
     }
   });
 
+  test('latest pattern works', () {
+    final controller1 = StreamController<int>.broadcast(
+        sync: true); // Use a broadcast stream to make debugging easier
+    final source1 = controller1.stream;
+
+    final controller2 = StreamController<int>.broadcast(
+        sync: true); // Use a broadcast stream to make debugging easier
+    final source2 = controller2.stream;
+
+    final c = Computed(() {
+      int? s1prev, s1now, s2now;
+      try {
+        s1prev = source1.prev;
+      } on NoValueException {
+        //Pass
+      }
+      try {
+        s1now = source1.use;
+      } on NoValueException {
+        //Pass
+      }
+      try {
+        s2now = source2.use;
+      } on NoValueException {
+        //Pass
+      }
+      if (s1now == null && s2now == null) {
+        throw NoValueException(); // Give up
+      }
+      if (s1prev != s1now) return s1now;
+      return s2now;
+    });
+
+    var expectation = 0;
+    var callCnt = 0;
+
+    final sub = c.listen((event) {
+      callCnt++;
+      expect(event, expectation);
+    }, (e) => fail(e.toString()));
+
+    try {
+      controller1.add(0);
+      expect(callCnt, 1);
+      expectation = 1;
+      controller2.add(1);
+      expect(callCnt, 2);
+      expectation = 2;
+      controller1.add(2);
+      expect(callCnt, 3);
+      expectation = 3;
+      controller1.add(3);
+      expect(callCnt, 4);
+      expectation = 4;
+      controller2.add(4);
+      expect(callCnt, 5);
+    } finally {
+      sub.cancel();
+    }
+  });
+
   group('respects topological order', () {
     test('on upstream updates', () {
       for (var streamFirst in [false, true]) {
