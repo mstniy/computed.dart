@@ -257,17 +257,23 @@ class ComputedImpl<T> with Computed<T> {
               continue;
             }
           }
+          assert(cur._lastUpdate == GlobalCtx._currentUpdate);
           for (var down in cur._downstreamComputations) {
             if (!done.contains(down)) {
               var nud = numUnsatDep[down];
               if (nud == null) {
                 nud = 0;
                 for (var up in down._lastUpstreamComputations.keys) {
-                  nud =
-                      nud! + ((up._dss == null) ? 1 : ((up._novalue) ? 1 : 0));
+                  nud = nud! +
+                      ((up._dss != null ||
+                              up._lastUpdate == GlobalCtx._currentUpdate)
+                          ? 0
+                          : 1);
                 }
+              } else {
+                assert(nud > 0);
+                nud--;
               }
-              if (cur._dss == null) nud = nud! - 1;
               if (nud == 0) {
                 noUnsatDep.add(down);
               } else {
@@ -298,6 +304,7 @@ class ComputedImpl<T> with Computed<T> {
         return;
       }
     }
+    _lastUpdate = GlobalCtx._currentUpdate;
   }
 
   // Also notifies the listeners (but not downstream computations) if necessary
@@ -332,9 +339,11 @@ class ComputedImpl<T> with Computed<T> {
         for (var up in oldDiffNew) {
           up._removeDownstreamComputation(this);
         }
+        // Bookkeep the fact the we ran/tried to run this computation
+        // so that we can unlock its downstream during the DAG walk
+        _lastUpdate = GlobalCtx._currentUpdate;
       }
-      // The "resultful" case (the function either returned or threw an exception (not an Error) other than NoValueException)
-      _lastUpdate = GlobalCtx._currentUpdate;
+      // The "resultful" case (the function either returned or threw an exception other than NoValueException)
       final shouldNotify = _prevResult?.shouldNotify(_lastResult!) ?? true;
       if (shouldNotify) {
         _lastResultfulUpstreamComputations = _lastUpstreamComputations;
