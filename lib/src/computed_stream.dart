@@ -27,7 +27,7 @@ class ComputedStreamExtensionImpl<T> {
 
   void _onListen() {
     _computedSubscription ??= _parent.listen((event) => _controller!.add(event),
-        (error) => _controller!.addError(error));
+        onError: (error) => _controller!.addError(error));
   }
 
   void _onCancel() {

@@ -19,7 +19,7 @@ void main() {
 
       final sub = Computed(() => source.use * 2).listen((event) {
         lastRes = event;
-      }, (e) => fail(e.toString()));
+      }, onError: (e) => fail(e.toString()));
 
       try {
         controller.add(0);
@@ -43,7 +43,7 @@ void main() {
         ctr++;
         lastWasError = false;
         lastRes = event;
-      }, (e) {
+      }, onError: (e) {
         ctr++;
         lastWasError = true;
         lastError = e;
@@ -163,7 +163,7 @@ void main() {
 
       final sub = c.listen((event) {
         subCnt++;
-      }, (e) => fail(e.toString()));
+      }, onError: (e) => fail(e.toString()));
 
       try {
         controller.add(0);
@@ -201,7 +201,7 @@ void main() {
       final sub = x3.listen((event) {
         callCnt++;
         expect(event, 8);
-      }, (e) => fail(e.toString()));
+      }, onError: (e) => fail(e.toString()));
 
       try {
         completer.complete(2);
@@ -231,7 +231,7 @@ void main() {
 
       final sub = c.listen((event) {
         callCnt++;
-      }, (e) => fail(e.toString()));
+      }, onError: (e) => fail(e.toString()));
 
       try {
         completer.completeError(1);
@@ -253,7 +253,7 @@ void main() {
 
       final sub = x.listen((event) {
         fail('Must not call the listener');
-      }, (e) => fail(e.toString()));
+      }, onError: (e) => fail(e.toString()));
 
       sub.cancel();
 
@@ -274,7 +274,7 @@ void main() {
 
     final sub = c.listen((event) {
       fail("Must not run");
-    }, (e) => fail("Must not run"));
+    }, onError: (e) => fail("Must not run"));
 
     try {
       int ctr = 0;
@@ -316,7 +316,7 @@ void main() {
 
     final sub = Computed(() => x2.use + 1).listen((event) {
       lastRes = event;
-    }, (e) => fail(e.toString()));
+    }, onError: (e) => fail(e.toString()));
 
     try {
       controller.add(0);
@@ -344,7 +344,7 @@ void main() {
       return x2.use;
     }).listen((event) {
       lastRes = event;
-    }, (e) => fail(e.toString()));
+    }, onError: (e) => fail(e.toString()));
 
     expect(callCnt, 1);
 
@@ -405,7 +405,7 @@ void main() {
     final sub = c.listen((event) {
       callCnt++;
       expect(event, expectation);
-    }, (e) => fail(e.toString()));
+    }, onError: (e) => fail(e.toString()));
 
     try {
       controller1.add(0);
@@ -445,7 +445,7 @@ void main() {
 
         final sub = x2Plusx.listen((output) {
           outputs.add(output);
-        }, (e) => fail(e.toString()));
+        }, onError: (e) => fail(e.toString()));
 
         try {
           controller.add(0);
@@ -484,11 +484,11 @@ void main() {
 
           final sub2 = c2.listen((output) {
             outputs2.add(output);
-          }, (e) => fail(e.toString()));
+          }, onError: (e) => fail(e.toString()));
 
           final sub3 = c3.listen((output) {
             outputs3.add(output);
-          }, (e) => fail(e.toString()));
+          }, onError: (e) => fail(e.toString()));
 
           try {
             controller1.add(0);
@@ -532,7 +532,7 @@ void main() {
     var sub = c2.listen((output) {
       checkCnt++;
       expect(output, 0);
-    }, (e) => fail(e.toString()));
+    }, onError: (e) => fail(e.toString()));
 
     expect(callCnt1, 1);
     expect(callCnt2, 1);
@@ -556,7 +556,7 @@ void main() {
     sub = c2.listen((output) {
       expect(output, 4);
       checkCnt++;
-    }, (e) => fail(e.toString())); // This triggers a re-computation
+    }, onError: (e) => fail(e.toString())); // This triggers a re-computation
 
     await Future.value();
     expect(callCnt1,
@@ -584,7 +584,7 @@ void main() {
 
     final sub = c2.listen((output) {
       fail('must not reach here');
-    }, (e) {
+    }, onError: (e) {
       checkFlag = true;
       expect(e, 42);
     });
@@ -613,7 +613,7 @@ void main() {
       expect(checkFlag, false);
       checkFlag = true;
       expect(event, 42);
-    }, (e) => fail(e.toString()));
+    }, onError: (e) => fail(e.toString()));
 
     try {
       await Future.value(); // Wait for the update
@@ -629,7 +629,7 @@ void main() {
       expect(checkFlag, false);
       checkFlag = true;
       expect(event, 42);
-    }, (e) => fail(e.toString()));
+    }, onError: (e) => fail(e.toString()));
 
     try {
       await Future.value(); // Wait for the update
@@ -649,7 +649,7 @@ void main() {
       return source.use;
     });
 
-    var sub = c.listen((output) {}, (e) => fail(e.toString()));
+    var sub = c.listen((output) {}, onError: (e) => fail(e.toString()));
 
     sub.cancel();
 
@@ -683,7 +683,7 @@ void main() {
 
     final sub = c.listen((event) {
       fail('Must not call listener');
-    }, (e) {
+    }, onError: (e) {
       flag = true;
       expect(
           e.message,
@@ -709,7 +709,7 @@ void main() {
 
     final sub = c.listen((event) {
       fail('Must not call listener');
-    }, (e) {
+    }, onError: (e) {
       flag = true;
       expect(
           e.message,
@@ -740,7 +740,7 @@ void main() {
       var sub = c.listen((output) {
         listenerCallCnt++;
         expect(output, expectation);
-      }, (e) => fail(e.toString()));
+      }, onError: (e) => fail(e.toString()));
 
       try {
         c.fix(42);
@@ -790,7 +790,7 @@ void main() {
         }
       });
 
-      var sub = c2.listen((output) {}, (e) => fail(e.toString()));
+      var sub = c2.listen((output) {}, onError: (e) => fail(e.toString()));
 
       try {
         mustThrow = true;
@@ -826,7 +826,7 @@ void main() {
     final sub = c2.listen((event) {
       subCnt++;
       expect(event, expected);
-    }, (e) => fail(e.toString()));
+    }, onError: (e) => fail(e.toString()));
 
     expect(c1cnt, 1);
     expect(c2cnt, 1);
@@ -881,7 +881,7 @@ void main() {
     final sub = c2.listen((event) {
       subCnt++;
       expect(expectThrow, false);
-    }, (e) {
+    }, onError: (e) {
       subCnt++;
       expect(expectThrow, true);
     });
@@ -943,7 +943,7 @@ void main() {
     final sub = c.listen((event) {
       subCnt++;
       expect(event, expectation);
-    }, (e) => fail(e.toString()));
+    }, onError: (e) => fail(e.toString()));
 
     try {
       controller.add(0);
@@ -993,7 +993,7 @@ void main() {
     final sub = c.listen((event) {
       subCnt++;
       expect(event, expectation);
-    }, (e) => fail(e.toString()));
+    }, onError: (e) => fail(e.toString()));
 
     try {
       controller1.add(0);
@@ -1038,7 +1038,7 @@ void main() {
 
         final sub = c.listen((event) {
           subCnt++;
-        }, (e) => fail(e.toString()));
+        }, onError: (e) => fail(e.toString()));
 
         try {
           expect(subCnt, 0);
@@ -1083,7 +1083,7 @@ void main() {
 
       final sub = c.listen((event) {
         subCnt++;
-      }, (e) => fail(e.toString()));
+      }, onError: (e) => fail(e.toString()));
 
       try {
         expect(subCnt, 0);
@@ -1125,7 +1125,7 @@ void main() {
 
       final sub = c.listen((event) {
         subCnt++;
-      }, (e) => fail(e.toString()));
+      }, onError: (e) => fail(e.toString()));
 
       try {
         expect(subCnt, 0);
@@ -1173,7 +1173,7 @@ void main() {
 
       final sub = c2.listen((event) {
         subCnt++;
-      }, (e) => fail(e.toString()));
+      }, onError: (e) => fail(e.toString()));
 
       try {
         controller.add(0);
@@ -1212,7 +1212,7 @@ void main() {
 
       final sub = c.listen((event) {
         subCnt++;
-      }, (e) => fail(e.toString()));
+      }, onError: (e) => fail(e.toString()));
 
       try {
         expect(subCnt, 0);
@@ -1260,7 +1260,7 @@ void main() {
 
       final sub = c.listen((event) {
         subCnt++;
-      }, (e) => fail(e.toString()));
+      }, onError: (e) => fail(e.toString()));
 
       try {
         expect(subCnt, 0);
@@ -1317,7 +1317,7 @@ void main() {
 
       final sub = c.listen((event) {
         subCnt++;
-      }, (e) => fail(e.toString()));
+      }, onError: (e) => fail(e.toString()));
 
       try {
         await Future.value();
@@ -1367,7 +1367,7 @@ void main() {
 
       final sub = c.listen((event) {
         subCnt++;
-      }, (e) => fail(e.toString()));
+      }, onError: (e) => fail(e.toString()));
 
       try {
         controller1.add(0);
@@ -1413,7 +1413,7 @@ void main() {
         }
       });
 
-      final sub = c.listen((event) {}, (e) => fail(e.toString()));
+      final sub = c.listen((event) {}, onError: (e) => fail(e.toString()));
 
       try {
         expect(flag, true);
@@ -1433,7 +1433,7 @@ void main() {
 
       final sub = b.listen((event) {
         fail('What?');
-      }, (e) {
+      }, onError: (e) {
         flag = true;
         expect(e, isA<CyclicUseException>());
       });
@@ -1464,7 +1464,7 @@ void main() {
       final sub = b.listen((event) {
         cnt1++;
         expect(event, 1);
-      }, (e) {
+      }, onError: (e) {
         expect(e, isA<CyclicUseException>());
         cnt2++;
       });

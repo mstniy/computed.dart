@@ -154,8 +154,8 @@ class ComputedImpl<T> with Computed<T> {
   }
 
   @override
-  ComputedSubscription<T> listen(
-      void Function(T event)? onData, Function? onError) {
+  ComputedSubscription<T> listen(void Function(T event)? onData,
+      {Function? onError}) {
     final sub = _ComputedSubscriptionImpl<T>(this, onData, onError);
     if (_novalue) {
       try {

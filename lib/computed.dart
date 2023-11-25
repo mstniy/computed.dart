@@ -18,8 +18,8 @@ abstract class Computed<T> {
     return c;
   }
 
-  ComputedSubscription<T> listen(
-      void Function(T event)? onData, Function? onError);
+  ComputedSubscription<T> listen(void Function(T event)? onData,
+      {Function? onError});
 
   /// Fixes the result of this computation to the given value.
   ///
