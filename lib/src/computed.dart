@@ -25,8 +25,9 @@ class _ValueOrException<T> {
   }
 
   bool shouldNotify(_ValueOrException<T> other) {
-    // Do not memoize exceptions
-    return !_isValue || (!other._isValue) || (_value != other._value);
+    return _isValue != other._isValue ||
+        (_isValue && _value != other._value) ||
+        (!_isValue && _exc != other._exc);
   }
 }
 
@@ -143,6 +144,9 @@ class ComputedImpl<T> with Computed<T> {
     if (_dss == null) return;
     final rvoe =
         GlobalCtx._routerExpando[_dss!._ds] as _RouterValueOrException<T>;
+    if (rvoe._voe != null && !rvoe._voe!._isValue && rvoe._voe!._exc == err) {
+      return;
+    }
     // Update the global last value cache
     rvoe._voe = _ValueOrException<T>.exc(err);
 
@@ -314,7 +318,6 @@ class ComputedImpl<T> with Computed<T> {
       final oldPrevResult = _prevResult;
       final oldUpstreamComputations = _lastUpstreamComputations;
       _prevResult = _lastResult;
-      // Never memoize exceptions
       _curUpstreamComputations = {};
       try {
         GlobalCtx._currentComputation = this;

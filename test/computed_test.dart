@@ -60,14 +60,20 @@ void main() {
         expect(ctr, 2);
         expect(lastWasError, false);
         expect(lastRes, 1);
-        source.mockEmitError(2);
+        source.mockEmitError(1);
         expect(ctr, 3);
         expect(lastWasError, true);
-        expect(lastError, 2);
+        expect(lastError, 1);
         source.mockEmitError(2);
         expect(ctr, 4);
         expect(lastWasError, true);
         expect(lastError, 2);
+        source.mockEmitError(2);
+        expect(ctr, 4);
+        source.mockEmit(3);
+        expect(ctr, 5);
+        expect(lastWasError, false);
+        expect(lastRes, 3);
       } finally {
         sub.cancel();
       }
@@ -165,17 +171,17 @@ void main() {
         expectation = 1;
         controller.addError(1);
         expect(subCnt, 2);
-        // Exceptions are never memoized
+        // Exceptions are also memoized
         controller.addError(1);
-        expect(subCnt, 3);
+        expect(subCnt, 2);
         expectation = 2;
         controller.addError(2);
-        expect(subCnt, 4);
+        expect(subCnt, 3);
         expectation = null;
         controller.add(3);
-        expect(subCnt, 5);
+        expect(subCnt, 4);
         controller.add(3);
-        expect(subCnt, 5);
+        expect(subCnt, 4);
       } finally {
         sub.cancel();
       }
@@ -822,7 +828,7 @@ void main() {
     }
   });
 
-  test('exceptions are not memoized', () {
+  test('exceptions are memoized', () {
     final controller = StreamController<int>.broadcast(
         sync: true); // Use a broadcast stream to make debugging easier
     final source = controller.stream;
@@ -832,7 +838,7 @@ void main() {
 
     final c1 = Computed(() {
       c1cnt++;
-      if (source.use % 2 == 0) throw 42;
+      if (source.use % 2 == 0) throw source.use % 4;
       return source.use;
     });
     final c2 = Computed(() {
@@ -861,18 +867,22 @@ void main() {
       expect(c1cnt, 2);
       expect(c2cnt, 2);
       expect(subCnt, 1);
-      controller.add(2);
+      controller.add(4);
       expect(c1cnt, 3);
+      expect(c2cnt, 2);
+      expect(subCnt, 1);
+      controller.add(2);
+      expect(c1cnt, 4);
       expect(c2cnt, 3);
       expect(subCnt, 2);
       expectThrow = false;
       controller.add(1);
-      expect(c1cnt, 5);
+      expect(c1cnt, 6);
       expect(c2cnt, 5);
       expect(subCnt, 3);
       expectThrow = true;
       controller.add(0);
-      expect(c1cnt, 6);
+      expect(c1cnt, 7);
       expect(c2cnt, 6);
       expect(subCnt, 4);
     } finally {
