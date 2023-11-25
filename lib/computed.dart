@@ -19,7 +19,7 @@ abstract class Computed<T> {
   }
 
   ComputedSubscription<T> listen(void Function(T event)? onData,
-      {Function? onError});
+      {Function? onError, bool memoize = true});
 
   /// Fixes the result of this computation to the given value.
   ///

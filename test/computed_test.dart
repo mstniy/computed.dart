@@ -79,64 +79,123 @@ void main() {
       }
     });
 
-    test('can be used as listeners', () async {
+    test('asStream works', () async {
       final controller = StreamController<int>.broadcast(
           sync: true); // Use a broadcast stream to make debugging easier
       final source = controller.stream;
 
-      for (var isBroadcast in [false, true]) {
-        bool? lastWasError;
-        int? lastRes;
-        Object? lastError;
-        var ctr = 0;
+      bool? lastWasError;
+      int? lastRes;
+      Object? lastError;
+      var ctr = 0;
 
-        final c = Computed(() => source.use * 2);
+      final c = Computed(() => source.use * 2);
 
-        final stream = isBroadcast ? c.asBroadcastStream : c.asStream;
+      final stream = c.asStream;
 
-        final sub = stream.listen((event) {
-          ctr++;
-          lastWasError = false;
-          lastRes = event;
-        }, onError: (e) {
-          ctr++;
-          lastWasError = true;
-          lastError = e;
-        });
+      final sub = stream.listen((event) {
+        ctr++;
+        lastWasError = false;
+        lastRes = event;
+      }, onError: (e) {
+        ctr++;
+        lastWasError = true;
+        lastError = e;
+      });
 
-        try {
-          await Future.value(); // Sanity check
-          expect(ctr, 0);
-          controller.add(0);
-          await Future
-              .value(); // As Stream-s call their listeners in the next tick
-          expect(ctr, 1);
-          expect(lastWasError, false);
-          expect(lastRes, 0);
-          controller.add(1);
-          await Future.value();
-          expect(ctr, 2);
-          expect(lastRes, 2);
-          controller.addError(2);
-          await Future.value();
-          expect(ctr, 3);
-          expect(lastWasError, true);
-          expect(lastError, 2);
-          await Future.value(); // Sanity check
-          expect(ctr, 3);
-        } finally {
-          sub.cancel();
-        }
-
-        try {
-          stream.listen((event) {});
-          if (!isBroadcast) fail("should have thrown");
-        } on StateError catch (e) {
-          expect(isBroadcast, false);
-          // The returned stream is not a broadcast stream
-          expect(e.message, contains('Stream has already been listened to.'));
-        }
+      try {
+        await Future.value(); // Sanity check
+        expect(ctr, 0);
+        controller.add(0);
+        await Future
+            .value(); // As Stream-s call their listeners in the next tick
+        expect(ctr, 1);
+        expect(lastWasError, false);
+        expect(lastRes, 0);
+        controller.add(0);
+        await Future
+            .value(); // As Stream-s call their listeners in the next tick
+        expect(ctr, 2); // Non-broadcast streams are not memoized
+        expect(lastWasError, false);
+        expect(lastRes, 0);
+        controller.add(1);
+        await Future.value();
+        expect(ctr, 3);
+        expect(lastRes, 2);
+        controller.addError(2);
+        await Future.value();
+        expect(ctr, 4);
+        expect(lastWasError, true);
+        expect(lastError, 2);
+        await Future.value(); // Sanity check
+        expect(ctr, 4);
+      } finally {
+        sub.cancel();
       }
+
+      try {
+        stream.listen((event) {});
+        fail("should have thrown");
+      } on StateError catch (e) {
+        expect(e.message, contains('Stream has already been listened to.'));
+      }
+    });
+
+    test('asBroadcastStream works', () async {
+      final controller = StreamController<int>.broadcast(
+          sync: true); // Use a broadcast stream to make debugging easier
+      final source = controller.stream;
+
+      bool? lastWasError;
+      int? lastRes;
+      Object? lastError;
+      var ctr = 0;
+
+      final c = Computed(() => source.use * 2);
+
+      final stream = c.asBroadcastStream;
+
+      final sub = stream.listen((event) {
+        ctr++;
+        lastWasError = false;
+        lastRes = event;
+      }, onError: (e) {
+        ctr++;
+        lastWasError = true;
+        lastError = e;
+      });
+
+      try {
+        await Future.value(); // Sanity check
+        expect(ctr, 0);
+        controller.add(0);
+        await Future
+            .value(); // As Stream-s call their listeners in the next tick
+        expect(ctr, 1);
+        expect(lastWasError, false);
+        expect(lastRes, 0);
+        controller.add(
+            0); // Must not trigger a re-computation: broadcast streams are memoized
+        await Future.value();
+        expect(ctr, 1);
+        controller.add(1);
+        await Future.value();
+        expect(ctr, 2);
+        expect(lastRes, 2);
+        controller.addError(2);
+        await Future.value();
+        expect(ctr, 3);
+        expect(lastWasError, true);
+        expect(lastError, 2);
+        await Future.value(); // Sanity check
+        expect(ctr, 3);
+      } finally {
+        sub.cancel();
+      }
+
+      stream
+          .listen((event) {})
+          .cancel(); // Broadcast stream must be listenable more than once
     });
 
     test('can pass errors to computations', () {
