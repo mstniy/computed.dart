@@ -322,7 +322,15 @@ class ComputedImpl<T> with Computed<T> {
       try {
         GlobalCtx._currentComputation = this;
         final newResult = _ValueOrException.value(_f());
-        assert(_f() == newResult._value,
+        assert(() {
+          T? f2;
+          try {
+            f2 = _f();
+          } catch (_) {
+            return false;
+          }
+          return f2 == newResult._value;
+        }(),
             "Computed expressions must be purely functional. Please use listeners for side effects.");
         _lastResult = newResult;
       } on NoValueException {

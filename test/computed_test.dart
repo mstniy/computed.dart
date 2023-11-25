@@ -690,9 +690,38 @@ void main() {
           contains(
               "Computed expressions must be purely functional. Please use listeners for side effects."));
     });
-    await Future.value();
-    sub.cancel();
-    expect(flag, true);
+    try {
+      await Future.value();
+      expect(flag, true);
+    } finally {
+      sub.cancel();
+    }
+  });
+
+  test('asserts if f throws only on the second try', () async {
+    var ctr = 0;
+    final c = Computed(() {
+      if (ctr == 1) throw 42;
+      return ctr++;
+    });
+
+    var flag = false;
+
+    final sub = c.listen((event) {
+      fail('Must not call listener');
+    }, (e) {
+      flag = true;
+      expect(
+          e.message,
+          contains(
+              "Computed expressions must be purely functional. Please use listeners for side effects."));
+    });
+    try {
+      await Future.value();
+      expect(flag, true);
+    } finally {
+      sub.cancel();
+    }
   });
 
   group('mocks', () {
