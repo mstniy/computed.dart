@@ -91,10 +91,21 @@ extension ComputedStreamExtension<T> on Computed<T> {
 extension StreamComputedExtension<T> on Stream<T> {
   /// Returns the current value of this stream and subscribes to it.
   ///
+  /// Unlike [useAll], [use] does not trigger a re-computation if the stream
+  /// consecutively produces values comparing equal to each other.
   /// Can only be used inside computations.
   /// If the last item in the stream is an error, throws it.
   /// Throws [NoValueException] if the stream does not have a known value yet.
   T get use => StreamComputedExtensionImpl<T>(this).use;
+
+  /// Returns the current value of this stream and subscribes to all values and errors produced by it it.
+  ///
+  /// Unlike [use], [useAll] does trigger a re-computation if the stream
+  /// consecutively produces values comparing equal to each other.
+  /// Can only be used inside computations.
+  /// If the last item in the stream is an error, throws it.
+  /// Throws [NoValueException] if the stream does not have a known value yet.
+  T get useAll => StreamComputedExtensionImpl<T>(this).useAll;
 
   /// Returns the value of this stream during the last run of the current computation which returned a different value to the previous one.
   ///

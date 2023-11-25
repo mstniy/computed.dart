@@ -8,7 +8,7 @@ class StreamComputedExtensionImpl<T> {
   final Stream<T> s;
 
   StreamComputedExtensionImpl(this.s);
-  T get use {
+  T _use(bool memoized) {
     final caller = GlobalCtx.currentComputation;
     return caller.useDataSource(
         s,
@@ -17,7 +17,16 @@ class StreamComputedExtensionImpl<T> {
             (data) => router.onDataSourceData(data),
             onError: (e) => router.onDataSourceError(e))),
         false,
-        null);
+        null,
+        memoized);
+  }
+
+  T get use {
+    return _use(true);
+  }
+
+  T get useAll {
+    return _use(false);
   }
 
   T get prev {

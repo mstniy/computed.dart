@@ -31,6 +31,52 @@ void main() {
       }
     });
 
+    test('useAll does not memoize the values produced by the stream', () async {
+      final controller = StreamController<int>.broadcast(
+          sync: true); // Use a broadcast stream to make debugging easier
+      final source = controller.stream;
+
+      // Also test that calling both .use and .useAll works
+      for (var callBoth in [false, true]) {
+        for (var useAllFirst in [false, if (callBoth) true]) {
+          int cCnt = 0;
+          int lCnt = 0;
+          int? lastRes;
+
+          final sub = Computed(() {
+            cCnt++;
+            if (callBoth) {
+              if (useAllFirst) source.useAll;
+              source.use;
+            }
+            return source.useAll * 2;
+          }).listen((event) {
+            lCnt++;
+            lastRes = event;
+          }, (e) => fail(e.toString()));
+
+          try {
+            await Future.value(0);
+            expect(cCnt, 1);
+            expect(lCnt, 0);
+            controller.add(0);
+            expect(cCnt, 3);
+            expect(lCnt, 1);
+            expect(lastRes, 0);
+            controller.add(0);
+            expect(cCnt, 5);
+            expect(lCnt, 1);
+            controller.add(1);
+            expect(cCnt, 7);
+            expect(lCnt, 2);
+            expect(lastRes, 2);
+          } finally {
+            sub.cancel();
+          }
+        }
+      }
+    });
+
     test('mockEmit[Error] works', () async {
       final source = Stream.empty();
 

@@ -24,7 +24,7 @@ class _ValueOrException<T> {
     throw _exc!;
   }
 
-  bool shouldNotify(_ValueOrException<T> other) {
+  bool shouldNotifyMemoized(_ValueOrException<T> other) {
     return _isValue != other._isValue ||
         (_isValue && _value != other._value) ||
         (!_isValue && _exc != other._exc);
@@ -91,20 +91,25 @@ class GlobalCtx {
 }
 
 class ComputedImpl<T> with Computed<T> {
-  Map<ComputedImpl, _ValueOrException?>? _lastResultfulUpstreamComputations;
-  var _lastUpstreamComputations = <ComputedImpl, _ValueOrException?>{};
-  Map<ComputedImpl, _ValueOrException?>? _curUpstreamComputations;
-  final _downstreamComputations = <ComputedImpl>{};
-
   _DataSourceAndSubscription<T>? _dss;
-  final _listeners = <_ComputedSubscriptionImpl<T>>{};
+
+  _UpdateToken? _lastUpdate;
 
   bool get _novalue => _lastResult == null;
-  _UpdateToken? _lastUpdate;
-  bool get _computing => _curUpstreamComputations != null;
-
   _ValueOrException<T>? _lastResult;
   _ValueOrException<T>? _prevResult;
+  Map<ComputedImpl, _ValueOrException?>? _lastResultfulUpstreamComputations;
+  var _lastUpstreamComputations = <ComputedImpl, _ValueOrException?>{};
+
+  bool get _computing => _curUpstreamComputations != null;
+  Map<ComputedImpl, _ValueOrException?>? _curUpstreamComputations;
+
+  final _memoizedDownstreamComputations = <ComputedImpl>{};
+  final _nonMemoizedDownstreamComputations = <ComputedImpl>{};
+
+  final _listeners = <_ComputedSubscriptionImpl<T>>{};
+
+  var _dirty = false;
 
   @override
   T get prev {
@@ -131,11 +136,14 @@ class ComputedImpl<T> with Computed<T> {
     if (_dss == null) return;
     final rvoe =
         GlobalCtx._routerExpando[_dss!._ds] as _RouterValueOrException<T>;
-    if (rvoe._voe != null && rvoe._voe!._isValue && rvoe._voe!._value == data) {
+    if (rvoe._voe == null ||
+        !rvoe._voe!._isValue ||
+        rvoe._voe!._value != data) {
+      // Update the global last value cache
+      rvoe._voe = _ValueOrException<T>.value(data);
+    } else if (_nonMemoizedDownstreamComputations.isEmpty) {
       return;
     }
-    // Update the global last value cache
-    rvoe._voe = _ValueOrException<T>.value(data);
 
     _rerunGraph();
   }
@@ -144,11 +152,12 @@ class ComputedImpl<T> with Computed<T> {
     if (_dss == null) return;
     final rvoe =
         GlobalCtx._routerExpando[_dss!._ds] as _RouterValueOrException<T>;
-    if (rvoe._voe != null && !rvoe._voe!._isValue && rvoe._voe!._exc == err) {
+    if (rvoe._voe == null || rvoe._voe!._isValue || rvoe._voe!._exc != err) {
+      // Update the global last value cache
+      rvoe._voe = _ValueOrException<T>.exc(err);
+    } else if (_nonMemoizedDownstreamComputations.isEmpty) {
       return;
     }
-    // Update the global last value cache
-    rvoe._voe = _ValueOrException<T>.exc(err);
 
     _rerunGraph();
   }
@@ -187,7 +196,8 @@ class ComputedImpl<T> with Computed<T> {
       DT Function() dataSourceUse,
       DataSourceSubscription<DT> Function(ComputedImpl<DT> router) dss,
       bool hasCurrentValue,
-      DT? currentValue) {
+      DT? currentValue,
+      bool memoized) {
     var rvoe =
         GlobalCtx._routerExpando[dataSource] as _RouterValueOrException<DT>?;
 
@@ -195,16 +205,15 @@ class ComputedImpl<T> with Computed<T> {
       rvoe = _RouterValueOrException(ComputedImpl(dataSourceUse),
           hasCurrentValue ? _ValueOrException.value(currentValue as DT) : null);
       GlobalCtx._routerExpando[dataSource] = rvoe;
+      rvoe._router._dss ??=
+          _DataSourceAndSubscription<DT>(dataSource, dss(rvoe._router));
     }
 
     if (rvoe._router != this) {
       // Subscribe to the router instead
-      return rvoe._router.use;
+      return rvoe._router._use(memoized);
     }
     // We are the router (thus, DT == T)
-    // Make sure we are subscribed
-    _dss ??= _DataSourceAndSubscription<T>(
-        dataSource, dss(this as ComputedImpl<DT>) as DataSourceSubscription<T>);
 
     if (rvoe._voe == null) {
       throw NoValueException();
@@ -246,7 +255,9 @@ class ComputedImpl<T> with Computed<T> {
         noUnsatDep.remove(cur);
         if (done.contains(cur)) continue;
         try {
-          if (cur._downstreamComputations.isEmpty && cur._listeners.isEmpty) {
+          if (cur._memoizedDownstreamComputations.isEmpty &&
+              cur._nonMemoizedDownstreamComputations.isEmpty &&
+              cur._listeners.isEmpty) {
             continue;
           }
           if (cur._lastUpdate != GlobalCtx._currentUpdate) {
@@ -262,7 +273,10 @@ class ComputedImpl<T> with Computed<T> {
             }
           }
           assert(cur._lastUpdate == GlobalCtx._currentUpdate);
-          for (var down in cur._downstreamComputations) {
+          for (var down in [
+            ...cur._memoizedDownstreamComputations,
+            ...cur._nonMemoizedDownstreamComputations
+          ]) {
             if (!done.contains(down)) {
               var nud = numUnsatDep[down];
               if (nud == null) {
@@ -299,20 +313,16 @@ class ComputedImpl<T> with Computed<T> {
       _evalF();
       return;
     }
-    for (var compVOE in _lastUpstreamComputations.entries) {
-      final comp = compVOE.key;
-      if (comp._lastResult == null) continue;
-      final voe = compVOE.value;
-      if (voe == null || voe.shouldNotify(comp._lastResult!)) {
-        _evalF();
-        return;
-      }
+    if (!_dirty) {
+      _lastUpdate = GlobalCtx._currentUpdate;
+    } else {
+      _evalF();
     }
-    _lastUpdate = GlobalCtx._currentUpdate;
   }
 
   // Also notifies the listeners (but not downstream computations) if necessary
   void _evalF() {
+    _dirty = false;
     final oldComputation = GlobalCtx._currentComputation;
     try {
       final oldPrevResult = _prevResult;
@@ -355,9 +365,16 @@ class ComputedImpl<T> with Computed<T> {
         _lastUpdate = GlobalCtx._currentUpdate;
       }
       // The "resultful" case (the function either returned or threw an exception other than NoValueException)
-      final shouldNotify = _prevResult?.shouldNotify(_lastResult!) ?? true;
+      final shouldNotify =
+          _prevResult?.shouldNotifyMemoized(_lastResult!) ?? true;
+      for (var down in _nonMemoizedDownstreamComputations) {
+        down._dirty = true;
+      }
       if (shouldNotify) {
         _lastResultfulUpstreamComputations = _lastUpstreamComputations;
+        for (var down in _memoizedDownstreamComputations) {
+          down._dirty = true;
+        }
         _notifyListeners();
       } else {
         // If the result of the computation is the same as the last time,
@@ -405,27 +422,46 @@ class ComputedImpl<T> with Computed<T> {
   }
 
   void _removeDownstreamComputation(ComputedImpl c) {
-    assert(_downstreamComputations.remove(c));
-    if (_downstreamComputations.isEmpty && _listeners.isEmpty) {
+    assert(_memoizedDownstreamComputations.remove(c) ||
+        _nonMemoizedDownstreamComputations.remove(c));
+    if (_memoizedDownstreamComputations.isEmpty &&
+        _nonMemoizedDownstreamComputations.isEmpty &&
+        _listeners.isEmpty) {
       _removeDataSourcesAndUpstreams();
     }
   }
 
   void _removeListener(ComputedSubscription<T> sub) {
     _listeners.remove(sub);
-    if (_downstreamComputations.isEmpty && _listeners.isEmpty) {
+    if (_memoizedDownstreamComputations.isEmpty &&
+        _nonMemoizedDownstreamComputations.isEmpty &&
+        _listeners.isEmpty) {
       _removeDataSourcesAndUpstreams();
     }
   }
 
-  @override
-  T get use {
+  T _use(bool memoized) {
+    // Only routers can have non-memoized listeners
+    assert(_dss != null || memoized);
     if (_computing) throw CyclicUseException();
 
     final caller = GlobalCtx.currentComputation;
     // Make sure the caller is subscribed
     caller._curUpstreamComputations![this] = _lastResult;
-    this._downstreamComputations.add(caller);
+    // Only routers can have non-memoized downstream computations
+    if (_dss != null) {
+      // Make sure a downstream computation cannot be subscribed as both memoizing and non-memoizing
+      if (memoized) {
+        if (!this._nonMemoizedDownstreamComputations.contains(caller)) {
+          this._memoizedDownstreamComputations.add(caller);
+        }
+      } else {
+        this._memoizedDownstreamComputations.remove(caller);
+        this._nonMemoizedDownstreamComputations.add(caller);
+      }
+    } else {
+      this._memoizedDownstreamComputations.add(caller);
+    }
 
     if (GlobalCtx._currentUpdate == null ||
         _lastUpdate != GlobalCtx._currentUpdate) {
@@ -437,5 +473,10 @@ class ComputedImpl<T> with Computed<T> {
 
     if (_lastResult == null) throw NoValueException();
     return _lastResult!.value;
+  }
+
+  @override
+  T get use {
+    return _use(true);
   }
 }
