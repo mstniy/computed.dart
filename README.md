@@ -166,7 +166,7 @@ Here is a simple example that computes the difference between the old and new va
 final c = Computed(() => s.useAll - s.prev);
 ```
 
-Note that the listeners of this computations or other computations using the result of this computation will not be notified if the difference does not change, as computation results are memoized. If this behaviour is not suitable for your application logic, you can wrap the result to a data type which implements object identity-based comparison (like `List`).
+Note that the listeners of this computations or other computations using the result of this computation will not be notified if the difference does not change, as computation results are memoized. If this behaviour is not suitable for your application logic, you can return a counter along with the value itself.
 
 You can also create temporal accumulators:
 
