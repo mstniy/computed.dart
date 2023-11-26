@@ -1,11 +1,11 @@
-[![Workflow Status](https://github.com/mstniy/computed.dart/actions/workflows/tests.yml/badge.svg)](https://github.com/mstniy/computed.dart/actions?query=branch%3Amaster+workflow%3Atests) [![codecov](https://codecov.io/github/mstniy/computed.dart/graph/badge.svg?token=VVG1YCC1FL)](https://codecov.io/github/mstniy/computed.dart)
-
----
-
 A straightforward, reliable, performant and testable reactive state management solution for Dart.
 
 > [!TIP]
 > Are you using Flutter? Then make sure to check out [Computed Flutter](https://github.com/mstniy/computed_flutter).
+
+[![Workflow Status](https://github.com/mstniy/computed.dart/actions/workflows/tests.yml/badge.svg)](https://github.com/mstniy/computed.dart/actions?query=branch%3Amaster+workflow%3Atests) [![codecov](https://codecov.io/github/mstniy/computed.dart/graph/badge.svg?token=VVG1YCC1FL)](https://codecov.io/github/mstniy/computed.dart)
+
+---
 
 Computed makes it a breeze to write code that reacts to external events. Just define how you compute your app state based on external data sources, and what effects you want as a result, and Computed will take care of everything else, allowing you to define your app state decleratively, rather than imperatively.
 
@@ -18,7 +18,25 @@ Computed:
 - Runs the computations in a topologically-consistent order upon external events.
 - Allows you to reliably test your app's logic with no boilerplate.
 
-## Here's how it works
+## <a name='Tableofcontents'></a>Table of contents
+
+<!-- vscode-markdown-toc -->
+
+- [Here's how it works](#Hereshowitworks)
+- [A larger example](#Alargerexample)
+- [Testing](#Testing)
+- [Looking at the past](#Lookingatthepast)
+- [FAQ](#FAQ)
+- [Pitfalls](#Pitfalls)
+  - [Do not use mutable values in computations](#Donotusemutablevaluesincomputations)
+
+<!-- vscode-markdown-toc-config
+	numbering=false
+	autoSave=true
+	/vscode-markdown-toc-config -->
+<!-- /vscode-markdown-toc -->
+
+## <a name='Hereshowitworks'></a>Here's how it works
 
 Assume you have a data source, like a `Stream` representing a series of external events:
 
@@ -51,7 +69,7 @@ You can also have computations which use other computations' results:
 final cPlus1 = Computed(() => c.use + 1);
 ```
 
-## A larger example
+## <a name='Alargerexample'></a>A larger example
 
 Assume you have two data sources, one is a stream of integers:
 
@@ -112,7 +130,7 @@ Computed(() {
 }).asStream.listen(db.write);
 ```
 
-## Testing
+## <a name='Testing'></a>Testing
 
 Computed lets you mock any computation or data source, allowing you to easily test downstream behaviour.
 
@@ -138,7 +156,7 @@ c.unmock();
 
 These actions will trigger a re-computation if necessary.
 
-## Looking at the past
+## <a name='Lookingatthepast'></a>Looking at the past
 
 `.use` returns the current value of the data source or computation, so how can you look at the past without resorting to keeping mutable state in your app code? `.prev` allows you to obtain the last value assumed by a given data source or computation the last time the current computation changed its value.
 
@@ -167,14 +185,14 @@ final sum = Computed.withSelf((self) {
 Note the use of `.useAll` instead of `.use` in these examples.
 `.useAll` marks the current computation to be recomputed for all values produced by a data source, even if it consecutively produces a pair of values comparing `==`.
 
-## FAQ
+## <a name='FAQ'></a>FAQ
 
 - Q: How to pass an async function into `Computed`?
 - A: Short answer is: you can't. The functions passed to `Computed` should be pure computations, free of side effects. If you are meaning to use an external value as part of the computation, see `.use`. If you wish to produce external side effects, see `.listen` or `.as[Broadcast]Stream`.
 
-## Pitfalls
+## <a name='Pitfalls'></a>Pitfalls
 
-### Do not use mutable values in computations
+### <a name='Donotusemutablevaluesincomputations'></a>Do not use mutable values in computations
 
 Especially if conditionals depending on them are guarding `.use` expressions. Here is an example:
 
