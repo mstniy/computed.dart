@@ -420,12 +420,12 @@ class ComputedImpl<T> with Computed<T> {
 
   @override
   T get use {
+    if (_computing) throw CyclicUseException();
+
     final caller = GlobalCtx.currentComputation;
     // Make sure the caller is subscribed
     caller._curUpstreamComputations![this] = _lastResult;
     this._downstreamComputations.add(caller);
-
-    if (_computing) throw CyclicUseException();
 
     if (GlobalCtx._currentUpdate == null ||
         _lastUpdate != GlobalCtx._currentUpdate) {
