@@ -1,3 +1,8 @@
+## 0.2.1 - 2023-11-27
+
+- Loosen semver bound on test
+- Fix README
+
 ## 0.2.0 - 2023-11-26
 
 - `.useAll` for streams: Disables memoization
