@@ -1,3 +1,7 @@
+## 0.2.2 - 2023-11-28
+
+- Improve dependencies
+
 ## 0.2.1 - 2023-11-27
 
 - Loosen semver bound on test
