@@ -77,6 +77,63 @@ void main() {
       }
     });
 
+    test('(regression) can subscribe to constant computations', () async {
+      final controller = StreamController<int>.broadcast(
+          sync: true); // Use a broadcast stream to make debugging easier
+      final source = controller.stream;
+
+      var cCnt = 0;
+
+      final c2 = Computed(() => 42);
+
+      var expectation1 = 42;
+      int? expectation2; // If null, expect NoValueException
+
+      final c = Computed(() {
+        cCnt++;
+        // Subscribe to the sources and c2
+        expect(c2.use, expectation1);
+        try {
+          expect(source.use, expectation2);
+        } on NoValueException {
+          expect(expectation2, null);
+        }
+      });
+
+      final sub = c.listen(null, (e) => fail(e.toString()));
+
+      try {
+        expect(cCnt, 2);
+        expectation2 = 0;
+        controller.add(0);
+        expect(cCnt, 4);
+        controller.add(0);
+        expect(cCnt, 4);
+        expectation2 = 1;
+        controller.add(1);
+        expect(cCnt, 6);
+        c2.fix(42);
+        expect(cCnt, 6);
+        c2.unmock();
+        expect(cCnt, 6);
+        expectation1 = 43;
+        c2.fix(43);
+        expect(cCnt, 8);
+        c2.fix(43);
+        expect(cCnt, 8);
+        expectation1 = 42;
+        c2.unmock();
+        expect(cCnt, 10);
+        source.mockEmit(1);
+        expect(cCnt, 10);
+        expectation2 = 2;
+        source.mockEmit(2);
+        expect(cCnt, 12);
+      } finally {
+        sub.cancel();
+      }
+    });
+
     test('mockEmit[Error] works', () async {
       final source = Stream.empty();
 

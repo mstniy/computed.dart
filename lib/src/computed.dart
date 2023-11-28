@@ -282,11 +282,7 @@ class ComputedImpl<T> with Computed<T> {
               if (nud == null) {
                 nud = 0;
                 for (var up in down._lastUpstreamComputations.keys) {
-                  nud = nud! +
-                      ((up._dss != null ||
-                              up._lastUpdate == GlobalCtx._currentUpdate)
-                          ? 0
-                          : 1);
+                  nud = nud! + (up._dirty ? 1 : 0);
                 }
               } else {
                 assert(nud > 0);
