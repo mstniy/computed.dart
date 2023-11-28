@@ -115,6 +115,12 @@ extension StreamComputedExtension<T> on Stream<T> {
   /// Note that [prev] does not subscribe to this stream. To do that, see [use].
   T get prev => StreamComputedExtensionImpl<T>(this).prev;
 
+  /// Returns whether a value/error published by this stream triggered the current computation.
+  ///
+  /// Can only be used inside computations.
+  /// Note that this does not subscribe the current computation to this stream.
+  bool get updated => StreamComputedExtensionImpl<T>(this).updated;
+
   /// Makes computations listening on this stream behave as if it emmitted the given value.
   @visibleForTesting
   void mockEmit(T value) {

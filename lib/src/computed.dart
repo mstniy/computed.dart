@@ -78,7 +78,7 @@ class GlobalCtx {
     return _currentComputation!;
   }
 
-  static ComputedImpl? routerFor(dynamic ds) {
+  static ComputedImpl? routerFor(Object ds) {
     return _routerExpando[ds]?._router;
   }
 
@@ -88,6 +88,10 @@ class GlobalCtx {
   static final _routerExpando = Expando<_RouterValueOrException>('computed');
 
   static _UpdateToken? _currentUpdate;
+  // Note that _currentUpdateTriggerer might be null even if
+  // _currentUpdate is not if the current run is triggered by a (un)mock
+  // on a computation
+  static Object? _currentUpdateTriggerer;
 }
 
 class ComputedImpl<T> with Computed<T> {
@@ -245,6 +249,7 @@ class ComputedImpl<T> with Computed<T> {
   void _rerunGraph() {
     GlobalCtx._currentUpdate =
         _UpdateToken(); // Guaranteed to be unique thanks to GC
+    GlobalCtx._currentUpdateTriggerer = _dss?._ds;
     try {
       final numUnsatDep = <ComputedImpl, int>{};
       final noUnsatDep = <ComputedImpl>{this};
@@ -301,6 +306,7 @@ class ComputedImpl<T> with Computed<T> {
       }
     } finally {
       GlobalCtx._currentUpdate = null;
+      GlobalCtx._currentUpdateTriggerer = null;
     }
   }
 
@@ -475,4 +481,14 @@ class ComputedImpl<T> with Computed<T> {
   T get use {
     return _use(true);
   }
+}
+
+bool dataSourceUpdated(Object ds) {
+  GlobalCtx.currentComputation; // Throw if there is no running computation
+  // Note that the line below is well-behaved if there is no current update
+  // (eg. if the current computation is triggered by a listener attaching)
+  // or the current update is not triggered by a data source (eg. by a mock
+  // on a computation)
+  return identityHashCode(ds) ==
+      identityHashCode(GlobalCtx._currentUpdateTriggerer);
 }

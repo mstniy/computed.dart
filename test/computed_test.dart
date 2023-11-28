@@ -77,6 +77,70 @@ void main() {
       }
     });
 
+    test('.updated works', () async {
+      final controller1 = StreamController<int>.broadcast(
+          sync: true); // Use a broadcast stream to make debugging easier
+      final source1 = controller1.stream;
+
+      final controller2 = StreamController<int>.broadcast(
+          sync: true); // Use a broadcast stream to make debugging easier
+      final source2 = controller2.stream;
+
+      var expectation1 = false;
+      var expectation2 = false;
+      var cCnt = 0;
+
+      final c2 = Computed(() => 42);
+
+      final c = Computed(() {
+        // Subscribe to both sources and c2
+        c2.use;
+        try {
+          source1.use;
+        } on NoValueException {
+          // Fine
+        }
+        try {
+          source2.useAll;
+        } on NoValueException {
+          // Fine
+        }
+        cCnt++;
+        expect(source1.updated, expectation1);
+        expect(source2.updated, expectation2);
+      });
+
+      final sub = c.listen(null, (e) => fail(e.toString()));
+
+      try {
+        expect(cCnt, 2);
+        expectation1 = true;
+        controller1.add(0);
+        expect(cCnt, 4);
+        controller1.add(0);
+        expect(cCnt, 4);
+        expectation1 = false;
+        expectation2 = true;
+        controller2.add(1);
+        expect(cCnt, 6);
+        controller2.add(1);
+        expect(cCnt, 8);
+        controller2.add(2);
+        expect(cCnt, 10);
+        controller1.add(0);
+        expect(cCnt, 10);
+        expectation1 = true;
+        expectation2 = false;
+        controller1.add(1);
+        expect(cCnt, 12);
+        expectation1 = false;
+        c2.fix(43);
+        expect(cCnt, 14);
+      } finally {
+        sub.cancel();
+      }
+    });
+
     test('(regression) can subscribe to constant computations', () async {
       final controller = StreamController<int>.broadcast(
           sync: true); // Use a broadcast stream to make debugging easier
