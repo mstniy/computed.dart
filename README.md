@@ -252,7 +252,7 @@ final appState = Computed.withSelf((self){
 We also define a computation that skips the first value of the app state, as we don't want to persist the state we read/initialized during startup:
 
 ```
-final stateToPersist = Computed<AppState>((){
+final stateToPersist = Computed((){
     // Throw and do not produce a value if
     // this is the first value of [appState].
     appState.prev;
