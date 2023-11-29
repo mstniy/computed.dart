@@ -57,17 +57,17 @@ void main() {
 
           try {
             await Future.value(0);
-            expect(cCnt, 1);
+            expect(cCnt, 2);
             expect(lCnt, 0);
             controller.add(0);
-            expect(cCnt, 3);
+            expect(cCnt, 4);
             expect(lCnt, 1);
             expect(lastRes, 0);
             controller.add(0);
-            expect(cCnt, 5);
+            expect(cCnt, 6);
             expect(lCnt, 1);
             controller.add(1);
-            expect(cCnt, 7);
+            expect(cCnt, 8);
             expect(lCnt, 2);
             expect(lastRes, 2);
           } finally {
@@ -513,21 +513,21 @@ void main() {
       lastRes = event;
     }, (e) => fail(e.toString()));
 
-    expect(callCnt, 1);
+    expect(callCnt, 2);
 
     try {
       controller.add(0);
       expect(lastRes, 0);
-      expect(callCnt, 3);
+      expect(callCnt, 4);
       controller.add(1);
       expect(lastRes, 1);
-      expect(callCnt, 5);
+      expect(callCnt, 6);
       controller.add(1);
       expect(lastRes, 1);
-      expect(callCnt, 5);
+      expect(callCnt, 6);
       controller.add(-1);
       expect(lastRes, 1);
-      expect(callCnt, 5);
+      expect(callCnt, 6);
     } finally {
       sub.cancel();
     }
@@ -701,14 +701,14 @@ void main() {
       expect(output, 0);
     }, (e) => fail(e.toString()));
 
-    expect(callCnt1, 1);
-    expect(callCnt2, 1);
+    expect(callCnt1, 2);
+    expect(callCnt2, 2);
     expect(checkCnt, 0);
 
     try {
       controller.add(0);
-      expect(callCnt1, 3);
-      expect(callCnt2, 3);
+      expect(callCnt1, 4);
+      expect(callCnt2, 4);
       await Future.value(); // Wait for the listener to fire
       expect(checkCnt, 1);
     } finally {
@@ -716,8 +716,8 @@ void main() {
     }
 
     controller.add(1); // Must not trigger a re-calculation
-    expect(callCnt1, 3);
-    expect(callCnt2, 3);
+    expect(callCnt1, 4);
+    expect(callCnt2, 4);
     expect(checkCnt, 1);
 
     sub = c2.listen((output) {
@@ -727,14 +727,14 @@ void main() {
 
     await Future.value();
     expect(callCnt1,
-        4); // Attaching the listeners triggers a call to discover dependencies
-    expect(callCnt2, 4);
+        6); // Attaching the listeners triggers a call to discover dependencies
+    expect(callCnt2, 6);
     expect(checkCnt,
         1); // The listener is not run: no value was produced by the stream after the second listen
 
     controller.add(2); // Must trigger a re-calculation
-    expect(callCnt1, 6);
-    expect(callCnt2, 6);
+    expect(callCnt1, 8);
+    expect(callCnt2, 8);
     expect(checkCnt, 2);
   });
 
@@ -851,6 +851,7 @@ void main() {
     final sub = c.listen((event) {
       fail('Must not call listener');
     }, (e) {
+      expect(flag, false);
       flag = true;
       expect(
           e.message,
@@ -877,6 +878,7 @@ void main() {
     final sub = c.listen((event) {
       fail('Must not call listener');
     }, (e) {
+      expect(flag, false);
       flag = true;
       expect(
           e.message,
@@ -886,6 +888,67 @@ void main() {
     try {
       await Future.value();
       expect(flag, true);
+    } finally {
+      sub.cancel();
+    }
+  });
+
+  test('asserts if f throws NVE only on the second try', () async {
+    var ctr = 0;
+    final c = Computed(() {
+      ctr++;
+      if (ctr == 1) throw NoValueException();
+      return 42;
+    });
+
+    var flag = false;
+
+    final sub = c.listen((event) {
+      fail('Must not call listener');
+    }, (e) {
+      expect(flag, false);
+      flag = true;
+      expect(
+          e.message,
+          contains(
+              "Computed expressions must be purely functional. Please use listeners for side effects."));
+    });
+    try {
+      await Future.value();
+      expect(flag, true);
+    } finally {
+      sub.cancel();
+    }
+  });
+
+  test(
+      '(regression) avoids re-computing deeply nested computations exponentially many times',
+      () async {
+    final controller = StreamController<int>.broadcast(
+        sync: true); // Use a broadcast stream to make debugging easier
+    final source = controller.stream;
+
+    var cnt1 = 0, cnt2 = 0, cnt3 = 0;
+
+    final c1 = Computed(() {
+      cnt1++;
+      source.use;
+    });
+    final c2 = Computed(() {
+      cnt2++;
+      c1.use;
+    });
+    final c3 = Computed(() {
+      cnt3++;
+      c2.use;
+    });
+
+    final sub = c3.listen(null, (e) => fail(e.toString()));
+
+    try {
+      expect(cnt1, 2);
+      expect(cnt2, 2);
+      expect(cnt3, 2);
     } finally {
       sub.cancel();
     }
@@ -995,29 +1058,29 @@ void main() {
       expect(event, expected);
     }, (e) => fail(e.toString()));
 
-    expect(c1cnt, 1);
-    expect(c2cnt, 1);
+    expect(c1cnt, 2);
+    expect(c2cnt, 2);
     expect(subCnt, 0);
 
     try {
       expected = null;
       controller.add(null);
-      expect(c1cnt, 3);
-      expect(c2cnt, 3);
+      expect(c1cnt, 4);
+      expect(c2cnt, 4);
       expect(subCnt, 1);
       expected = 0;
       controller.add(0);
-      expect(c1cnt, 5);
-      expect(c2cnt, 5);
+      expect(c1cnt, 6);
+      expect(c2cnt, 6);
       expect(subCnt, 2);
       expected = null;
       controller.add(null);
-      expect(c1cnt, 7);
-      expect(c2cnt, 7);
+      expect(c1cnt, 8);
+      expect(c2cnt, 8);
       expect(subCnt, 3);
       controller.add(null);
-      expect(c1cnt, 7);
-      expect(c2cnt, 7);
+      expect(c1cnt, 8);
+      expect(c2cnt, 8);
       expect(subCnt, 3);
     } finally {
       sub.cancel();
@@ -1053,33 +1116,33 @@ void main() {
       expect(expectThrow, true);
     });
 
-    expect(c1cnt, 1);
-    expect(c2cnt, 1);
+    expect(c1cnt, 2);
+    expect(c2cnt, 2);
     expect(subCnt, 0);
 
     try {
       expectThrow = true;
       controller.add(0);
-      expect(c1cnt, 2);
-      expect(c2cnt, 2);
+      expect(c1cnt, 3);
+      expect(c2cnt, 3);
       expect(subCnt, 1);
       controller.add(4);
-      expect(c1cnt, 3);
-      expect(c2cnt, 2);
-      expect(subCnt, 1);
-      controller.add(2);
       expect(c1cnt, 4);
       expect(c2cnt, 3);
+      expect(subCnt, 1);
+      controller.add(2);
+      expect(c1cnt, 5);
+      expect(c2cnt, 4);
       expect(subCnt, 2);
       expectThrow = false;
       controller.add(1);
-      expect(c1cnt, 6);
-      expect(c2cnt, 5);
+      expect(c1cnt, 7);
+      expect(c2cnt, 6);
       expect(subCnt, 3);
       expectThrow = true;
       controller.add(0);
-      expect(c1cnt, 7);
-      expect(c2cnt, 6);
+      expect(c1cnt, 8);
+      expect(c2cnt, 7);
       expect(subCnt, 4);
     } finally {
       sub.cancel();
@@ -1113,21 +1176,22 @@ void main() {
     }, (e) => fail(e.toString()));
 
     try {
+      expect(cnt, 2);
       controller.add(0);
-      expect(cnt, 3);
+      expect(cnt, 4);
       expect(subCnt, 1);
 
       dependOnSource = false;
       expectation = 1;
       controller.add(2);
-      expect(cnt, 5);
+      expect(cnt, 6);
       expect(subCnt, 2);
 
       // From this point on c is regarded as a constant
       // Thus, adding items to the stream does not trigger a re-computation
 
       controller.add(3);
-      expect(cnt, 5);
+      expect(cnt, 6);
       expect(subCnt, 2);
     } finally {
       sub.cancel();
@@ -1163,19 +1227,20 @@ void main() {
     }, (e) => fail(e.toString()));
 
     try {
+      expect(cnt, 2);
       controller1.add(0);
-      expect(cnt, 3);
+      expect(cnt, 4);
       expect(subCnt, 1);
 
       dependOnSource2 = true;
       controller1.add(1);
       expect(cnt,
-          4); // Attempted evaluation, failed with NoValueException on source2
+          6); // Attempted evaluation, failed with NoValueException on source2
       expect(subCnt, 1);
 
       expectation = 3;
       controller2.add(2);
-      expect(cnt, 6);
+      expect(cnt, 8);
       expect(subCnt, 2);
     } finally {
       sub.cancel();

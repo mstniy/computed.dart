@@ -176,6 +176,14 @@ class ComputedImpl<T> with Computed<T> {
         // Might set lastResult, won't notify the listener just yet (as that is against the Stream contract)
       } on NoValueException {
         // It is fine if we don't have a value yet
+      } catch (e) {
+        // For any other exception,
+        // schedule an onError call
+        if (onError != null) {
+          scheduleMicrotask(() {
+            onError(e);
+          });
+        }
       }
     }
     _listeners.add(sub);
@@ -334,21 +342,45 @@ class ComputedImpl<T> with Computed<T> {
       try {
         GlobalCtx._currentComputation = this;
         final newResult = _ValueOrException.value(_f());
-        assert(() {
-          T? f2;
-          try {
-            f2 = _f();
-          } catch (_) {
-            return false;
-          }
-          return f2 == newResult._value;
-        }(),
-            "Computed expressions must be purely functional. Please use listeners for side effects.");
+        if (oldComputation == null) {
+          // If we are the first _evalF in the call stack,
+          // run f() a second time to make sure it returns the same result.
+          // Nested _evalF-s don't do this to avoid calling
+          // deeply nested computations exponentially many times.
+          assert(() {
+            T? f2;
+            try {
+              f2 = _f();
+            } catch (_) {
+              return false;
+            }
+            return f2 == newResult._value;
+          }(),
+              "Computed expressions must be purely functional. Please use listeners for side effects.");
+        }
         _lastResult = newResult;
       } on NoValueException {
         // Not much we can do
+        // Run the computation once again and make sure
+        // it throws NoValueException again
+        if (oldComputation == null) {
+          assert(() {
+            try {
+              _f();
+            } on NoValueException {
+              // Good
+              return true;
+            } catch (_) {
+              // Pass
+            }
+            return false;
+          }(),
+              "Computed expressions must be purely functional. Please use listeners for side effects.");
+        }
         rethrow;
       } catch (e) {
+        // Do not re-run f in this path to check for side effects
+        // as thrown objects might not implement ==
         _lastResult = _ValueOrException.exc(e);
       } finally {
         final oldDiffNew = _lastUpstreamComputations.keys
