@@ -506,6 +506,13 @@ class ComputedImpl<T> with Computed<T> {
     }
 
     if (_lastResult == null) throw NoValueException();
+
+    if (!memoized &&
+        identityHashCode(_dss!._ds) !=
+            identityHashCode(GlobalCtx._currentUpdateTriggerer)) {
+      throw NoValueException();
+    }
+
     return _lastResult!.value;
   }
 
@@ -513,14 +520,4 @@ class ComputedImpl<T> with Computed<T> {
   T get use {
     return _use(true);
   }
-}
-
-bool dataSourceUpdated(Object ds) {
-  GlobalCtx.currentComputation; // Throw if there is no running computation
-  // Note that the line below is well-behaved if there is no current update
-  // (eg. if the current computation is triggered by a listener attaching)
-  // or the current update is not triggered by a data source (eg. by a mock
-  // on a computation)
-  return identityHashCode(ds) ==
-      identityHashCode(GlobalCtx._currentUpdateTriggerer);
 }

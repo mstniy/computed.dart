@@ -91,23 +91,25 @@ extension ComputedStreamExtension<T> on Computed<T> {
 extension StreamComputedExtension<T> on Stream<T> {
   /// Returns the current value of this stream and subscribes to it.
   ///
-  /// Unlike [useAll], [use] does not trigger a re-computation if the stream
+  /// Unlike [react], [use] does not trigger a re-computation if this stream
   /// consecutively produces values comparing equal to each other.
   /// Can only be used inside computations.
-  /// If the last item in the stream is an error, throws it.
-  /// Throws [NoValueException] if the stream does not have a known value yet.
+  /// If the last item in this stream is an error, throws it.
+  /// Throws [NoValueException] if this stream does not have a known value yet.
   T get use => StreamComputedExtensionImpl<T>(this).use;
 
-  /// Returns the current value of this stream and subscribes to all values and errors produced by it it.
+  /// Returns the value produced by this stream since the last time the current computation changed its value.
   ///
-  /// As a rule of thumb, you should use [useAll] over [use] if this stream
+  /// Also subscribes the current computation to all values and errors produced by this stream.
+  /// Throws [NoValueException] if the current computation is not running as a result of a data/error
+  /// produced by this stream.
+  /// As a rule of thumb, you should use [react] over [use] if this stream
   /// represents a sequence of events rather than a state.
-  /// Unlike [use], [useAll] does trigger a re-computation if the stream
+  /// Unlike [use], [react] does trigger a re-computation if the stream
   /// consecutively produces values comparing equal to each other.
   /// Can only be used inside computations.
   /// If the last item in the stream is an error, throws it.
-  /// Throws [NoValueException] if the stream does not have a known value yet.
-  T get useAll => StreamComputedExtensionImpl<T>(this).useAll;
+  T get react => StreamComputedExtensionImpl<T>(this).react;
 
   /// Returns the value of this stream during the last run of the current computation which returned a different value to the previous one.
   ///
@@ -116,12 +118,6 @@ extension StreamComputedExtension<T> on Stream<T> {
   /// during its previous run.
   /// Note that [prev] does not subscribe to this stream. To do that, see [use].
   T get prev => StreamComputedExtensionImpl<T>(this).prev;
-
-  /// Returns whether a value/error published by this stream triggered the current computation.
-  ///
-  /// Can only be used inside computations.
-  /// Note that this does not subscribe the current computation to this stream.
-  bool get updated => StreamComputedExtensionImpl<T>(this).updated;
 
   /// Makes computations listening on this stream behave as if it emmitted the given value.
   @visibleForTesting

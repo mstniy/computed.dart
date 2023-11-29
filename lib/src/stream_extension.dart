@@ -25,17 +25,13 @@ class StreamComputedExtensionImpl<T> {
     return _use(true);
   }
 
-  T get useAll {
+  T get react {
     return _use(false);
   }
 
   T get prev {
     final caller = GlobalCtx.currentComputation;
     return caller.dataSourcePrev(s);
-  }
-
-  bool get updated {
-    return dataSourceUpdated(s);
   }
 
   void mockEmit(T value) {

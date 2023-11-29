@@ -31,14 +31,14 @@ void main() {
       }
     });
 
-    test('useAll does not memoize the values produced by the stream', () async {
+    test('react does not memoize the values produced by the stream', () async {
       final controller = StreamController<int>.broadcast(
           sync: true); // Use a broadcast stream to make debugging easier
       final source = controller.stream;
 
-      // Also test that calling both .use and .useAll works
+      // Also test that calling both .use and .react works
       for (var callBoth in [false, true]) {
-        for (var useAllFirst in [false, if (callBoth) true]) {
+        for (var reactFirst in [false, if (callBoth) true]) {
           int cCnt = 0;
           int lCnt = 0;
           int? lastRes;
@@ -46,10 +46,10 @@ void main() {
           final sub = Computed(() {
             cCnt++;
             if (callBoth) {
-              if (useAllFirst) source.useAll;
+              if (reactFirst) source.react;
               source.use;
             }
-            return source.useAll * 2;
+            return source.react * 2;
           }).listen((event) {
             lCnt++;
             lastRes = event;
@@ -77,8 +77,8 @@ void main() {
       }
     });
 
-    test('can switch from use to useAll', () async {
-      // Note that the other direction (useAll -> use) does not work.
+    test('can switch from use to react', () async {
+      // Note that the other direction (react -> use) does not work.
       // I can't think of a way to make it work without introducing
       // additional bookkeeping (ie. overhead),
       // nor a real-world scenario where it would be useful.
@@ -91,7 +91,7 @@ void main() {
 
       final c = Computed(() {
         cnt++;
-        useUse ? source.use : source.useAll;
+        useUse ? source.use : source.react;
       });
 
       final sub = c.listen(null, (e) => fail(e.toString()));
@@ -112,7 +112,7 @@ void main() {
       }
     });
 
-    test('.updated works', () async {
+    test('.react throws if the stream has no new value', () async {
       final controller1 = StreamController<int>.broadcast(
           sync: true); // Use a broadcast stream to make debugging easier
       final source1 = controller1.stream;
@@ -121,56 +121,53 @@ void main() {
           sync: true); // Use a broadcast stream to make debugging easier
       final source2 = controller2.stream;
 
-      var expectation1 = false;
-      var expectation2 = false;
+      int? expectation1; // If null, expect NVE
+      int? expectation2;
       var cCnt = 0;
 
       final c2 = Computed(() => 42);
 
       final c = Computed(() {
         // Subscribe to both sources and c2
+        cCnt++;
         c2.use;
         try {
-          source1.use;
+          expect(source1.react, expectation1);
         } on NoValueException {
-          // Fine
+          expect(expectation1, null);
         }
         try {
-          source2.useAll;
+          expect(source2.react, expectation2);
         } on NoValueException {
-          // Fine
+          expect(expectation2, null);
         }
-        cCnt++;
-        expect(source1.updated, expectation1);
-        expect(source2.updated, expectation2);
       });
 
       final sub = c.listen(null, (e) => fail(e.toString()));
 
       try {
         expect(cCnt, 2);
-        expectation1 = true;
+        expectation1 = 0;
         controller1.add(0);
         expect(cCnt, 4);
         controller1.add(0);
-        expect(cCnt, 4);
-        expectation1 = false;
-        expectation2 = true;
-        controller2.add(1);
         expect(cCnt, 6);
+        expectation1 = null;
+        expectation2 = 1;
         controller2.add(1);
         expect(cCnt, 8);
+        controller2.add(1);
+        expect(cCnt, 10);
+        expectation2 = 2;
         controller2.add(2);
-        expect(cCnt, 10);
-        controller1.add(0);
-        expect(cCnt, 10);
-        expectation1 = true;
-        expectation2 = false;
-        controller1.add(1);
         expect(cCnt, 12);
-        expectation1 = false;
-        c2.fix(43);
+        expectation1 = 2;
+        expectation2 = null;
+        controller1.add(2);
         expect(cCnt, 14);
+        expectation1 = null;
+        c2.fix(43);
+        expect(cCnt, 16);
       } finally {
         sub.cancel();
       }

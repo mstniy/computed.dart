@@ -164,7 +164,7 @@ These actions will trigger a re-computation if necessary.
 Here is a simple example that computes the difference between the old and new values of a data source whenever it produces a value:
 
 ```
-final c = Computed(() => s.useAll - s.prev);
+final c = Computed(() => s.react - s.prev);
 ```
 
 Note that the listeners of this computations or other computations using the result of this computation will not be notified if the difference does not change, as computation results are memoized. If this behaviour is not suitable for your application logic, you can return a counter along with the value itself.
@@ -174,17 +174,17 @@ You can also create temporal accumulators:
 ```
 final sum = Computed.withSelf((self) {
     try {
-        return self.prev + s.useAll;
+        return self.prev + s.react;
     } on NoValueException {
         // Thrown for the first value produced by the stream
         // as self.prev has no value
-        return s.useAll;
+        return s.react;
     }
 });
 ```
 
-Note the use of `.useAll` instead of `.use` in these examples.
-`.useAll` marks the current computation to be recomputed for all values produced by a data source, even if it consecutively produces a pair of values comparing `==`.
+Note the use of `.react` instead of `.use` in these examples.
+`.react` marks the current computation to be recomputed for all values produced by a data source, even if it consecutively produces a pair of values comparing `==`. Note that unlike `.use`, `.react` will throw a NoValueException if the data source has not produced a new data or error since the last time the current computation changed value. As a rule of thumb, you should use `.react` over `.use` for data sources representing a sequence of events rather than a state.
 
 ## <a name='Amorecompleteexample'></a>A more complete example
 
@@ -272,7 +272,7 @@ stateToPersist.listen(
 ## <a name='FAQ'></a>FAQ
 
 - Q: How to pass an async function into `Computed`?
-- A: Short answer is: you can't. The functions passed to `Computed` should be pure computations, free of side effects. If you are meaning to use an external value as part of the computation, see `.use`. If you wish to produce external side effects, see `.listen` or `.as[Broadcast]Stream`.
+- A: Short answer is: you can't. The functions passed to `Computed` should be pure computations, free of side effects. If you are meaning to use an external value as part of the computation, see `.use`. If you want to react to a stream of external events, see `.react`. If you wish to produce external side effects, see `.listen` or `.as[Broadcast]Stream`.
 
 ## <a name='Pitfalls'></a>Pitfalls
 
