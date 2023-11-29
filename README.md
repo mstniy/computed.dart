@@ -216,7 +216,7 @@ Stream<String> uiDelete;
 Stream<TodoItem> uiUpsert;
 ```
 
-The first step is to create a computation which defines the current state of the app. During app startup, the state comes from the database, unless this is the first startup, in which case it is set to an initial value. After the startup, the state can get modified by the data streams produced by the UI:
+We start by creating a computation which defines the current state of the app. During app startup, the state comes from the database, unless this is the first startup, in which case it is set to an initial value. After the startup, the state can get modified by the data streams produced by the UI:
 
 ```
 final appState = Computed.withSelf((self){
@@ -226,12 +226,12 @@ final appState = Computed.withSelf((self){
         // We have no state, so we are starting up.
         // Load the state from the database,
         // if it exists. Otherwise, set it to an empty collection.
-        return database.loadState().use ?? AppState();
+        return Tuple2(true, database.loadState().use ?? AppState());
     }
     // We have a state, so this is not startup.
     // Then this is an update coming from the UI
     // Apply them
-    var state = self.prev;
+    var state = self.prev.item2;
     try {
         state = state.rebuild((b) =>
             b.remove(uiDelete.react));
@@ -245,29 +245,23 @@ final appState = Computed.withSelf((self){
         // Pass
     }
 
-    return state;
+    return Tuple2(false, state);
 });
 ```
 
-We also define a computation that skips the first value of the app state, as we don't want to persist the state we read/initialized during startup:
+Note that in addition to the app state, we also return a bool denoting if the state was created for the first time or if it was updated. That is because we don't want to persist the state we read/initialized during startup.
+
+Then, we attach a listener to the app state to persist it:
 
 ```
-final stateToPersist = Computed((){
-    // Throw and do not produce a value if
-    // this is the first value of [appState].
-    appState.prev;
-    // Otherwise, return the current value of [appState].
-    return appState.use;
-});
-```
-
-Then we attach a listener which will persist the state to the database:
-
-```
-stateToPersist.listen(
-    (state) => db.saveState,
+appState.listen(
+    (state) {
+        if (!state.item1) db.saveState(state.item2);
+    },
     (e) => print('Exception:', e));
 ```
+
+That's all there is to it. The state computation will run during startup, read the state from the db or initialize it, and re-run in response to any user actions to update itself. The listener will be fired whenever the state gets updated.
 
 ## <a name='FAQ'></a>FAQ
 
