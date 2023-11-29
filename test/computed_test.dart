@@ -77,6 +77,41 @@ void main() {
       }
     });
 
+    test('can switch from use to useAll', () async {
+      // Note that the other direction (useAll -> use) does not work.
+      // I can't think of a way to make it work without introducing
+      // additional bookkeeping (ie. overhead),
+      // nor a real-world scenario where it would be useful.
+      final controller = StreamController<int>.broadcast(
+          sync: true); // Use a broadcast stream to make debugging easier
+      final source = controller.stream;
+
+      var useUse = true;
+      var cnt = 0;
+
+      final c = Computed(() {
+        cnt++;
+        useUse ? source.use : source.useAll;
+      });
+
+      final sub = c.listen(null, (e) => fail(e.toString()));
+
+      try {
+        expect(cnt, 2);
+        controller.add(0);
+        expect(cnt, 4);
+        controller.add(0);
+        expect(cnt, 4);
+        useUse = false;
+        controller.add(1);
+        expect(cnt, 6);
+        controller.add(1);
+        expect(cnt, 8);
+      } finally {
+        sub.cancel();
+      }
+    });
+
     test('.updated works', () async {
       final controller1 = StreamController<int>.broadcast(
           sync: true); // Use a broadcast stream to make debugging easier
