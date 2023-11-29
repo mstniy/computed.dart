@@ -100,6 +100,8 @@ extension StreamComputedExtension<T> on Stream<T> {
 
   /// Returns the current value of this stream and subscribes to all values and errors produced by it it.
   ///
+  /// As a rule of thumb, you should use [useAll] over [use] if this stream
+  /// represents a sequence of events rather than a state.
   /// Unlike [use], [useAll] does trigger a re-computation if the stream
   /// consecutively produces values comparing equal to each other.
   /// Can only be used inside computations.
