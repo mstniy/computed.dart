@@ -26,10 +26,12 @@ Computed:
 - [A larger example](#Alargerexample)
 - [Testing](#Testing)
 - [Looking at the past](#Lookingatthepast)
-- [A more complete example](#Amorecompleteexample)
 - [FAQ](#FAQ)
 - [Pitfalls](#Pitfalls)
   - [Do not use mutable values in computations](#Donotusemutablevaluesincomputations)
+  - [Do not create new `Future`s inside computations](#DonotcreatenewFuturesinsidecomputations)
+  - [Do not forget to `.use` or `.react` your data sources](#Donotforgetto.useor.reactyourdatasources)
+  - [Keep in mind that `.prev` does not subscribe](#Keepinmindthat.prevdoesnotsubscribe)
 
 <!-- vscode-markdown-toc-config
 	numbering=false
@@ -186,83 +188,6 @@ final sum = Computed.withSelf((self) {
 Note the use of `.react` instead of `.use` in these examples.
 `.react` marks the current computation to be recomputed for all values produced by a data source, even if it consecutively produces a pair of values comparing `==`. Note that unlike `.use`, `.react` will throw a NoValueException if the data source has not produced a new data or error since the last time the current computation changed value. As a rule of thumb, you should use `.react` over `.use` for data sources representing a sequence of events rather than a state.
 
-## <a name='Amorecompleteexample'></a>A more complete example
-
-In a real world application, it is likely that you will have multiple data and event sources, like a user interface and a local database. Imagine you are developing the canonical todo app. The state should be read from a local database during startup, if one exists, otherwise it should be set to a pre-defined initial value. After startup, the user should be able to manipulate the state using the UI. Let's see how such a complex interaction can be implemented using Computed.
-
-For the sake of simplicity, we define the state of the app at any point in time solely by the set of todo items:
-
-```
-typedef AppState = BuiltMap<String, TodoItem> todos; // Keyed by object ids
-```
-
-Note that in this example we are using immutable collections from the `built_collection` package, but Computed has no inherent dependency on it.
-
-We will assume we have a local database from which we will load the state during startup:
-
-```
-abstract class FictionaryDatabase {
-    Future<AppState?> loadState(); // Resolves to null if no state is saved
-    Future<void> saveState(AppState state);
-}
-
-FictionaryDatabase db;
-```
-
-And assume we have created the following streams and our UI pushes data to them whenever the user wishes to make changes to the data:
-
-```
-Stream<String> uiDelete;
-Stream<TodoItem> uiUpsert;
-```
-
-We start by creating a computation which defines the current state of the app. During app startup, the state comes from the database, unless this is the first startup, in which case it is set to an initial value. After the startup, the state can get modified by the data streams produced by the UI:
-
-```
-final appState = Computed.withSelf((self){
-    try {
-        self.prev; // Check if we have a state
-    } on NoValueException {
-        // We have no state, so we are starting up.
-        // Load the state from the database,
-        // if it exists. Otherwise, set it to an empty collection.
-        return Tuple2(true, database.loadState().use ?? AppState());
-    }
-    // We have a state, so this is not startup.
-    // Then this is an update coming from the UI
-    // Apply them
-    var state = self.prev.item2;
-    try {
-        state = state.rebuild((b) =>
-            b.remove(uiDelete.react));
-    } on NoValueException {
-        // Pass
-    }
-    try {
-        state = state.rebuild((b) =>
-            b[uiUpsert.react.id] = uiUpsert.react);
-    } on NoValueException {
-        // Pass
-    }
-
-    return Tuple2(false, state);
-});
-```
-
-Note that in addition to the app state, we also return a bool denoting if the state was created for the first time or if it was updated. That is because we don't want to persist the state we read/initialized during startup.
-
-Then, we attach a listener to the app state to persist it:
-
-```
-appState.listen(
-    (state) {
-        if (!state.item1) db.saveState(state.item2);
-    },
-    (e) => print('Exception:', e));
-```
-
-That's all there is to it. The state computation will run during startup, read the state from the db or initialize it, and re-run in response to any user actions to update itself. The listener will be fired whenever the state gets updated.
-
 ## <a name='FAQ'></a>FAQ
 
 - Q: How to pass an async function into `Computed`?
@@ -282,3 +207,15 @@ final c = Computed(() => b ? value.use : 42);
 ```
 
 As this may cause Computed to stop tracking `value`, breaking the reactivity of the computation.
+
+### <a name='DonotcreatenewFuturesinsidecomputations'></a>Do not create new `Future`s inside computations
+
+This will lead to an infinite loop, assuming you `.use` them afterwards, as each run of the computation will produce a new `Future`.
+
+### <a name='Donotforgetto.useor.reactyourdatasources'></a>Do not forget to `.use` or `.react` your data sources
+
+If a computation returns without calling either of these on a data source, Computed assumes it doesn't depend on it.
+
+### <a name='Keepinmindthat.prevdoesnotsubscribe'></a>Keep in mind that `.prev` does not subscribe
+
+It is also "subjective" to the running computation. Different functions can have different `.prev`s on the same data source or computation.
