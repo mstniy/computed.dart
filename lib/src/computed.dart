@@ -136,6 +136,16 @@ class ComputedImpl<T> with Computed<T> {
 
   ComputedImpl(this._f) : _origF = _f;
 
+  static ComputedImpl<T> withPrev<T>(T Function(T prev) f, T initialPrev) {
+    late ComputedImpl<T> c;
+    c = ComputedImpl<T>(() {
+      c._prevResult ??= _ValueOrException.value(initialPrev);
+      return f(c._prevResult!.value);
+    });
+
+    return c;
+  }
+
   void onDataSourceData(T data) {
     if (_dss == null) return;
     final rvoe =

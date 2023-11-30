@@ -1514,17 +1514,19 @@ void main() {
       }
     });
 
-    test('computation self.prev works', () async {
+    test('computation self .prev works', () async {
       final controller1 = StreamController<int>.broadcast(
           sync: true); // Use a broadcast stream to make debugging easier
       final source1 = controller1.stream;
 
       int? expectation; // If null, expect NoValueError
 
-      final c = Computed.withSelf((self) {
+      late Computed<int> c;
+
+      c = Computed(() {
         source1.use;
         try {
-          expect(self.prev, expectation);
+          expect(c.prev, expectation);
         } on NoValueException {
           expect(expectation, null);
         }
@@ -1538,6 +1540,7 @@ void main() {
       }, (e) => fail(e.toString()));
 
       try {
+        await Future.value();
         expect(subCnt, 0);
         controller1.add(0);
         expect(subCnt, 1);
@@ -1546,6 +1549,41 @@ void main() {
         expect(subCnt, 2);
       } finally {
         sub.cancel();
+      }
+    });
+
+    test('computation withPrev works', () async {
+      final controller1 = StreamController<int>.broadcast(
+          sync: true); // Use a broadcast stream to make debugging easier
+      final source1 = controller1.stream;
+
+      for (var useSelfPrev in [false, true]) {
+        int prevExpectation = 0;
+
+        late Computed<int> c;
+
+        c = Computed.withPrev((prev) {
+          expect(useSelfPrev ? c.prev : prev, prevExpectation);
+          return source1.use;
+        }, initialPrev: 0);
+
+        var subCnt = 0;
+
+        final sub = c.listen((event) {
+          subCnt++;
+        }, (e) => fail(e.toString()));
+
+        try {
+          await Future.value();
+          expect(subCnt, 0);
+          controller1.add(1);
+          expect(subCnt, 1);
+          prevExpectation = 1;
+          controller1.add(2);
+          expect(subCnt, 2);
+        } finally {
+          sub.cancel();
+        }
       }
     });
 
@@ -1727,9 +1765,10 @@ void main() {
   group('cycles', () {
     test('computation self.use throws', () async {
       var flag = false;
-      final c = Computed.withSelf((self) {
+      late Computed<void> c;
+      c = Computed(() {
         try {
-          self.use;
+          c.use;
           fail('Must have thrown');
         } on CyclicUseException {
           flag = true;

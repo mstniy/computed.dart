@@ -12,11 +12,8 @@ import 'src/stream_extension.dart';
 /// as it is used for memoization.
 abstract class Computed<T> {
   factory Computed(T Function() f) => ComputedImpl(f);
-  factory Computed.withSelf(T Function(Computed<T> self) f) {
-    Computed<T>? c;
-    c = ComputedImpl(() => f(c!));
-    return c;
-  }
+  factory Computed.withPrev(T Function(T prev) f, {required T initialPrev}) =>
+      ComputedImpl.withPrev(f, initialPrev);
 
   ComputedSubscription<T> listen(
       void Function(T event)? onData, Function? onError);
