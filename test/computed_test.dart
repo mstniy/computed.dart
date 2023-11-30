@@ -173,6 +173,65 @@ void main() {
       }
     });
 
+    test(
+        '(regression) .react on non-changed stream does not mark computation dirty',
+        () async {
+      final controller1 = StreamController<int>.broadcast(
+          sync: true); // Use a broadcast stream to make debugging easier
+      final source1 = controller1.stream;
+
+      final controller2 = StreamController<int>.broadcast(
+          sync: true); // Use a broadcast stream to make debugging easier
+      final source2 = controller2.stream;
+
+      var lCnt = 0;
+
+      final c1 = Computed.withSelf((self) {
+        try {
+          source2.react;
+        } on NoValueException {
+          // Pass
+        }
+
+        return lCnt;
+      });
+
+      final c2 = Computed.withSelf((self) {
+        try {
+          source1.react;
+        } on NoValueException {
+          // Pass
+        }
+        try {
+          c1.use;
+        } on NoValueException {
+          // Pass
+        }
+
+        return lCnt;
+      });
+
+      final sub = c2.listen((event) {
+        lCnt++;
+      }, (e) => fail(e.toString()));
+
+      try {
+        await Future.value();
+        expect(lCnt, 1);
+        controller2.add(0);
+        await Future.value();
+        expect(lCnt, 2);
+        controller1.add(0);
+        await Future.value();
+        expect(lCnt, 3);
+        controller1.add(0);
+        await Future.value();
+        expect(lCnt, 4);
+      } finally {
+        sub.cancel();
+      }
+    });
+
     test('(regression) can subscribe to constant computations', () async {
       final controller = StreamController<int>.broadcast(
           sync: true); // Use a broadcast stream to make debugging easier

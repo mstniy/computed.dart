@@ -497,8 +497,9 @@ class ComputedImpl<T> with Computed<T> {
       this._memoizedDownstreamComputations.add(caller);
     }
 
-    if (GlobalCtx._currentUpdate == null ||
-        _lastUpdate != GlobalCtx._currentUpdate) {
+    if ((GlobalCtx._currentUpdate == null ||
+            _lastUpdate != GlobalCtx._currentUpdate) &&
+        (_dss == null || _lastResult == null)) {
       // This means that this [use] happened outside the control of [_rerunGraph]
       // so be prudent and force a re-computation.
       // The main benefit is that this helps us detect cyclic dependencies.
