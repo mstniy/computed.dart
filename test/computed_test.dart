@@ -186,7 +186,7 @@ void main() {
 
       var lCnt = 0;
 
-      final c1 = Computed.withSelf((self) {
+      final c1 = Computed(() {
         try {
           source2.react;
         } on NoValueException {
@@ -196,7 +196,7 @@ void main() {
         return lCnt;
       });
 
-      final c2 = Computed.withSelf((self) {
+      final c2 = Computed(() {
         try {
           source1.react;
         } on NoValueException {
