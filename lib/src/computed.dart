@@ -82,6 +82,26 @@ class GlobalCtx {
     return _routerExpando[ds]?._router;
   }
 
+  static _RouterValueOrException<T> _maybeCreateRouterFor<T>(
+      Object dataSource,
+      T Function() dataSourceUser,
+      DataSourceSubscription<T> Function(ComputedImpl<T> router) dss,
+      bool hasCurrentValue,
+      T? currentValue) {
+    var rvoe =
+        GlobalCtx._routerExpando[dataSource] as _RouterValueOrException<T>?;
+
+    if (rvoe == null) {
+      rvoe = _RouterValueOrException(ComputedImpl(dataSourceUser),
+          hasCurrentValue ? _ValueOrException.value(currentValue as T) : null);
+      GlobalCtx._routerExpando[dataSource] = rvoe;
+      rvoe._router._dss ??=
+          _DataSourceAndSubscription<T>(dataSource, dss(rvoe._router));
+    }
+
+    return rvoe;
+  }
+
   // For each data source, have a "router", which is a computation that returns the
   // value, or throws the error, produced by the data source.
   // This allows most of the logic to only deal with upstream computations.
@@ -218,23 +238,13 @@ class ComputedImpl<T> with Computed<T> {
       DT Function() dataSourceUser,
       DataSourceSubscription<DT> Function(ComputedImpl<DT> router) dss,
       bool hasCurrentValue,
-      DT? currentValue,
-      // TODO: Remove the memoized parameter
-      bool memoized) {
-    var rvoe =
-        GlobalCtx._routerExpando[dataSource] as _RouterValueOrException<DT>?;
-
-    if (rvoe == null) {
-      rvoe = _RouterValueOrException(ComputedImpl(dataSourceUser),
-          hasCurrentValue ? _ValueOrException.value(currentValue as DT) : null);
-      GlobalCtx._routerExpando[dataSource] = rvoe;
-      rvoe._router._dss ??=
-          _DataSourceAndSubscription<DT>(dataSource, dss(rvoe._router));
-    }
+      DT? currentValue) {
+    final rvoe = GlobalCtx._maybeCreateRouterFor<DT>(
+        dataSource, dataSourceUser, dss, hasCurrentValue, currentValue);
 
     if (rvoe._router != this) {
       // Subscribe to the router instead
-      return rvoe._router._use(memoized);
+      return rvoe._router._use(true);
     }
     // We are the router (thus, DT == T)
 
@@ -263,8 +273,14 @@ class ComputedImpl<T> with Computed<T> {
       void Function(Object)? onError) {
     DT value;
     try {
-      value = dataSourceUse<DT>(dataSource, dataSourceUser, dss,
-          hasCurrentValue, currentValue, false);
+      final rvoe = GlobalCtx._maybeCreateRouterFor<DT>(
+          dataSource, dataSourceUser, dss, hasCurrentValue, currentValue);
+
+      // Routers don't call .react on data sources, they call .use
+
+      assert(rvoe._router != this);
+      // Subscribe to the router instead
+      value = rvoe._router._use(false);
     } on NoValueException {
       // Don't run the functions
       return;

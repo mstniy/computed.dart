@@ -52,13 +52,13 @@ extension _TestDataSourceComputedExtension<T> on _TestDataSource<T> {
         (router) => _TestDataSourceSubscription(
             this, () => router.onDataSourceData(value)),
         true,
-        value,
-        true);
+        value);
   }
 }
 
 void main() {
   group('sync data sources', () {
+    // TODO: Also test react
     test('work', () async {
       final s = _TestDataSource(1);
       final c = Computed(() => s.use + s.use);

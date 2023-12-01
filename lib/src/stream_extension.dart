@@ -18,8 +18,7 @@ class StreamComputedExtensionImpl<T> {
             (data) => router.onDataSourceData(data),
             onError: (e) => router.onDataSourceError(e))),
         false,
-        null,
-        true);
+        null);
   }
 
   void react(void Function(T) onData, void Function(Object)? onError) {
