@@ -25,8 +25,20 @@ class StreamComputedExtensionImpl<T> {
     return _use(true);
   }
 
-  T get react {
-    return _use(false);
+  void react(void Function(T) onData, void Function(Object)? onError) {
+    // TODO: Move this into ComputedImpl, replacing the nonMemoized parameter in useDataSource
+    // Make it dataSourceReact (rename useDataSource to dataSourceUse also)
+    T value;
+    try {
+      value = _use(false);
+    } on NoValueException {
+      // Don't run the functions
+      return;
+    } catch (e) {
+      if (onError != null) onError(e);
+      return;
+    }
+    onData(value);
   }
 
   T get prev {

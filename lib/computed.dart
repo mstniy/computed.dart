@@ -95,18 +95,17 @@ extension StreamComputedExtension<T> on Stream<T> {
   /// Throws [NoValueException] if this stream does not have a known value yet.
   T get use => StreamComputedExtensionImpl<T>(this).use;
 
-  /// Returns the value produced by this stream since the last time the current computation changed its value.
+  /// If this stream has produced a value or error since the last time the current computation changed its value, runs the given functional on the value or error produced by this stream.
   ///
   /// Also subscribes the current computation to all values and errors produced by this stream.
-  /// Throws [NoValueException] if the current computation is not running as a result of a data/error
-  /// produced by this stream.
   /// As a rule of thumb, you should use [react] over [use] if this stream
   /// represents a sequence of events rather than a state.
   /// Unlike [use], [react] does trigger a re-computation if the stream
   /// consecutively produces values comparing equal to each other.
   /// Can only be used inside computations.
   /// If the last item in the stream is an error, throws it.
-  T get react => StreamComputedExtensionImpl<T>(this).react;
+  void react(void Function(T) onData, void Function(Object)? onError) =>
+      StreamComputedExtensionImpl<T>(this).react(onData, onError);
 
   /// Returns the value of this stream during the last run of the current computation which returned a different value to the previous one.
   ///

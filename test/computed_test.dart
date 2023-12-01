@@ -46,29 +46,33 @@ void main() {
           final sub = Computed(() {
             cCnt++;
             if (callBoth) {
-              if (reactFirst) source.react;
+              if (reactFirst) source.react((p0) {}, null);
               source.use;
             }
-            return source.react * 2;
+            int? reactRes;
+            source.react((val) => reactRes = val, null);
+            return reactRes != null ? (reactRes! * 2) : null;
           }).listen((event) {
             lCnt++;
             lastRes = event;
           }, (e) => fail(e.toString()));
 
           try {
+            final lCntBase = callBoth ? 0 : 1;
             await Future.value(0);
             expect(cCnt, 2);
-            expect(lCnt, 0);
+            expect(lCnt, lCntBase);
+            expect(lastRes, null);
             controller.add(0);
             expect(cCnt, 4);
-            expect(lCnt, 1);
+            expect(lCnt, lCntBase + 1);
             expect(lastRes, 0);
             controller.add(0);
             expect(cCnt, 6);
-            expect(lCnt, 1);
+            expect(lCnt, lCntBase + 1);
             controller.add(1);
             expect(cCnt, 8);
-            expect(lCnt, 2);
+            expect(lCnt, lCntBase + 2);
             expect(lastRes, 2);
           } finally {
             sub.cancel();
@@ -91,7 +95,7 @@ void main() {
 
       final c = Computed(() {
         cnt++;
-        useUse ? source.use : source.react;
+        useUse ? source.use : source.react((p0) {}, null);
       });
 
       final sub = c.listen(null, (e) => fail(e.toString()));
@@ -131,16 +135,18 @@ void main() {
         // Subscribe to both sources and c2
         cCnt++;
         c2.use;
-        try {
-          expect(source1.react, expectation1);
-        } on NoValueException {
-          expect(expectation1, null);
-        }
-        try {
-          expect(source2.react, expectation2);
-        } on NoValueException {
-          expect(expectation2, null);
-        }
+        var flag = false;
+        source1.react((val) {
+          flag = true;
+          expect(val, expectation1);
+        }, null);
+        if (!flag) expect(expectation1, null);
+        flag = false;
+        source2.react((val) {
+          flag = true;
+          expect(val, expectation2);
+        }, null);
+        if (!flag) expect(expectation2, null);
       });
 
       final sub = c.listen(null, (e) => fail(e.toString()));
@@ -187,21 +193,13 @@ void main() {
       var lCnt = 0;
 
       final c1 = Computed(() {
-        try {
-          source2.react;
-        } on NoValueException {
-          // Pass
-        }
+        source2.react((p0) {}, null);
 
         return lCnt;
       });
 
       final c2 = Computed(() {
-        try {
-          source1.react;
-        } on NoValueException {
-          // Pass
-        }
+        source1.react((p0) {}, null);
         try {
           c1.use;
         } on NoValueException {
