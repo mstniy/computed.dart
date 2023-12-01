@@ -213,18 +213,19 @@ class ComputedImpl<T> with Computed<T> {
     return sub;
   }
 
-  DT useDataSource<DT>(
+  DT dataSourceUse<DT>(
       Object dataSource,
-      DT Function() dataSourceUse,
+      DT Function() dataSourceUser,
       DataSourceSubscription<DT> Function(ComputedImpl<DT> router) dss,
       bool hasCurrentValue,
       DT? currentValue,
+      // TODO: Remove the memoized parameter
       bool memoized) {
     var rvoe =
         GlobalCtx._routerExpando[dataSource] as _RouterValueOrException<DT>?;
 
     if (rvoe == null) {
-      rvoe = _RouterValueOrException(ComputedImpl(dataSourceUse),
+      rvoe = _RouterValueOrException(ComputedImpl(dataSourceUser),
           hasCurrentValue ? _ValueOrException.value(currentValue as DT) : null);
       GlobalCtx._routerExpando[dataSource] = rvoe;
       rvoe._router._dss ??=
@@ -250,6 +251,28 @@ class ComputedImpl<T> with Computed<T> {
       throw NoValueException();
     }
     return rvoe._router.prev;
+  }
+
+  void dataSourceReact<DT>(
+      Object dataSource,
+      DT Function() dataSourceUser,
+      DataSourceSubscription<DT> Function(ComputedImpl<DT> router) dss,
+      bool hasCurrentValue,
+      DT? currentValue,
+      void Function(DT) onData,
+      void Function(Object)? onError) {
+    DT value;
+    try {
+      value = dataSourceUse<DT>(dataSource, dataSourceUser, dss,
+          hasCurrentValue, currentValue, false);
+    } on NoValueException {
+      // Don't run the functions
+      return;
+    } catch (e) {
+      if (onError != null) onError(e);
+      return;
+    }
+    onData(value);
   }
 
   @override

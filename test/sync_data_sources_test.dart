@@ -46,7 +46,7 @@ class _TestDataSource<T> {
 extension _TestDataSourceComputedExtension<T> on _TestDataSource<T> {
   T get use {
     final caller = GlobalCtx.currentComputation;
-    return caller.useDataSource(
+    return caller.dataSourceUse(
         this,
         () => this.use,
         (router) => _TestDataSourceSubscription(

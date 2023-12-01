@@ -8,7 +8,7 @@ class FutureComputedExtensionImpl<T> {
   FutureComputedExtensionImpl(this.f);
   T get use {
     final caller = GlobalCtx.currentComputation;
-    return caller.useDataSource(
+    return caller.dataSourceUse(
         f,
         () => f.use,
         (router) => _FutureDataSourceSubscription<T>(f, router),
