@@ -244,7 +244,7 @@ class ComputedImpl<T> with Computed<T> {
 
     if (rvoe._router != this) {
       // Subscribe to the router instead
-      return rvoe._router._use(true);
+      return rvoe._router.use;
     }
     // We are the router (thus, DT == T)
 
@@ -271,24 +271,13 @@ class ComputedImpl<T> with Computed<T> {
       DT? currentValue,
       void Function(DT) onData,
       void Function(Object)? onError) {
-    DT value;
-    try {
-      final rvoe = GlobalCtx._maybeCreateRouterFor<DT>(
-          dataSource, dataSourceUser, dss, hasCurrentValue, currentValue);
+    final rvoe = GlobalCtx._maybeCreateRouterFor<DT>(
+        dataSource, dataSourceUser, dss, hasCurrentValue, currentValue);
 
-      // Routers don't call .react on data sources, they call .use
+    // Routers don't call .react on data sources, they call .use
+    assert(rvoe._router != this);
 
-      assert(rvoe._router != this);
-      // Subscribe to the router instead
-      value = rvoe._router._use(false);
-    } on NoValueException {
-      // Don't run the functions
-      return;
-    } catch (e) {
-      if (onError != null) onError(e);
-      return;
-    }
-    onData(value);
+    rvoe._router._react(onData, onError);
   }
 
   @override
@@ -523,9 +512,38 @@ class ComputedImpl<T> with Computed<T> {
     }
   }
 
-  T _use(bool memoized) {
-    // Only routers can have non-memoized listeners
-    assert(_dss != null || memoized);
+  void _react(void Function(T) onData, void Function(Object)? onError) {
+    // Only routers can be .react-ed to
+    // As otherwise the meaning of .prev becomes ambiguous
+    assert(_dss != null);
+    final caller = GlobalCtx.currentComputation;
+    // Make sure the caller is subscribed
+    caller._curUpstreamComputations![this] = _lastResult;
+
+    // Make sure a downstream computation cannot be subscribed as both memoizing and non-memoizing
+    this._memoizedDownstreamComputations.remove(caller);
+    this._nonMemoizedDownstreamComputations.add(caller);
+
+    if (identityHashCode(_dss!._ds) !=
+        identityHashCode(GlobalCtx._currentUpdateTriggerer)) {
+      // Don't call the functions
+      return;
+    }
+
+    if (_lastResult!._isValue) {
+      onData(_lastResult!._value as T);
+    } else if (onError != null) {
+      onError(_lastResult!._exc as Object);
+    } else {
+      // TODO: Store the exception in an internal field and
+      //  behave as if the current computation threw it
+      //  (without throwing it here, as this might
+      //  cause subsequent .react-s to be skipped)
+    }
+  }
+
+  @override
+  T get use {
     if (_computing) throw CyclicUseException();
 
     final caller = GlobalCtx.currentComputation;
@@ -534,13 +552,8 @@ class ComputedImpl<T> with Computed<T> {
     // Only routers can have non-memoized downstream computations
     if (_dss != null) {
       // Make sure a downstream computation cannot be subscribed as both memoizing and non-memoizing
-      if (memoized) {
-        if (!this._nonMemoizedDownstreamComputations.contains(caller)) {
-          this._memoizedDownstreamComputations.add(caller);
-        }
-      } else {
-        this._memoizedDownstreamComputations.remove(caller);
-        this._nonMemoizedDownstreamComputations.add(caller);
+      if (!this._nonMemoizedDownstreamComputations.contains(caller)) {
+        this._memoizedDownstreamComputations.add(caller);
       }
     } else {
       this._memoizedDownstreamComputations.add(caller);
@@ -557,17 +570,6 @@ class ComputedImpl<T> with Computed<T> {
 
     if (_lastResult == null) throw NoValueException();
 
-    if (!memoized &&
-        identityHashCode(_dss!._ds) !=
-            identityHashCode(GlobalCtx._currentUpdateTriggerer)) {
-      throw NoValueException();
-    }
-
     return _lastResult!.value;
-  }
-
-  @override
-  T get use {
-    return _use(true);
   }
 }
