@@ -402,12 +402,12 @@ class ComputedImpl<T> with Computed<T> {
       final shouldNotify =
           _prevResult?.shouldNotifyMemoized(_lastResult!) ?? true;
       for (var down in _nonMemoizedDownstreamComputations) {
-        down._dirty = true;
+        if (!down._computing) down._dirty = true;
       }
       if (shouldNotify) {
         _lastResultfulUpstreamComputations = _lastUpstreamComputations;
         for (var down in _memoizedDownstreamComputations) {
-          down._dirty = true;
+          if (!down._computing) down._dirty = true;
         }
         _notifyListeners();
       } else {
