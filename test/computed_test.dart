@@ -93,12 +93,17 @@ void main() {
       var useUse = true;
       var cnt = 0;
 
+      var lCnt = 0; // To prevent memoization of [c]
+
       final c = Computed(() {
         cnt++;
         useUse ? source.use : source.react((p0) {}, null);
+        return lCnt;
       });
 
-      final sub = c.listen(null, (e) => fail(e.toString()));
+      final sub = c.listen((res) {
+        lCnt++;
+      }, (e) => fail(e.toString()));
 
       try {
         expect(cnt, 2);

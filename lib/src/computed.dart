@@ -24,10 +24,10 @@ class _ValueOrException<T> {
     throw _exc!;
   }
 
-  bool shouldNotifyMemoized(_ValueOrException<T> other) {
-    return _isValue != other._isValue ||
-        (_isValue && _value != other._value) ||
-        (!_isValue && _exc != other._exc);
+  bool shouldNotifyMemoized(_ValueOrException<T>? other) {
+    return (_isValue != other?._isValue) ||
+        (_isValue && _value != other?._value) ||
+        (!_isValue && _exc != other?._exc);
   }
 }
 
@@ -66,6 +66,13 @@ class _ComputedSubscriptionImpl<T> implements ComputedSubscription<T> {
   void onError(Function? handleError) {
     _onError = handleError;
   }
+}
+
+class _MemoizedValueOrException<T> {
+  final bool _memoized;
+  final _ValueOrException<T>? _voe;
+
+  _MemoizedValueOrException(this._memoized, this._voe);
 }
 
 class GlobalCtx {
@@ -122,12 +129,13 @@ class ComputedImpl<T> with Computed<T> {
   bool get _novalue => _lastResult == null;
   _ValueOrException<T>? _lastResult;
   _ValueOrException<T>? _prevResult;
-  Map<ComputedImpl, _ValueOrException?>? _lastResultfulUpstreamComputations;
-  var _lastUpstreamComputations = <ComputedImpl, _ValueOrException?>{};
+  Map<ComputedImpl, _MemoizedValueOrException>?
+      _lastResultfulUpstreamComputations;
+  var _lastUpstreamComputations = <ComputedImpl, _MemoizedValueOrException>{};
 
   bool get _computing => _curUpstreamComputations != null;
   bool _reacting = false;
-  Map<ComputedImpl, _ValueOrException?>? _curUpstreamComputations;
+  Map<ComputedImpl, _MemoizedValueOrException>? _curUpstreamComputations;
 
   final _memoizedDownstreamComputations = <ComputedImpl>{};
   final _nonMemoizedDownstreamComputations = <ComputedImpl>{};
@@ -144,11 +152,11 @@ class ComputedImpl<T> with Computed<T> {
       return _prevResult!.value;
     } else {
       if (caller._lastResult == null) throw NoValueException();
-      final voe = caller._lastResultfulUpstreamComputations![this];
-      if (voe == null) {
+      final mvoe = caller._lastResultfulUpstreamComputations![this];
+      if (mvoe?._voe == null) {
         throw NoValueException();
       }
-      return voe.value;
+      return mvoe!._voe!.value;
     }
   }
 
@@ -373,6 +381,7 @@ class ComputedImpl<T> with Computed<T> {
   void _evalF() {
     _dirty = false;
     final oldComputation = GlobalCtx._currentComputation;
+    var gotNVE = false;
     try {
       final oldPrevResult = _prevResult;
       final oldUpstreamComputations = _lastUpstreamComputations;
@@ -399,6 +408,7 @@ class ComputedImpl<T> with Computed<T> {
         }
         _lastResult = newResult;
       } on NoValueException {
+        gotNVE = true;
         // Not much we can do
         // Run the computation once again and make sure
         // it throws NoValueException again
@@ -422,27 +432,36 @@ class ComputedImpl<T> with Computed<T> {
         // as thrown objects might not implement ==
         _lastResult = _ValueOrException.exc(e);
       } finally {
-        final oldDiffNew = _lastUpstreamComputations.keys
-            .toSet()
-            .difference(_curUpstreamComputations!.keys.toSet());
+        final shouldNotify =
+            _prevResult?.shouldNotifyMemoized(_lastResult) ?? true;
+        if (gotNVE || shouldNotify) {
+          // Commit the changes to the DAG
+          for (var e in _curUpstreamComputations!.entries) {
+            final up = e.key;
+            up._addDownstreamComputation(this, e.value._memoized);
+          }
+          final oldDiffNew = _lastUpstreamComputations.keys
+              .toSet()
+              .difference(_curUpstreamComputations!.keys.toSet());
+          for (var up in oldDiffNew) {
+            up._removeDownstreamComputation(this);
+          }
+        }
         // Even for the non "resultful" case.
         // So that we can memoize that f threw NoValueException
         // when ran with a specific set of dependencies, for example.
         _lastUpstreamComputations = _curUpstreamComputations!;
         _curUpstreamComputations = null;
-        for (var up in oldDiffNew) {
-          up._removeDownstreamComputation(this);
-        }
         // Bookkeep the fact the we ran/tried to run this computation
         // so that we can unlock its downstream during the DAG walk
         _lastUpdate = GlobalCtx._currentUpdate;
       }
       // The "resultful" case (the function either returned or threw an exception other than NoValueException)
-      final shouldNotify =
-          _prevResult?.shouldNotifyMemoized(_lastResult!) ?? true;
       for (var down in _nonMemoizedDownstreamComputations) {
         if (!down._computing) down._dirty = true;
       }
+      final shouldNotify =
+          _prevResult?.shouldNotifyMemoized(_lastResult) ?? true;
       if (shouldNotify) {
         _lastResultfulUpstreamComputations = _lastUpstreamComputations;
         for (var down in _memoizedDownstreamComputations) {
@@ -473,6 +492,24 @@ class ComputedImpl<T> with Computed<T> {
           listener._onData!(_lastResult!._value as T);
         }
       }
+    }
+  }
+
+  void _addDownstreamComputation(ComputedImpl down, bool memoized) {
+    if (memoized) {
+      // Only routers can have non-memoized downstream computations
+      if (_dss != null) {
+        // Make sure a downstream computation cannot be subscribed as both memoizing and non-memoizing
+        if (!_nonMemoizedDownstreamComputations.contains(down)) {
+          _memoizedDownstreamComputations.add(down);
+        }
+      } else {
+        this._memoizedDownstreamComputations.add(down);
+      }
+    } else {
+      // Make sure a downstream computation cannot be subscribed as both memoizing and non-memoizing
+      _memoizedDownstreamComputations.remove(down);
+      _nonMemoizedDownstreamComputations.add(down);
     }
   }
 
@@ -522,11 +559,8 @@ class ComputedImpl<T> with Computed<T> {
       throw StateError("`use` and `react` not allowed inside react callbacks.");
     }
     // Make sure the caller is subscribed
-    caller._curUpstreamComputations![this] = _lastResult;
-
-    // Make sure a downstream computation cannot be subscribed as both memoizing and non-memoizing
-    this._memoizedDownstreamComputations.remove(caller);
-    this._nonMemoizedDownstreamComputations.add(caller);
+    caller._curUpstreamComputations![this] =
+        _MemoizedValueOrException(false, _lastResult);
 
     if (identityHashCode(_dss!._ds) !=
         identityHashCode(GlobalCtx._currentUpdateTriggerer)) {
@@ -560,16 +594,10 @@ class ComputedImpl<T> with Computed<T> {
       throw StateError("`use` and `react` not allowed inside react callbacks.");
     }
     // Make sure the caller is subscribed
-    caller._curUpstreamComputations![this] = _lastResult;
-    // Only routers can have non-memoized downstream computations
-    if (_dss != null) {
-      // Make sure a downstream computation cannot be subscribed as both memoizing and non-memoizing
-      if (!this._nonMemoizedDownstreamComputations.contains(caller)) {
-        this._memoizedDownstreamComputations.add(caller);
-      }
-    } else {
-      this._memoizedDownstreamComputations.add(caller);
-    }
+    caller._curUpstreamComputations![this] = _MemoizedValueOrException(
+        // If the caller is subscribed in a non-memoizing way, keep it.
+        caller._curUpstreamComputations![this]?._memoized ?? true,
+        _lastResult);
 
     if ((GlobalCtx._currentUpdate == null ||
             _lastUpdate != GlobalCtx._currentUpdate) &&
