@@ -1433,6 +1433,47 @@ void main() {
     }
   });
 
+  test(
+      '(regression) avoids dag state corruption if a computation re-runs with fewer dependencies but same result',
+      () async {
+    final controller1 = StreamController<int>.broadcast(
+        sync: true); // Use a broadcast stream to make debugging easier
+    final source1 = controller1.stream;
+
+    final c2 = Computed(() => source1.use);
+
+    var dependOnC2 = true;
+
+    final c = Computed(() {
+      if (dependOnC2) c2.use;
+      return 0;
+    });
+
+    var subCnt = 0;
+
+    final sub = c.listen((event) {
+      subCnt++;
+      expect(event, 0);
+    }, (e) => fail(e.toString()));
+
+    try {
+      await Future.value();
+      expect(subCnt, 0);
+      controller1.add(0);
+      await Future.value();
+      expect(subCnt, 1);
+      dependOnC2 = false;
+      controller1.add(1);
+      await Future.value();
+      expect(subCnt, 1);
+      controller1.add(2);
+      await Future.value();
+      expect(subCnt, 1);
+    } finally {
+      sub.cancel();
+    }
+  });
+
   group('prev', () {
     test('works on streams', () async {
       final controller1 = StreamController<int>.broadcast(
