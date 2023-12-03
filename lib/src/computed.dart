@@ -129,6 +129,7 @@ class ComputedImpl<T> with Computed<T> {
   bool get _novalue => _lastResult == null;
   _ValueOrException<T>? _lastResult;
   _ValueOrException<T>? _prevResult;
+  T? _initialPrev;
   Map<ComputedImpl, _MemoizedValueOrException>?
       _lastResultfulUpstreamComputations;
   var _lastUpstreamComputations = <ComputedImpl, _MemoizedValueOrException>{};
@@ -148,8 +149,8 @@ class ComputedImpl<T> with Computed<T> {
   T get prev {
     final caller = GlobalCtx.currentComputation;
     if (caller == this) {
-      if (_prevResult == null) throw NoValueException();
-      return _prevResult!.value;
+      if (_prevResult == null && _initialPrev == null) throw NoValueException();
+      return (_prevResult?.value ?? _initialPrev)!;
     } else {
       if (caller._lastResult == null) throw NoValueException();
       final mvoe = caller._lastResultfulUpstreamComputations![this];
@@ -167,10 +168,8 @@ class ComputedImpl<T> with Computed<T> {
 
   static ComputedImpl<T> withPrev<T>(T Function(T prev) f, T initialPrev) {
     late ComputedImpl<T> c;
-    c = ComputedImpl<T>(() {
-      c._prevResult ??= _ValueOrException.value(initialPrev);
-      return f(c._prevResult!.value);
-    });
+    c = ComputedImpl<T>(() => f(c._prevResult?.value ?? initialPrev));
+    c._initialPrev = initialPrev;
 
     return c;
   }

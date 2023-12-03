@@ -57,8 +57,9 @@ void main() async {
         uiUpdate.react((t) {
           b[t.item1] = t.item2;
         }, null);
+        final id = largestId.use;
         uiCreate.react((t) {
-          b[largestId.use] = t;
+          b[id] = t;
         }, null);
       },
     );
