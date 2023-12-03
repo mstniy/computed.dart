@@ -46,11 +46,11 @@ void main() {
           final sub = Computed(() {
             cCnt++;
             if (callBoth) {
-              if (reactFirst) source.react((p0) {}, null);
+              if (reactFirst) source.react((p0) {});
               source.use;
             }
             int? reactRes;
-            source.react((val) => reactRes = val, null);
+            source.react((val) => reactRes = val);
             return reactRes != null ? (reactRes! * 2) : null;
           }).listen((event) {
             lCnt++;
@@ -97,7 +97,7 @@ void main() {
 
       final c = Computed(() {
         cnt++;
-        useUse ? source.use : source.react((p0) {}, null);
+        useUse ? source.use : source.react((p0) {});
         return lCnt;
       });
 
@@ -144,13 +144,13 @@ void main() {
         source1.react((val) {
           flag = true;
           expect(val, expectation1);
-        }, null);
+        });
         if (!flag) expect(expectation1, null);
         flag = false;
         source2.react((val) {
           flag = true;
           expect(val, expectation2);
-        }, null);
+        });
         if (!flag) expect(expectation2, null);
       });
 
@@ -198,13 +198,13 @@ void main() {
       var lCnt = 0;
 
       final c1 = Computed(() {
-        source2.react((p0) {}, null);
+        source2.react((p0) {});
 
         return lCnt;
       });
 
       final c2 = Computed(() {
-        source1.react((p0) {}, null);
+        source1.react((p0) {});
         try {
           c1.use;
         } on NoValueException {
@@ -948,10 +948,10 @@ void main() {
     for (var f in [
       (p0) => source2.use,
       (p0) => c2.use,
-      (p0) => source2.react((p0) {}, null)
+      (p0) => source2.react((p0) {})
     ]) {
       var c = Computed(() {
-        source.react(f, null);
+        source.react(f);
       });
 
       var expectThrow = false;

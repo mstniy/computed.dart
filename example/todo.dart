@@ -40,7 +40,7 @@ void main() async {
   final dbFuture = db.loadState();
   final largestId = Computed<int>.withPrev((prev) {
     var id = prev;
-    uiCreate.react((p0) => id++, null);
+    uiCreate.react((p0) => id++);
 
     return id;
   },
@@ -51,16 +51,14 @@ void main() async {
     // Apply UI changes, if there are any
     return prev.rebuild(
       (b) {
-        uiDelete.react((id) {
-          b.remove(id);
-        }, null);
+        uiDelete.react(b.remove);
         uiUpdate.react((t) {
           b[t.item1] = t.item2;
-        }, null);
+        });
         final id = largestId.use;
         uiCreate.react((t) {
           b[id] = t;
-        }, null);
+        });
       },
     );
   }, initialPrev: (await dbFuture) ?? AppState());
