@@ -126,6 +126,7 @@ class ComputedImpl<T> with Computed<T> {
   var _lastUpstreamComputations = <ComputedImpl, _ValueOrException?>{};
 
   bool get _computing => _curUpstreamComputations != null;
+  bool _reacting = false;
   Map<ComputedImpl, _ValueOrException?>? _curUpstreamComputations;
 
   final _memoizedDownstreamComputations = <ComputedImpl>{};
@@ -517,6 +518,9 @@ class ComputedImpl<T> with Computed<T> {
     // As otherwise the meaning of .prev becomes ambiguous
     assert(_dss != null);
     final caller = GlobalCtx.currentComputation;
+    if (caller._reacting) {
+      throw StateError("`use` and `react` not allowed inside react callbacks.");
+    }
     // Make sure the caller is subscribed
     caller._curUpstreamComputations![this] = _lastResult;
 
@@ -530,15 +534,20 @@ class ComputedImpl<T> with Computed<T> {
       return;
     }
 
-    if (_lastResult!._isValue) {
-      onData(_lastResult!._value as T);
-    } else if (onError != null) {
-      onError(_lastResult!._exc as Object);
-    } else {
-      // TODO: Store the exception in an internal field and
-      //  behave as if the current computation threw it
-      //  (without throwing it here, as this might
-      //  cause subsequent .react-s to be skipped)
+    caller._reacting = true;
+    try {
+      if (_lastResult!._isValue) {
+        onData(_lastResult!._value as T);
+      } else if (onError != null) {
+        onError(_lastResult!._exc as Object);
+      } else {
+        // TODO: Store the exception in an internal field and
+        //  behave as if the current computation threw it
+        //  (without throwing it here, as this might
+        //  cause subsequent .react-s to be skipped)
+      }
+    } finally {
+      caller._reacting = false;
     }
   }
 
@@ -547,6 +556,9 @@ class ComputedImpl<T> with Computed<T> {
     if (_computing) throw CyclicUseException();
 
     final caller = GlobalCtx.currentComputation;
+    if (caller._reacting) {
+      throw StateError("`use` and `react` not allowed inside react callbacks.");
+    }
     // Make sure the caller is subscribed
     caller._curUpstreamComputations![this] = _lastResult;
     // Only routers can have non-memoized downstream computations

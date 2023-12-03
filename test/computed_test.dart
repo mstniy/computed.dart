@@ -931,6 +931,55 @@ void main() {
     }
   });
 
+  test('cannot call use/react inside react callbacks', () async {
+    final controller = StreamController<int>.broadcast(
+        sync: true); // Use a broadcast stream to make debugging easier
+    final source = controller.stream;
+
+    final source2 = Stream.empty();
+
+    final c2 = Computed(() => null);
+
+    for (var f in [
+      (p0) => source2.use,
+      (p0) => c2.use,
+      (p0) => source2.react((p0) {}, null)
+    ]) {
+      var c = Computed(() {
+        source.react(f, null);
+      });
+
+      var expectThrow = false;
+      var cnt = 0;
+
+      c.listen((output) {
+        if (expectThrow) {
+          fail("Should have thrown");
+        } else {
+          expect(output, null);
+          expectThrow = true;
+        }
+      }, (e) {
+        expect(expectThrow, true);
+        cnt++;
+        expect(
+            e,
+            allOf(
+                isA<StateError>(),
+                (StateError e) =>
+                    e.message ==
+                    "`use` and `react` not allowed inside react callbacks."));
+      });
+
+      await Future.value();
+      expect(expectThrow, true);
+
+      controller.add(0);
+      await Future.value();
+      expect(cnt, 1);
+    }
+  });
+
   test('asserts on detected side effects', () async {
     var ctr = 0;
     final c = Computed(() => ctr++);

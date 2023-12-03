@@ -91,6 +91,7 @@ extension StreamComputedExtension<T> on Stream<T> {
   /// Unlike [react], [use] does not trigger a re-computation if this stream
   /// consecutively produces values comparing equal to each other.
   /// Can only be used inside computations.
+  /// Cannot be used inside [react] callbacks.
   /// If the last item in this stream is an error, throws it.
   /// Throws [NoValueException] if this stream does not have a known value yet.
   T get use => StreamComputedExtensionImpl<T>(this).use;
@@ -103,6 +104,7 @@ extension StreamComputedExtension<T> on Stream<T> {
   /// Unlike [use], [react] does trigger a re-computation if the stream
   /// consecutively produces values comparing equal to each other.
   /// Can only be used inside computations.
+  /// Cannot be used inside [react] callbacks.
   /// If the last item in the stream is an error, throws it.
   void react(void Function(T) onData, void Function(Object)? onError) =>
       StreamComputedExtensionImpl<T>(this).react(onData, onError);
