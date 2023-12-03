@@ -47,26 +47,30 @@ void main() async {
       initialPrev:
           ((await dbFuture) ?? BuiltMap<int, String>()).keys.reduce(math.max));
 
-  final appState = Computed<Tuple2<bool, AppState>>.withPrev((prev) {
-    var newState = prev;
+  final appState = Computed<AppState>.withPrev((prev) {
     // Apply UI changes, if there are any
-    uiDelete.react(
-        (delId) => newState =
-            Tuple2(false, newState.item2.rebuild((p0) => p0.remove(delId))),
-        null);
-    uiUpdate.react(
-        (update) => newState = Tuple2(false,
-            newState.item2.rebuild((p0) => p0[update.item1] = update.item2)),
-        null);
-    uiCreate.react(
-        (todo) => newState = Tuple2(
-            false, newState.item2.rebuild((p0) => p0[largestId.use] = todo)),
-        null);
-    return newState;
-  }, initialPrev: Tuple2(true, (await dbFuture) ?? AppState()));
+    return prev.rebuild(
+      (b) {
+        uiDelete.react((id) {
+          b.remove(id);
+        }, null);
+        uiUpdate.react((t) {
+          b[t.item1] = t.item2;
+        }, null);
+        uiCreate.react((t) {
+          b[largestId.use] = t;
+        }, null);
+      },
+    );
+  }, initialPrev: (await dbFuture) ?? AppState());
 
-  appState.listen((state) {
-    if (!state.item1) db.saveState(state.item2);
+  final stateIsInitial = Computed.withPrev(
+      (prev) => Tuple2(prev == null, appState.use),
+      initialPrev: null);
+
+  stateIsInitial.listen((state) {
+    // Do not save the initial state
+    if (!state!.item1) db.saveState(state.item2);
   }, (e) => print('Exception: ${e.toString()}'));
 
   await Future.delayed(const Duration(seconds: 2));
@@ -74,7 +78,7 @@ void main() async {
   await Future.value();
   uiCreateController.add('new todo');
   await Future.value();
-  uiDeleteController.add(0); // this marks largestId as dirty. why?
+  uiDeleteController.add(0);
   await Future.value();
   uiUpdateController.add(Tuple2(1, 'new todo edited'));
   await Future.value();
