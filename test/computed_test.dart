@@ -1336,6 +1336,54 @@ void main() {
     }
   });
 
+  test(
+      '(regression) new dependencies computed for the first time do not mark running computation as dirty',
+      () async {
+    final controller1 = StreamController<int>.broadcast(
+        sync: true); // Use a broadcast stream to make debugging easier
+    final source1 = controller1.stream;
+
+    final controller2 = StreamController<int>.broadcast(
+        sync: true); // Use a broadcast stream to make debugging easier
+    final source2 = controller2.stream;
+
+    var dependOnC2 = false;
+
+    final c2 = Computed(() => source1.use);
+
+    final c = Computed(() {
+      if (dependOnC2) c2.use;
+      return source1.use + source2.use;
+    });
+
+    final c3 = Computed(() => c.use);
+
+    var subCnt = 0;
+    var expectation = 0;
+
+    final sub = c3.listen((event) {
+      subCnt++;
+      expect(event, expectation);
+    }, (e) => fail(e.toString()));
+
+    try {
+      await Future.value();
+      expect(subCnt, 0);
+      expectation = 3;
+      controller1.add(1);
+      controller2.add(2);
+      await Future.value();
+      expect(subCnt, 1);
+      dependOnC2 = true;
+      expectation = 5;
+      controller1.add(3);
+      await Future.value();
+      expect(subCnt, 2);
+    } finally {
+      sub.cancel();
+    }
+  });
+
   group('prev', () {
     test('works on streams', () async {
       final controller1 = StreamController<int>.broadcast(
