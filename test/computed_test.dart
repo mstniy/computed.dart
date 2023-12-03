@@ -81,46 +81,6 @@ void main() {
       }
     });
 
-    test('can switch from use to react', () async {
-      // Note that the other direction (react -> use) does not work.
-      // I can't think of a way to make it work without introducing
-      // additional bookkeeping (ie. overhead),
-      // nor a real-world scenario where it would be useful.
-      final controller = StreamController<int>.broadcast(
-          sync: true); // Use a broadcast stream to make debugging easier
-      final source = controller.stream;
-
-      var useUse = true;
-      var cnt = 0;
-
-      var lCnt = 0; // To prevent memoization of [c]
-
-      final c = Computed(() {
-        cnt++;
-        useUse ? source.use : source.react((p0) {});
-        return lCnt;
-      });
-
-      final sub = c.listen((res) {
-        lCnt++;
-      }, (e) => fail(e.toString()));
-
-      try {
-        expect(cnt, 2);
-        controller.add(0);
-        expect(cnt, 4);
-        controller.add(0);
-        expect(cnt, 4);
-        useUse = false;
-        controller.add(1);
-        expect(cnt, 6);
-        controller.add(1);
-        expect(cnt, 8);
-      } finally {
-        sub.cancel();
-      }
-    });
-
     test('.react throws if the stream has no new value', () async {
       final controller1 = StreamController<int>.broadcast(
           sync: true); // Use a broadcast stream to make debugging easier
@@ -179,57 +139,6 @@ void main() {
         expectation1 = null;
         c2.fix(43);
         expect(cCnt, 16);
-      } finally {
-        sub.cancel();
-      }
-    });
-
-    test(
-        '(regression) .react on non-changed stream does not mark computation dirty',
-        () async {
-      final controller1 = StreamController<int>.broadcast(
-          sync: true); // Use a broadcast stream to make debugging easier
-      final source1 = controller1.stream;
-
-      final controller2 = StreamController<int>.broadcast(
-          sync: true); // Use a broadcast stream to make debugging easier
-      final source2 = controller2.stream;
-
-      var lCnt = 0;
-
-      final c1 = Computed(() {
-        source2.react((p0) {});
-
-        return lCnt;
-      });
-
-      final c2 = Computed(() {
-        source1.react((p0) {});
-        try {
-          c1.use;
-        } on NoValueException {
-          // Pass
-        }
-
-        return lCnt;
-      });
-
-      final sub = c2.listen((event) {
-        lCnt++;
-      }, (e) => fail(e.toString()));
-
-      try {
-        await Future.value();
-        expect(lCnt, 1);
-        controller2.add(0);
-        await Future.value();
-        expect(lCnt, 2);
-        controller1.add(0);
-        await Future.value();
-        expect(lCnt, 3);
-        controller1.add(0);
-        await Future.value();
-        expect(lCnt, 4);
       } finally {
         sub.cancel();
       }
@@ -936,53 +845,215 @@ void main() {
     }
   });
 
-  test('cannot call use/react inside react callbacks', () async {
-    final controller = StreamController<int>.broadcast(
-        sync: true); // Use a broadcast stream to make debugging easier
-    final source = controller.stream;
+  group('react', () {
+    test('can switch from use to react', () async {
+      // Note that the other direction (react -> use) does not work.
+      // I can't think of a way to make it work without introducing
+      // additional bookkeeping (ie. overhead),
+      // nor a real-world scenario where it would be useful.
+      final controller = StreamController<int>.broadcast(
+          sync: true); // Use a broadcast stream to make debugging easier
+      final source = controller.stream;
 
-    final source2 = Stream.empty();
-
-    final c2 = Computed(() => null);
-
-    for (var f in [
-      (p0) => source2.use,
-      (p0) => c2.use,
-      (p0) => source2.react((p0) {})
-    ]) {
-      var c = Computed(() {
-        source.react(f);
-      });
-
-      var expectThrow = false;
+      var useUse = true;
       var cnt = 0;
 
-      c.listen((output) {
-        if (expectThrow) {
-          fail("Should have thrown");
-        } else {
-          expect(output, null);
-          expectThrow = true;
-        }
-      }, (e) {
-        expect(expectThrow, true);
+      var lCnt = 0; // To prevent memoization of [c]
+
+      final c = Computed(() {
         cnt++;
-        expect(
-            e,
-            allOf(
-                isA<StateError>(),
-                (StateError e) =>
-                    e.message ==
-                    "`use` and `react` not allowed inside react callbacks."));
+        useUse ? source.use : source.react((p0) {});
+        return lCnt;
       });
 
-      await Future.value();
-      expect(expectThrow, true);
+      final sub = c.listen((res) {
+        lCnt++;
+      }, (e) => fail(e.toString()));
 
-      controller.add(0);
-      await Future.value();
-      expect(cnt, 1);
-    }
+      try {
+        expect(cnt, 2);
+        controller.add(0);
+        expect(cnt, 4);
+        controller.add(0);
+        expect(cnt, 4);
+        useUse = false;
+        controller.add(1);
+        expect(cnt, 6);
+        controller.add(1);
+        expect(cnt, 8);
+      } finally {
+        sub.cancel();
+      }
+    });
+    test('cannot call use/react inside react callbacks', () async {
+      final controller = StreamController<int>.broadcast(
+          sync: true); // Use a broadcast stream to make debugging easier
+      final source = controller.stream;
+
+      final source2 = Stream.empty();
+
+      final c2 = Computed(() => null);
+
+      for (var f in [
+        (p0) => source2.use,
+        (p0) => c2.use,
+        (p0) => source2.react((p0) {})
+      ]) {
+        var c = Computed(() {
+          source.react(f);
+        });
+
+        var expectThrow = false;
+        var cnt = 0;
+
+        c.listen((output) {
+          if (expectThrow) {
+            fail("Should have thrown");
+          } else {
+            expect(output, null);
+            expectThrow = true;
+          }
+        }, (e) {
+          expect(expectThrow, true);
+          cnt++;
+          expect(
+              e,
+              allOf(
+                  isA<StateError>(),
+                  (StateError e) =>
+                      e.message ==
+                      "`use` and `react` not allowed inside react callbacks."));
+        });
+
+        await Future.value();
+        expect(expectThrow, true);
+
+        controller.add(0);
+        await Future.value();
+        expect(cnt, 1);
+      }
+    });
+    test('.react onError works', () async {
+      final controller1 = StreamController<int>.broadcast(
+          sync: true); // Use a broadcast stream to make debugging easier
+      final source1 = controller1.stream;
+
+      var expectError = false;
+      var expectation = 0;
+      var cCnt = 0;
+
+      final c = Computed(() {
+        cCnt++;
+        source1.react((p0) {
+          expect(expectError, false);
+          expect(p0, expectation);
+        }, (p0) {
+          expect(expectError, true);
+          expect(p0, expectation);
+        });
+      });
+
+      final sub = c.listen(null, (e) => fail(e.toString()));
+
+      try {
+        expect(cCnt, 2);
+        controller1.add(0);
+        expect(cCnt, 4);
+        expectError = true;
+        expectation = 1;
+        controller1.addError(1);
+        expect(cCnt, 6);
+      } finally {
+        sub.cancel();
+      }
+    });
+
+    test('.react delays exceptions if no onError is provided', () async {
+      final controller1 = StreamController<int>.broadcast(
+          sync: true); // Use a broadcast stream to make debugging easier
+      final source1 = controller1.stream;
+
+      final c = Computed(() {
+        source1.react((p0) {});
+      });
+
+      var expectError = false;
+      var expectation = 0;
+      var lCnt = 0;
+
+      final sub = c.listen((event) {
+        lCnt++;
+        expect(expectError, false);
+      }, (e) {
+        lCnt++;
+        expect(expectError, true);
+        expect(e, expectation);
+      });
+
+      try {
+        expect(lCnt, 0);
+        controller1.add(0);
+        await Future.value();
+        expect(lCnt, 1);
+        expectError = true;
+        expectation = 1;
+        controller1.addError(1);
+        await Future.value();
+        expect(lCnt, 2);
+      } finally {
+        sub.cancel();
+      }
+    });
+    test(
+        '(regression) .react on non-changed stream does not mark computation dirty',
+        () async {
+      final controller1 = StreamController<int>.broadcast(
+          sync: true); // Use a broadcast stream to make debugging easier
+      final source1 = controller1.stream;
+
+      final controller2 = StreamController<int>.broadcast(
+          sync: true); // Use a broadcast stream to make debugging easier
+      final source2 = controller2.stream;
+
+      var lCnt = 0;
+
+      final c1 = Computed(() {
+        source2.react((p0) {});
+
+        return lCnt;
+      });
+
+      final c2 = Computed(() {
+        source1.react((p0) {});
+        try {
+          c1.use;
+        } on NoValueException {
+          // Pass
+        }
+
+        return lCnt;
+      });
+
+      final sub = c2.listen((event) {
+        lCnt++;
+      }, (e) => fail(e.toString()));
+
+      try {
+        await Future.value();
+        expect(lCnt, 1);
+        controller2.add(0);
+        await Future.value();
+        expect(lCnt, 2);
+        controller1.add(0);
+        await Future.value();
+        expect(lCnt, 3);
+        controller1.add(0);
+        await Future.value();
+        expect(lCnt, 4);
+      } finally {
+        sub.cancel();
+      }
+    });
   });
 
   test('asserts on detected side effects', () async {

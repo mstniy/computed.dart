@@ -136,6 +136,7 @@ class ComputedImpl<T> with Computed<T> {
 
   bool get _computing => _curUpstreamComputations != null;
   bool _reacting = false;
+  Object? _reactSuppressedException;
   Map<ComputedImpl, _MemoizedValueOrException>? _curUpstreamComputations;
 
   final _memoizedDownstreamComputations = <ComputedImpl>{};
@@ -389,6 +390,10 @@ class ComputedImpl<T> with Computed<T> {
       try {
         GlobalCtx._currentComputation = this;
         final newResult = _ValueOrException.value(_f());
+        if (_reactSuppressedException != null) {
+          // Throw it here
+          throw _reactSuppressedException!;
+        }
         if (oldComputation == null) {
           // If we are the first _evalF in the call stack,
           // run f() a second time to make sure it returns the same result.
@@ -431,6 +436,7 @@ class ComputedImpl<T> with Computed<T> {
         // as thrown objects might not implement ==
         _lastResult = _ValueOrException.exc(e);
       } finally {
+        _reactSuppressedException = null;
         final shouldNotify =
             _prevResult?.shouldNotifyMemoized(_lastResult) ?? true;
         if (gotNVE || shouldNotify) {
@@ -574,10 +580,9 @@ class ComputedImpl<T> with Computed<T> {
       } else if (onError != null) {
         onError(_lastResult!._exc as Object);
       } else {
-        // TODO: Store the exception in an internal field and
-        //  behave as if the current computation threw it
-        //  (without throwing it here, as this might
-        //  cause subsequent .react-s to be skipped)
+        // Do not throw the exception here,
+        // as this might cause other .react/.use-s to get skipped
+        caller._reactSuppressedException ??= _lastResult!._exc;
       }
     } finally {
       caller._reacting = false;
