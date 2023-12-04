@@ -197,6 +197,9 @@ Note the use of `.react` instead of `.use` in these examples.
 - Q: How to pass an async function into `Computed`?
 - A: Short answer is: you can't. The functions passed to `Computed` should be pure computations, free of side effects. If you are meaning to use an external value as part of the computation, see `.use`. If you want to react to a stream of external events, see `.react`. If you wish to produce external side effects, see `.listen` or `.as[Broadcast]Stream`.
 
+- Q: Why am I getting `Computed expressions must be purely functional. Please use listeners for side effects.`
+- A: On debug mode, Computed runs the given computations twice to make sure they behave identically. If this does not hold, it throws this assertion. Possible reasons include mutating and using a mutable value inside the computation or returning a type which does not implement deep comparisons, like `List` or `Set`.
+
 ## <a name='Pitfalls'></a>Pitfalls
 
 ### <a name='Donotusemutablevaluesincomputations'></a>Do not use mutable values in computations

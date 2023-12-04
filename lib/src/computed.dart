@@ -407,7 +407,7 @@ class ComputedImpl<T> with Computed<T> {
           // run f() a second time to make sure it returns the same result.
           // Nested _evalF-s don't do this to avoid calling
           // deeply nested computations exponentially many times.
-          assert(() {
+          ast() {
             T? f2;
             try {
               f2 = _f();
@@ -415,7 +415,9 @@ class ComputedImpl<T> with Computed<T> {
               return false;
             }
             return f2 == newResult._value;
-          }(),
+          }
+
+          assert(ast(),
               "Computed expressions must be purely functional. Please use listeners for side effects.");
         }
         _lastResult = newResult;
@@ -425,7 +427,7 @@ class ComputedImpl<T> with Computed<T> {
         // Run the computation once again and make sure
         // it throws NoValueException again
         if (oldComputation == null) {
-          assert(() {
+          ast() {
             try {
               _f();
             } on NoValueException {
@@ -435,7 +437,9 @@ class ComputedImpl<T> with Computed<T> {
               // Pass
             }
             return false;
-          }(),
+          }
+
+          assert(ast(),
               "Computed expressions must be purely functional. Please use listeners for side effects.");
         }
         rethrow;
