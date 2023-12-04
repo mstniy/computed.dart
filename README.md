@@ -32,6 +32,7 @@ Computed:
   - [Do not create new `Future`s inside computations](#DonotcreatenewFuturesinsidecomputations)
   - [Do not forget to `.use` or `.react` your data sources](#Donotforgetto.useor.reactyourdatasources)
   - [Keep in mind that `.prev` does not subscribe](#Keepinmindthat.prevdoesnotsubscribe)
+  - [`.react` is not `.listen`](#.reactisnot.listen)
 
 <!-- vscode-markdown-toc-config
 	numbering=false
@@ -166,7 +167,19 @@ These actions will trigger a re-computation if necessary.
 Here is a simple example that computes the difference between the old and new values of a data source whenever it produces a value:
 
 ```
-final c = Computed(() => s.react - s.prev);
+final c = Computed(() {
+    s.use; // Make sure it has a value
+    late int res;
+    s.react((val) {
+      try {
+        res = val - s.prev;
+      } on NoValueException {
+        // This is the first value of [s]
+        res = val;
+      }
+    });
+    return res;
+});
 ```
 
 Note that the listeners of this computations or other computations using the result of this computation will not be notified if the difference does not change, as computation results are memoized. If this behaviour is not suitable for your application logic, you can return a counter along with the value itself.
@@ -174,19 +187,15 @@ Note that the listeners of this computations or other computations using the res
 You can also create temporal accumulators:
 
 ```
-final sum = Computed.withSelf((self) {
-    try {
-        return self.prev + s.react;
-    } on NoValueException {
-        // Thrown for the first value produced by the stream
-        // as self.prev has no value
-        return s.react;
-    }
-});
+final sum = Computed<int>.withPrev((prev) {
+    var res = prev;
+    s.react((val) => res += val);
+    return res;
+}, initialPrev: 0);
 ```
 
 Note the use of `.react` instead of `.use` in these examples.
-`.react` marks the current computation to be recomputed for all values produced by a data source, even if it consecutively produces a pair of values comparing `==`. Note that unlike `.use`, `.react` will throw a NoValueException if the data source has not produced a new data or error since the last time the current computation changed value. As a rule of thumb, you should use `.react` over `.use` for data sources representing a sequence of events rather than a state.
+`.react` marks the current computation to be recomputed for all values produced by a data source, even if it consecutively produces a pair of values comparing `==`. `.react` will run the given function if the data source has produced a new value/error. As a rule of thumb, you should use `.react` over `.use` for data sources representing a sequence of events rather than a state.
 
 ## <a name='FAQ'></a>FAQ
 
@@ -219,3 +228,8 @@ If a computation returns without calling either of these on a data source, Compu
 ### <a name='Keepinmindthat.prevdoesnotsubscribe'></a>Keep in mind that `.prev` does not subscribe
 
 It is also "subjective" to the running computation. Different functions can have different `.prev`s on the same data source or computation.
+
+### <a name='.reactisnot.listen'></a>`.react` is not `.listen`
+
+`.react` can only be used inside computations, `.listen` can only be used outside computations.  
+`.react` callbacks must not have side effects. `.listen` callbacks are where side effects are supposed to happen.
