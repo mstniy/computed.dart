@@ -80,7 +80,7 @@ class GlobalCtx {
   static ComputedImpl get currentComputation {
     if (_currentComputation == null) {
       throw StateError(
-          "`use` and `prev` are only allowed inside Computed expressions.");
+          "`use` and `prev` are only allowed inside computations.");
     }
     return _currentComputation!;
   }
@@ -208,6 +208,9 @@ class ComputedImpl<T> with Computed<T> {
   @override
   ComputedSubscription<T> listen(
       void Function(T event)? onData, Function? onError) {
+    if (GlobalCtx._currentComputation != null) {
+      throw StateError('`listen` is not allowed inside computations.');
+    }
     final sub = _ComputedSubscriptionImpl<T>(this, onData, onError);
     if (_novalue) {
       try {

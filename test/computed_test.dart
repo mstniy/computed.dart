@@ -832,17 +832,37 @@ void main() {
       s.use;
       fail("Should have thrown");
     } on StateError catch (e) {
-      expect(e.message,
-          "`use` and `prev` are only allowed inside Computed expressions.");
+      expect(
+          e.message, "`use` and `prev` are only allowed inside computations.");
     }
 
     try {
       s.prev;
       fail("Should have thrown");
     } on StateError catch (e) {
-      expect(e.message,
-          "`use` and `prev` are only allowed inside Computed expressions.");
+      expect(
+          e.message, "`use` and `prev` are only allowed inside computations.");
     }
+  });
+
+  test('cannot call listen inside computations', () async {
+    final c = Computed(() => null);
+    final c2 = Computed(() => c.listen((event) {}, null));
+
+    var flag = false;
+
+    c2.listen((event) {
+      fail("Should not call the listener");
+    }, (e) {
+      expect(flag, false);
+      flag = true;
+      expect(e, isA<StateError>());
+      expect(e.message, '`listen` is not allowed inside computations.');
+    });
+
+    await Future.value();
+
+    expect(flag, true);
   });
 
   group('react', () {
