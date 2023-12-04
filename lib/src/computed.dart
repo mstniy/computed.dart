@@ -272,6 +272,14 @@ class ComputedImpl<T> with Computed<T> {
     return rvoe._router.prev;
   }
 
+  DT dataSourcePrevOr<DT>(Object dataSource, DT or) {
+    try {
+      return dataSourcePrev(dataSource);
+    } on NoValueException {
+      return or;
+    }
+  }
+
   void dataSourceReact<DT>(
       Object dataSource,
       DT Function() dataSourceUser,

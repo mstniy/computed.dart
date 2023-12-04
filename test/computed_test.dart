@@ -1563,8 +1563,10 @@ void main() {
         final c = Computed(() {
           try {
             expect(source1.prev, expectation);
+            expect(source1.prevOr(42), expectation);
           } on NoValueException {
             expect(expectation, null);
+            expect(source1.prevOr(42), 42);
           }
           return source1.use;
         });

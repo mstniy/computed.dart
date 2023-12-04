@@ -40,6 +40,11 @@ class StreamComputedExtensionImpl<T> {
     return caller.dataSourcePrev(s);
   }
 
+  T prevOr(T or) {
+    final caller = GlobalCtx.currentComputation;
+    return caller.dataSourcePrevOr(s, or);
+  }
+
   void mockEmit(T value) {
     GlobalCtx.routerFor(s)?.onDataSourceData(value);
   }

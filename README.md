@@ -170,17 +170,12 @@ Here is a simple example that computes the difference between the old and new va
 final c = Computed(() {
     s.use; // Make sure it has a value
     late int res;
-    s.react((val) {
-      try {
-        res = val - s.prev;
-      } on NoValueException {
-        // This is the first value of [s]
-        res = val;
-      }
-    });
+    s.react((val) => res = val - s.prevOr(0));
     return res;
 });
 ```
+
+`.prevOr` is a handy shortcut which returns the given fallback value instead of throwing `NoValueException` if the data source had no value the last time the current computation changed value.
 
 Note that the listeners of this computations or other computations using the result of this computation will not be notified if the difference does not change, as computation results are memoized. If this behaviour is not suitable for your application logic, you can return a counter along with the value itself.
 

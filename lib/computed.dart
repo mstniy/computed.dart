@@ -119,6 +119,9 @@ extension StreamComputedExtension<T> on Stream<T> {
   /// Note that [prev] does not subscribe to this stream. To do that, see [use].
   T get prev => StreamComputedExtensionImpl<T>(this).prev;
 
+  /// As [prev], but returns [or] instead of throwing [NoValueException].
+  T prevOr(T or) => StreamComputedExtensionImpl<T>(this).prevOr(or);
+
   /// Makes computations listening on this stream behave as if it emmitted the given value.
   @visibleForTesting
   void mockEmit(T value) {
