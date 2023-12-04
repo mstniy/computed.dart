@@ -227,4 +227,5 @@ It is also "subjective" to the running computation. Different functions can have
 ### <a name='.reactisnot.listen'></a>`.react` is not `.listen`
 
 `.react` can only be used inside computations, `.listen` can only be used outside computations.  
-`.react` callbacks must not have side effects. `.listen` callbacks are where side effects are supposed to happen.
+`.react` callbacks must not have side effects. `.listen` callbacks are where side effects are supposed to happen.  
+`.listen` keeps a reference to the given callback and calls it at a later point in time. `.react` either calls the given function before returning or doesn't call it at all.
