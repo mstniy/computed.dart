@@ -71,16 +71,14 @@ void main() {
         expect(event, expectation);
       }, (e) => fail(e.toString()));
 
-      try {
-        expect(subCnt, 0);
-        await Future.value();
-        expect(subCnt, 1);
-        expectation = 4;
-        s.value = 2;
-        expect(subCnt, 2);
-      } finally {
-        sub.cancel();
-      }
+      expect(subCnt, 0);
+      await Future.value();
+      expect(subCnt, 1);
+      expectation = 4;
+      s.value = 2;
+      expect(subCnt, 2);
+
+      sub.cancel();
     });
 
     test('can have null value', () async {
@@ -95,16 +93,14 @@ void main() {
         expect(event, expectation);
       }, (e) => fail(e.toString()));
 
-      try {
-        expect(subCnt, 0);
-        await Future.value();
-        expect(subCnt, 1);
-        expectation = 2;
-        s.value = 1;
-        expect(subCnt, 2);
-      } finally {
-        sub.cancel();
-      }
+      expect(subCnt, 0);
+      await Future.value();
+      expect(subCnt, 1);
+      expectation = 2;
+      s.value = 1;
+      expect(subCnt, 2);
+
+      sub.cancel();
     });
   });
 }
