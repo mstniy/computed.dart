@@ -162,7 +162,7 @@ These actions will trigger a re-computation if necessary.
 
 ## <a name='Lookingatthepast'></a>Looking at the past
 
-`.use` returns the current value of the data source or computation, so how can you look at the past without resorting to keeping mutable state in your app code? `.prev` allows you to obtain the last value assumed by a given data source or computation the last time the current computation changed its value.
+`.use` returns the current value of the data source or computation, so how can you look at the past without resorting to keeping mutable state in your app code? `.prev` allows you to obtain the last value assumed by a given data source or computation the last time the current computation changed its value or otherwise notified its listeners or other computations which depend on it.
 
 Here is a simple example that computes the difference between the old and new values of a data source whenever it produces a value:
 
@@ -172,12 +172,13 @@ final c = Computed(() {
     late int res;
     s.react((val) => res = val - s.prevOr(0));
     return res;
-});
+}, memoized: false);
 ```
 
-`.prevOr` is a handy shortcut which returns the given fallback value instead of throwing `NoValueException` if the data source had no value the last time the current computation changed value.
-
-Note that the listeners of this computations or other computations using the result of this computation will not be notified if the difference does not change, as computation results are memoized. If this behaviour is not suitable for your application logic, you can return a counter along with the value itself.
+Note the use of `.react` in this example.
+`.react` marks the current computation to be recomputed for all values produced by a data source, even if it consecutively produces a pair of values comparing `==`. `.react` will run the given function if the data source has produced a new value/error. As a rule of thumb, you should use `.react` over `.use` for data sources representing a sequence of events rather than a state.  
+`.prevOr` is a handy shortcut which returns the given fallback value instead of throwing `NoValueException` if the data source had no value the last time the current computation notified its listeners or other computations which depend on it.  
+`memoized: false` prevents the result of the computation from being memoized, as we want the result of `.prevOr` to always reflect the last value of `s`, even if the result of the computation did not change.
 
 You can also create temporal accumulators:
 
@@ -188,9 +189,6 @@ final sum = Computed<int>.withPrev((prev) {
     return res;
 }, initialPrev: 0);
 ```
-
-Note the use of `.react` instead of `.use` in these examples.
-`.react` marks the current computation to be recomputed for all values produced by a data source, even if it consecutively produces a pair of values comparing `==`. `.react` will run the given function if the data source has produced a new value/error. As a rule of thumb, you should use `.react` over `.use` for data sources representing a sequence of events rather than a state.
 
 ## <a name='FAQ'></a>FAQ
 
