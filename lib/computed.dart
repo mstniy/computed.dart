@@ -73,7 +73,7 @@ abstract class Computed<T> {
   /// Throws [CyclicUseException] if this usage would cause a cyclic dependency.
   T get use;
 
-  /// Returns the result of this computation during the last run of the current computation which triggered the current computation's downstream, if one exists.
+  /// Returns the result of this computation during the last run of the current computation which notified the current computation's downstream, if one exists.
   /// If called on the current computation, returns its last result which was different to the previous one.
   ///
   /// This will never trigger a re-computation.
@@ -116,7 +116,7 @@ extension StreamComputedExtension<T> on Stream<T> {
   /// Throws [NoValueException] if this stream does not have a known value yet.
   T get use => StreamComputedExtensionImpl<T>(this).use;
 
-  /// If this stream has produced a value or error since the last time the current computation changed its value, runs the given functional on the value or error produced by this stream.
+  /// If this stream has produced a value or error since the last time the current computation notified its downstream, runs the given functional on the value or error produced by this stream.
   ///
   /// If no onError is provided and the stream has produced an error, the current computation
   /// will be assumed to have thrown that error at the end.

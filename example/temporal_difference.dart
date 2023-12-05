@@ -10,11 +10,14 @@ void main() {
     late int res;
     s.react((val) => res = val - s.prevOr(0));
     return res;
-  }).listen((event) => print(event), (e) {
+  }, memoized: false)
+      .listen((event) => print(event), (e) {
     print('Exception: $e');
   });
 
   cont.add(1);
+  cont.add(1);
+  cont.add(2);
   cont.add(3);
   cont.add(6);
   cont.add(3);
