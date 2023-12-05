@@ -1188,6 +1188,58 @@ void main() {
     }
   });
 
+  test('can have non-memoized computations', () async {
+    final controller = StreamController<int>.broadcast(
+        sync: true); // Use a broadcast stream to make debugging easier
+    final source = controller.stream;
+
+    var cnt1 = 0, cnt2 = 0;
+
+    final c1 = Computed(() {
+      cnt1++;
+      source.use; // Make sure it has a value
+      late int diff;
+      source.react((p0) {
+        diff = p0 - source.prevOr(0);
+      });
+      return diff;
+    }, memoized: false);
+    final c2 = Computed(() {
+      cnt2++;
+      return c1.use * 2;
+    }, memoized: false);
+
+    var lCnt = 0;
+    var expectation = 2;
+
+    final sub = c2.listen((value) {
+      lCnt++;
+      expect(value, expectation);
+    }, (e) => fail(e.toString()));
+
+    expect(cnt1, 2);
+    expect(cnt2, 2);
+    expect(lCnt, 0);
+    await Future.value(0);
+    expect(cnt1, 2);
+    expect(cnt2, 2);
+    expect(lCnt, 0);
+    controller.add(1);
+    expect(cnt1, 4);
+    expect(cnt2, 4);
+    expect(lCnt, 1);
+    controller.add(2);
+    expect(cnt1, 6);
+    expect(cnt2, 6);
+    expect(lCnt, 2);
+    expectation = 0;
+    controller.add(2);
+    expect(cnt1, 8);
+    expect(cnt2, 8);
+    expect(lCnt, 3);
+    sub.cancel();
+  });
+
   group('mocks', () {
     test('fix and unmock works', () async {
       final controller = StreamController<int>.broadcast(

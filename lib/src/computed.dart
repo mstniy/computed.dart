@@ -99,7 +99,7 @@ class GlobalCtx {
         GlobalCtx._routerExpando[dataSource] as _RouterValueOrException<T>?;
 
     if (rvoe == null) {
-      rvoe = _RouterValueOrException(ComputedImpl(dataSourceUser),
+      rvoe = _RouterValueOrException(ComputedImpl(dataSourceUser, true),
           hasCurrentValue ? _ValueOrException.value(currentValue as T) : null);
       GlobalCtx._routerExpando[dataSource] = rvoe;
       rvoe._router._dss ??=
@@ -124,6 +124,10 @@ class GlobalCtx {
 class ComputedImpl<T> with Computed<T> {
   _DataSourceAndSubscription<T>? _dss;
 
+  // Whether this node is memoized.
+  // Always true for routers, which might have both memoized (.use)
+  // and non-memoized (.react) listeners.
+  final bool _memoized;
   _UpdateToken? _lastUpdate;
 
   bool get _novalue => _lastResult == null;
@@ -165,11 +169,12 @@ class ComputedImpl<T> with Computed<T> {
   T Function() _f;
   final T Function() _origF;
 
-  ComputedImpl(this._f) : _origF = _f;
+  ComputedImpl(this._f, this._memoized) : _origF = _f;
 
-  static ComputedImpl<T> withPrev<T>(T Function(T prev) f, T initialPrev) {
+  static ComputedImpl<T> withPrev<T>(
+      T Function(T prev) f, T initialPrev, bool memoized) {
     late ComputedImpl<T> c;
-    c = ComputedImpl<T>(() => f(c._prevResult?.value ?? initialPrev));
+    c = ComputedImpl<T>(() => f(c._prevResult?.value ?? initialPrev), memoized);
     c._initialPrev = initialPrev;
 
     return c;
@@ -482,7 +487,7 @@ class ComputedImpl<T> with Computed<T> {
       }
       final shouldNotify =
           _prevResult?.shouldNotifyMemoized(_lastResult) ?? true;
-      if (shouldNotify) {
+      if (!_memoized || shouldNotify) {
         _lastResultfulUpstreamComputations = _lastUpstreamComputations;
         for (var down in _memoizedDownstreamComputations) {
           if (!down._computing) down._dirty = true;

@@ -11,10 +11,30 @@ import 'src/stream_extension.dart';
 /// Note that the equality operator [==] should be meaningful for [T],
 /// as it is used for memoization.
 abstract class Computed<T> {
-  factory Computed(T Function() f) => ComputedImpl(f);
-  factory Computed.withPrev(T Function(T prev) f, {required T initialPrev}) =>
-      ComputedImpl.withPrev(f, initialPrev);
+  /// Creates a reactive computation whose value is computed by the given function.
+  ///
+  /// If [memoized] is set to false, listeners of this computation as well as
+  /// other computations using its value will be re-run every time this computation
+  /// is re-run, even if it's value stays the same, except for the extra computations
+  /// being done in debug mode to check for non-idempotency.
+  factory Computed(T Function() f, {bool memoized = true}) =>
+      ComputedImpl(f, memoized);
 
+  /// As [Computed], but calls the given function with its last value.
+  ///
+  /// If the computation has no value yet, [prev] is set to [initialPrev].
+  factory Computed.withPrev(T Function(T prev) f,
+          {required T initialPrev, bool memoized = true}) =>
+      ComputedImpl.withPrev(f, initialPrev, memoized);
+
+  /// Subscribes to this computation.
+  ///
+  /// For non-memoized computations, the listener will be called every time
+  /// this computation is re-run, even if it's value stays the same,
+  /// except for the extra computations being done in debug mode to check
+  /// for non-idempotency.
+  /// For memoized computations, the listener will be called only
+  /// when the result of the computation changes.
   ComputedSubscription<T> listen(
       void Function(T event)? onData, Function? onError);
 
@@ -53,7 +73,7 @@ abstract class Computed<T> {
   /// Throws [CyclicUseException] if this usage would cause a cyclic dependency.
   T get use;
 
-  /// Returns the result of this computation during the previous run of the current computation, if one exists.
+  /// Returns the result of this computation during the last run of the current computation which triggered the current computation's downstream, if one exists.
   /// If called on the current computation, returns its last result which was different to the previous one.
   ///
   /// This will never trigger a re-computation.
@@ -111,7 +131,7 @@ extension StreamComputedExtension<T> on Stream<T> {
   void react(void Function(T) onData, [void Function(Object)? onError]) =>
       StreamComputedExtensionImpl<T>(this).react(onData, onError);
 
-  /// Returns the value of this stream during the last run of the current computation which returned a different value to the previous one.
+  /// Returns the value of this stream during the last run of the current computation which triggered the current computation's downstream, if one exists.
   ///
   /// Can only be used inside computations.
   /// Throws [NoValueException] if the current computation did not [use] this stream
