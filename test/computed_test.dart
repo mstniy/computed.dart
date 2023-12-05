@@ -21,14 +21,12 @@ void main() {
         lastRes = event;
       }, (e) => fail(e.toString()));
 
-      try {
-        controller.add(0);
-        expect(lastRes, 0);
-        controller.add(1);
-        expect(lastRes, 2);
-      } finally {
-        sub.cancel();
-      }
+      controller.add(0);
+      expect(lastRes, 0);
+      controller.add(1);
+      expect(lastRes, 2);
+
+      sub.cancel();
     });
 
     test('react does not memoize the values produced by the stream', () async {
@@ -57,26 +55,24 @@ void main() {
             lastRes = event;
           }, (e) => fail(e.toString()));
 
-          try {
-            final lCntBase = callBoth ? 0 : 1;
-            await Future.value(0);
-            expect(cCnt, 2);
-            expect(lCnt, lCntBase);
-            expect(lastRes, null);
-            controller.add(0);
-            expect(cCnt, 4);
-            expect(lCnt, lCntBase + 1);
-            expect(lastRes, 0);
-            controller.add(0);
-            expect(cCnt, 6);
-            expect(lCnt, lCntBase + 1);
-            controller.add(1);
-            expect(cCnt, 8);
-            expect(lCnt, lCntBase + 2);
-            expect(lastRes, 2);
-          } finally {
-            sub.cancel();
-          }
+          final lCntBase = callBoth ? 0 : 1;
+          await Future.value(0);
+          expect(cCnt, 2);
+          expect(lCnt, lCntBase);
+          expect(lastRes, null);
+          controller.add(0);
+          expect(cCnt, 4);
+          expect(lCnt, lCntBase + 1);
+          expect(lastRes, 0);
+          controller.add(0);
+          expect(cCnt, 6);
+          expect(lCnt, lCntBase + 1);
+          controller.add(1);
+          expect(cCnt, 8);
+          expect(lCnt, lCntBase + 2);
+          expect(lastRes, 2);
+
+          sub.cancel();
         }
       }
     });
@@ -116,32 +112,30 @@ void main() {
 
       final sub = c.listen(null, (e) => fail(e.toString()));
 
-      try {
-        expect(cCnt, 2);
-        expectation1 = 0;
-        controller1.add(0);
-        expect(cCnt, 4);
-        controller1.add(0);
-        expect(cCnt, 6);
-        expectation1 = null;
-        expectation2 = 1;
-        controller2.add(1);
-        expect(cCnt, 8);
-        controller2.add(1);
-        expect(cCnt, 10);
-        expectation2 = 2;
-        controller2.add(2);
-        expect(cCnt, 12);
-        expectation1 = 2;
-        expectation2 = null;
-        controller1.add(2);
-        expect(cCnt, 14);
-        expectation1 = null;
-        c2.fix(43);
-        expect(cCnt, 16);
-      } finally {
-        sub.cancel();
-      }
+      expect(cCnt, 2);
+      expectation1 = 0;
+      controller1.add(0);
+      expect(cCnt, 4);
+      controller1.add(0);
+      expect(cCnt, 6);
+      expectation1 = null;
+      expectation2 = 1;
+      controller2.add(1);
+      expect(cCnt, 8);
+      controller2.add(1);
+      expect(cCnt, 10);
+      expectation2 = 2;
+      controller2.add(2);
+      expect(cCnt, 12);
+      expectation1 = 2;
+      expectation2 = null;
+      controller1.add(2);
+      expect(cCnt, 14);
+      expectation1 = null;
+      c2.fix(43);
+      expect(cCnt, 16);
+
+      sub.cancel();
     });
 
     test('(regression) can subscribe to constant computations', () async {
@@ -169,36 +163,34 @@ void main() {
 
       final sub = c.listen(null, (e) => fail(e.toString()));
 
-      try {
-        expect(cCnt, 2);
-        expectation2 = 0;
-        controller.add(0);
-        expect(cCnt, 4);
-        controller.add(0);
-        expect(cCnt, 4);
-        expectation2 = 1;
-        controller.add(1);
-        expect(cCnt, 6);
-        c2.fix(42);
-        expect(cCnt, 6);
-        c2.unmock();
-        expect(cCnt, 6);
-        expectation1 = 43;
-        c2.fix(43);
-        expect(cCnt, 8);
-        c2.fix(43);
-        expect(cCnt, 8);
-        expectation1 = 42;
-        c2.unmock();
-        expect(cCnt, 10);
-        source.mockEmit(1);
-        expect(cCnt, 10);
-        expectation2 = 2;
-        source.mockEmit(2);
-        expect(cCnt, 12);
-      } finally {
-        sub.cancel();
-      }
+      expect(cCnt, 2);
+      expectation2 = 0;
+      controller.add(0);
+      expect(cCnt, 4);
+      controller.add(0);
+      expect(cCnt, 4);
+      expectation2 = 1;
+      controller.add(1);
+      expect(cCnt, 6);
+      c2.fix(42);
+      expect(cCnt, 6);
+      c2.unmock();
+      expect(cCnt, 6);
+      expectation1 = 43;
+      c2.fix(43);
+      expect(cCnt, 8);
+      c2.fix(43);
+      expect(cCnt, 8);
+      expectation1 = 42;
+      c2.unmock();
+      expect(cCnt, 10);
+      source.mockEmit(1);
+      expect(cCnt, 10);
+      expectation2 = 2;
+      source.mockEmit(2);
+      expect(cCnt, 12);
+
+      sub.cancel();
     });
 
     test('mockEmit[Error] works', () async {
@@ -219,34 +211,32 @@ void main() {
         lastError = e;
       });
 
-      try {
-        source.mockEmit(0);
-        expect(ctr, 1);
-        expect(lastWasError, false);
-        expect(lastRes, 0);
-        source.mockEmit(0);
-        expect(ctr, 1);
-        source.mockEmit(1);
-        expect(ctr, 2);
-        expect(lastWasError, false);
-        expect(lastRes, 1);
-        source.mockEmitError(1);
-        expect(ctr, 3);
-        expect(lastWasError, true);
-        expect(lastError, 1);
-        source.mockEmitError(2);
-        expect(ctr, 4);
-        expect(lastWasError, true);
-        expect(lastError, 2);
-        source.mockEmitError(2);
-        expect(ctr, 4);
-        source.mockEmit(3);
-        expect(ctr, 5);
-        expect(lastWasError, false);
-        expect(lastRes, 3);
-      } finally {
-        sub.cancel();
-      }
+      source.mockEmit(0);
+      expect(ctr, 1);
+      expect(lastWasError, false);
+      expect(lastRes, 0);
+      source.mockEmit(0);
+      expect(ctr, 1);
+      source.mockEmit(1);
+      expect(ctr, 2);
+      expect(lastWasError, false);
+      expect(lastRes, 1);
+      source.mockEmitError(1);
+      expect(ctr, 3);
+      expect(lastWasError, true);
+      expect(lastError, 1);
+      source.mockEmitError(2);
+      expect(ctr, 4);
+      expect(lastWasError, true);
+      expect(lastError, 2);
+      source.mockEmitError(2);
+      expect(ctr, 4);
+      source.mockEmit(3);
+      expect(ctr, 5);
+      expect(lastWasError, false);
+      expect(lastRes, 3);
+
+      sub.cancel();
     });
 
     test('can be used as listeners', () async {
@@ -274,29 +264,27 @@ void main() {
           lastError = e;
         });
 
-        try {
-          await Future.value(); // Sanity check
-          expect(ctr, 0);
-          controller.add(0);
-          await Future
-              .value(); // As Stream-s call their listeners in the next tick
-          expect(ctr, 1);
-          expect(lastWasError, false);
-          expect(lastRes, 0);
-          controller.add(1);
-          await Future.value();
-          expect(ctr, 2);
-          expect(lastRes, 2);
-          controller.addError(2);
-          await Future.value();
-          expect(ctr, 3);
-          expect(lastWasError, true);
-          expect(lastError, 2);
-          await Future.value(); // Sanity check
-          expect(ctr, 3);
-        } finally {
-          sub.cancel();
-        }
+        await Future.value(); // Sanity check
+        expect(ctr, 0);
+        controller.add(0);
+        await Future
+            .value(); // As Stream-s call their listeners in the next tick
+        expect(ctr, 1);
+        expect(lastWasError, false);
+        expect(lastRes, 0);
+        controller.add(1);
+        await Future.value();
+        expect(ctr, 2);
+        expect(lastRes, 2);
+        controller.addError(2);
+        await Future.value();
+        expect(ctr, 3);
+        expect(lastWasError, true);
+        expect(lastError, 2);
+        await Future.value(); // Sanity check
+        expect(ctr, 3);
+
+        sub.cancel();
 
         try {
           stream.listen((event) {});
@@ -335,26 +323,24 @@ void main() {
         subCnt++;
       }, (e) => fail(e.toString()));
 
-      try {
-        controller.add(0);
-        expect(subCnt, 1);
-        expectation = 1;
-        controller.addError(1);
-        expect(subCnt, 2);
-        // Exceptions are also memoized
-        controller.addError(1);
-        expect(subCnt, 2);
-        expectation = 2;
-        controller.addError(2);
-        expect(subCnt, 3);
-        expectation = null;
-        controller.add(3);
-        expect(subCnt, 4);
-        controller.add(3);
-        expect(subCnt, 4);
-      } finally {
-        sub.cancel();
-      }
+      controller.add(0);
+      expect(subCnt, 1);
+      expectation = 1;
+      controller.addError(1);
+      expect(subCnt, 2);
+      // Exceptions are also memoized
+      controller.addError(1);
+      expect(subCnt, 2);
+      expectation = 2;
+      controller.addError(2);
+      expect(subCnt, 3);
+      expectation = null;
+      controller.add(3);
+      expect(subCnt, 4);
+      controller.add(3);
+      expect(subCnt, 4);
+
+      sub.cancel();
     });
   });
 
@@ -373,13 +359,11 @@ void main() {
         expect(event, 8);
       }, (e) => fail(e.toString()));
 
-      try {
-        completer.complete(2);
-        await Future.value();
-        expect(callCnt, 1);
-      } finally {
-        sub.cancel();
-      }
+      completer.complete(2);
+      await Future.value();
+      expect(callCnt, 1);
+
+      sub.cancel();
     });
 
     test('can pass rejections to computations', () async {
@@ -403,13 +387,11 @@ void main() {
         callCnt++;
       }, (e) => fail(e.toString()));
 
-      try {
-        completer.completeError(1);
-        await Future.value(0);
-        expect(callCnt, 1);
-      } finally {
-        sub.cancel();
-      }
+      completer.completeError(1);
+      await Future.value(0);
+      expect(callCnt, 1);
+
+      sub.cancel();
     });
 
     test('can be cancelled', () async {
@@ -446,33 +428,31 @@ void main() {
       fail("Must not run");
     }, (e) => fail("Must not run"));
 
-    try {
-      int ctr = 0;
-      bool? lastWasError;
-      int? lastValue;
-      Object? lastError;
-      sub.onData((data) {
-        ctr++;
-        lastWasError = false;
-        lastValue = data;
-      });
-      sub.onError((e) {
-        ctr++;
-        lastWasError = true;
-        lastError = e;
-      });
+    int ctr = 0;
+    bool? lastWasError;
+    int? lastValue;
+    Object? lastError;
+    sub.onData((data) {
+      ctr++;
+      lastWasError = false;
+      lastValue = data;
+    });
+    sub.onError((e) {
+      ctr++;
+      lastWasError = true;
+      lastError = e;
+    });
 
-      controller.add(0);
-      expect(ctr, 1);
-      expect(lastWasError, false);
-      expect(lastValue, 0);
-      controller.addError(1);
-      expect(ctr, 2);
-      expect(lastWasError, true);
-      expect(lastError, 1);
-    } finally {
-      sub.cancel();
-    }
+    controller.add(0);
+    expect(ctr, 1);
+    expect(lastWasError, false);
+    expect(lastValue, 0);
+    controller.addError(1);
+    expect(ctr, 2);
+    expect(lastWasError, true);
+    expect(lastError, 1);
+
+    sub.cancel();
   });
 
   test('computations can use other computations', () {
@@ -488,14 +468,12 @@ void main() {
       lastRes = event;
     }, (e) => fail(e.toString()));
 
-    try {
-      controller.add(0);
-      expect(lastRes, 1);
-      controller.add(1);
-      expect(lastRes, 3);
-    } finally {
-      sub.cancel();
-    }
+    controller.add(0);
+    expect(lastRes, 1);
+    controller.add(1);
+    expect(lastRes, 3);
+
+    sub.cancel();
   });
 
   test('computations are memoized', () {
@@ -518,22 +496,20 @@ void main() {
 
     expect(callCnt, 2);
 
-    try {
-      controller.add(0);
-      expect(lastRes, 0);
-      expect(callCnt, 4);
-      controller.add(1);
-      expect(lastRes, 1);
-      expect(callCnt, 6);
-      controller.add(1);
-      expect(lastRes, 1);
-      expect(callCnt, 6);
-      controller.add(-1);
-      expect(lastRes, 1);
-      expect(callCnt, 6);
-    } finally {
-      sub.cancel();
-    }
+    controller.add(0);
+    expect(lastRes, 0);
+    expect(callCnt, 4);
+    controller.add(1);
+    expect(lastRes, 1);
+    expect(callCnt, 6);
+    controller.add(1);
+    expect(lastRes, 1);
+    expect(callCnt, 6);
+    controller.add(-1);
+    expect(lastRes, 1);
+    expect(callCnt, 6);
+
+    sub.cancel();
   });
 
   test('latest pattern works', () {
@@ -577,24 +553,22 @@ void main() {
       expect(event, expectation);
     }, (e) => fail(e.toString()));
 
-    try {
-      controller1.add(0);
-      expect(callCnt, 1);
-      expectation = 1;
-      controller2.add(1);
-      expect(callCnt, 2);
-      expectation = 2;
-      controller1.add(2);
-      expect(callCnt, 3);
-      expectation = 3;
-      controller1.add(3);
-      expect(callCnt, 4);
-      expectation = 4;
-      controller2.add(4);
-      expect(callCnt, 5);
-    } finally {
-      sub.cancel();
-    }
+    controller1.add(0);
+    expect(callCnt, 1);
+    expectation = 1;
+    controller2.add(1);
+    expect(callCnt, 2);
+    expectation = 2;
+    controller1.add(2);
+    expect(callCnt, 3);
+    expectation = 3;
+    controller1.add(3);
+    expect(callCnt, 4);
+    expectation = 4;
+    controller2.add(4);
+    expect(callCnt, 5);
+
+    sub.cancel();
   });
 
   group('respects topological order', () {
@@ -617,14 +591,12 @@ void main() {
           outputs.add(output);
         }, (e) => fail(e.toString()));
 
-        try {
-          controller.add(0);
-          expect(outputs, orderedEquals([0]));
-          controller.add(1);
-          expect(outputs, orderedEquals([0, 3]));
-        } finally {
-          sub.cancel();
-        }
+        controller.add(0);
+        expect(outputs, orderedEquals([0]));
+        controller.add(1);
+        expect(outputs, orderedEquals([0, 3]));
+
+        sub.cancel();
       }
     });
 
@@ -660,20 +632,18 @@ void main() {
             outputs3.add(output);
           }, (e) => fail(e.toString()));
 
-          try {
-            controller1.add(0);
-            expect(outputs2, orderedEquals([]));
-            expect(outputs3, orderedEquals([]));
-            controller2.add(1);
-            expect(outputs2, orderedEquals([1]));
-            expect(outputs3, orderedEquals([2]));
-            controller1.add(2);
-            expect(outputs2, orderedEquals([1, 5]));
-            expect(outputs3, orderedEquals([2, 4]));
-          } finally {
-            sub2.cancel();
-            sub3.cancel();
-          }
+          controller1.add(0);
+          expect(outputs2, orderedEquals([]));
+          expect(outputs3, orderedEquals([]));
+          controller2.add(1);
+          expect(outputs2, orderedEquals([1]));
+          expect(outputs3, orderedEquals([2]));
+          controller1.add(2);
+          expect(outputs2, orderedEquals([1, 5]));
+          expect(outputs3, orderedEquals([2, 4]));
+
+          sub2.cancel();
+          sub3.cancel();
         }
       }
     });
@@ -708,15 +678,13 @@ void main() {
     expect(callCnt2, 2);
     expect(checkCnt, 0);
 
-    try {
-      controller.add(0);
-      expect(callCnt1, 4);
-      expect(callCnt2, 4);
-      await Future.value(); // Wait for the listener to fire
-      expect(checkCnt, 1);
-    } finally {
-      sub.cancel();
-    }
+    controller.add(0);
+    expect(callCnt1, 4);
+    expect(callCnt2, 4);
+    await Future.value(); // Wait for the listener to fire
+    expect(checkCnt, 1);
+
+    sub.cancel();
 
     controller.add(1); // Must not trigger a re-calculation
     expect(callCnt1, 4);
@@ -739,6 +707,8 @@ void main() {
     expect(callCnt1, 8);
     expect(callCnt2, 8);
     expect(checkCnt, 2);
+
+    sub.cancel();
   });
 
   test('exceptions raised by computations are propagated', () async {
@@ -759,14 +729,12 @@ void main() {
       expect(e, 42);
     });
 
-    try {
-      await Future.value(); // Await the microtask
-      expect(checkFlag, true);
-      expect(callCnt,
-          1); // The first computation should never be re-run, as it has no dependencies
-    } finally {
-      sub.cancel();
-    }
+    await Future.value(); // Await the microtask
+    expect(checkFlag, true);
+    expect(callCnt,
+        1); // The first computation should never be re-run, as it has no dependencies
+
+    sub.cancel();
   });
 
   test('constant computations work', () async {
@@ -785,13 +753,11 @@ void main() {
       expect(event, 42);
     }, (e) => fail(e.toString()));
 
-    try {
-      await Future.value(); // Wait for the update
-      expect(checkFlag, true);
-      expect(callCnt, 2);
-    } finally {
-      sub.cancel();
-    }
+    await Future.value(); // Wait for the update
+    expect(checkFlag, true);
+    expect(callCnt, 2);
+
+    sub.cancel();
 
     checkFlag = false;
 
@@ -801,13 +767,11 @@ void main() {
       expect(event, 42);
     }, (e) => fail(e.toString()));
 
-    try {
-      await Future.value(); // Wait for the update
-      expect(checkFlag, true);
-      expect(callCnt, 2); // The constant does not get re-computed
-    } finally {
-      sub.cancel();
-    }
+    await Future.value(); // Wait for the update
+    expect(checkFlag, true);
+    expect(callCnt, 2); // The constant does not get re-computed
+
+    sub.cancel();
   });
 
   test('detaching all listeners removes the expando', () async {
@@ -851,7 +815,7 @@ void main() {
 
     var flag = false;
 
-    c2.listen((event) {
+    final sub = c2.listen((event) {
       fail("Should not call the listener");
     }, (e) {
       expect(flag, false);
@@ -863,6 +827,8 @@ void main() {
     await Future.value();
 
     expect(flag, true);
+
+    sub.cancel();
   });
 
   group('react', () {
@@ -890,20 +856,18 @@ void main() {
         lCnt++;
       }, (e) => fail(e.toString()));
 
-      try {
-        expect(cnt, 2);
-        controller.add(0);
-        expect(cnt, 4);
-        controller.add(0);
-        expect(cnt, 4);
-        useUse = false;
-        controller.add(1);
-        expect(cnt, 6);
-        controller.add(1);
-        expect(cnt, 8);
-      } finally {
-        sub.cancel();
-      }
+      expect(cnt, 2);
+      controller.add(0);
+      expect(cnt, 4);
+      controller.add(0);
+      expect(cnt, 4);
+      useUse = false;
+      controller.add(1);
+      expect(cnt, 6);
+      controller.add(1);
+      expect(cnt, 8);
+
+      sub.cancel();
     });
     test('cannot call use/react inside react callbacks', () async {
       final controller = StreamController<int>.broadcast(
@@ -926,7 +890,7 @@ void main() {
         var expectThrow = false;
         var cnt = 0;
 
-        c.listen((output) {
+        final sub = c.listen((output) {
           if (expectThrow) {
             fail("Should have thrown");
           } else {
@@ -951,6 +915,8 @@ void main() {
         controller.add(0);
         await Future.value();
         expect(cnt, 1);
+
+        sub.cancel();
       }
     });
     test('.react onError works', () async {
@@ -975,17 +941,15 @@ void main() {
 
       final sub = c.listen(null, (e) => fail(e.toString()));
 
-      try {
-        expect(cCnt, 2);
-        controller1.add(0);
-        expect(cCnt, 4);
-        expectError = true;
-        expectation = 1;
-        controller1.addError(1);
-        expect(cCnt, 6);
-      } finally {
-        sub.cancel();
-      }
+      expect(cCnt, 2);
+      controller1.add(0);
+      expect(cCnt, 4);
+      expectError = true;
+      expectation = 1;
+      controller1.addError(1);
+      expect(cCnt, 6);
+
+      sub.cancel();
     });
 
     test('.react delays exceptions if no onError is provided', () async {
@@ -1010,19 +974,17 @@ void main() {
         expect(e, expectation);
       });
 
-      try {
-        expect(lCnt, 0);
-        controller1.add(0);
-        await Future.value();
-        expect(lCnt, 1);
-        expectError = true;
-        expectation = 1;
-        controller1.addError(1);
-        await Future.value();
-        expect(lCnt, 2);
-      } finally {
-        sub.cancel();
-      }
+      expect(lCnt, 0);
+      controller1.add(0);
+      await Future.value();
+      expect(lCnt, 1);
+      expectError = true;
+      expectation = 1;
+      controller1.addError(1);
+      await Future.value();
+      expect(lCnt, 2);
+
+      sub.cancel();
     });
     test(
         '(regression) .react on non-changed stream does not mark computation dirty',
@@ -1058,21 +1020,19 @@ void main() {
         lCnt++;
       }, (e) => fail(e.toString()));
 
-      try {
-        await Future.value();
-        expect(lCnt, 1);
-        controller2.add(0);
-        await Future.value();
-        expect(lCnt, 2);
-        controller1.add(0);
-        await Future.value();
-        expect(lCnt, 3);
-        controller1.add(0);
-        await Future.value();
-        expect(lCnt, 4);
-      } finally {
-        sub.cancel();
-      }
+      await Future.value();
+      expect(lCnt, 1);
+      controller2.add(0);
+      await Future.value();
+      expect(lCnt, 2);
+      controller1.add(0);
+      await Future.value();
+      expect(lCnt, 3);
+      controller1.add(0);
+      await Future.value();
+      expect(lCnt, 4);
+
+      sub.cancel();
     });
   });
 
@@ -1092,12 +1052,11 @@ void main() {
           contains(
               "Computed expressions must be purely functional. Please use listeners for side effects."));
     });
-    try {
-      await Future.value();
-      expect(flag, true);
-    } finally {
-      sub.cancel();
-    }
+
+    await Future.value();
+    expect(flag, true);
+
+    sub.cancel();
   });
 
   test('asserts if f throws only on the second try', () async {
@@ -1119,12 +1078,11 @@ void main() {
           contains(
               "Computed expressions must be purely functional. Please use listeners for side effects."));
     });
-    try {
-      await Future.value();
-      expect(flag, true);
-    } finally {
-      sub.cancel();
-    }
+
+    await Future.value();
+    expect(flag, true);
+
+    sub.cancel();
   });
 
   test('asserts if f throws NVE only on the second try', () async {
@@ -1147,12 +1105,11 @@ void main() {
           contains(
               "Computed expressions must be purely functional. Please use listeners for side effects."));
     });
-    try {
-      await Future.value();
-      expect(flag, true);
-    } finally {
-      sub.cancel();
-    }
+
+    await Future.value();
+    expect(flag, true);
+
+    sub.cancel();
   });
 
   test(
@@ -1179,13 +1136,11 @@ void main() {
 
     final sub = c3.listen(null, (e) => fail(e.toString()));
 
-    try {
-      expect(cnt1, 2);
-      expect(cnt2, 2);
-      expect(cnt3, 2);
-    } finally {
-      sub.cancel();
-    }
+    expect(cnt1, 2);
+    expect(cnt2, 2);
+    expect(cnt3, 2);
+
+    sub.cancel();
   });
 
   test('can have non-memoized computations', () async {
@@ -1253,35 +1208,33 @@ void main() {
       var listenerCallCnt = 0;
       var expectation = 42;
 
-      var sub = c.listen((output) {
+      final sub = c.listen((output) {
         listenerCallCnt++;
         expect(output, expectation);
       }, (e) => fail(e.toString()));
 
-      try {
-        c.fix(42);
-        expect(listenerCallCnt, 1);
-        c.fix(42);
-        expect(listenerCallCnt, 1);
-        expectation = 43;
-        c.fix(43);
-        expect(listenerCallCnt, 2);
+      c.fix(42);
+      expect(listenerCallCnt, 1);
+      c.fix(42);
+      expect(listenerCallCnt, 1);
+      expectation = 43;
+      c.fix(43);
+      expect(listenerCallCnt, 2);
 
-        controller.add(0);
-        // Does not trigger a re-computation, as c has already been fixed
-        expect(listenerCallCnt, 2);
+      controller.add(0);
+      // Does not trigger a re-computation, as c has already been fixed
+      expect(listenerCallCnt, 2);
 
-        c.unmock();
-        // Does not trigger a call of the listener,
-        // as the source has not produced any value yet.
-        expect(listenerCallCnt, 2);
+      c.unmock();
+      // Does not trigger a call of the listener,
+      // as the source has not produced any value yet.
+      expect(listenerCallCnt, 2);
 
-        expectation = 1;
-        controller.add(1);
-        expect(listenerCallCnt, 3);
-      } finally {
-        sub.cancel();
-      }
+      expectation = 1;
+      controller.add(1);
+      expect(listenerCallCnt, 3);
+
+      sub.cancel();
     });
 
     test('fixThrow works', () async {
@@ -1306,16 +1259,14 @@ void main() {
         }
       });
 
-      var sub = c2.listen((output) {}, (e) => fail(e.toString()));
+      final sub = c2.listen((output) {}, (e) => fail(e.toString()));
 
-      try {
-        mustThrow = true;
-        c1.fixThrow(42);
-      } finally {
-        sub.cancel();
-      }
+      mustThrow = true;
+      c1.fixThrow(42);
 
       expect(callCnt, 4);
+
+      sub.cancel();
     });
   });
 
@@ -1348,29 +1299,27 @@ void main() {
     expect(c2cnt, 2);
     expect(subCnt, 0);
 
-    try {
-      expected = null;
-      controller.add(null);
-      expect(c1cnt, 4);
-      expect(c2cnt, 4);
-      expect(subCnt, 1);
-      expected = 0;
-      controller.add(0);
-      expect(c1cnt, 6);
-      expect(c2cnt, 6);
-      expect(subCnt, 2);
-      expected = null;
-      controller.add(null);
-      expect(c1cnt, 8);
-      expect(c2cnt, 8);
-      expect(subCnt, 3);
-      controller.add(null);
-      expect(c1cnt, 8);
-      expect(c2cnt, 8);
-      expect(subCnt, 3);
-    } finally {
-      sub.cancel();
-    }
+    expected = null;
+    controller.add(null);
+    expect(c1cnt, 4);
+    expect(c2cnt, 4);
+    expect(subCnt, 1);
+    expected = 0;
+    controller.add(0);
+    expect(c1cnt, 6);
+    expect(c2cnt, 6);
+    expect(subCnt, 2);
+    expected = null;
+    controller.add(null);
+    expect(c1cnt, 8);
+    expect(c2cnt, 8);
+    expect(subCnt, 3);
+    controller.add(null);
+    expect(c1cnt, 8);
+    expect(c2cnt, 8);
+    expect(subCnt, 3);
+
+    sub.cancel();
   });
 
   test('exceptions are memoized', () {
@@ -1406,33 +1355,31 @@ void main() {
     expect(c2cnt, 2);
     expect(subCnt, 0);
 
-    try {
-      expectThrow = true;
-      controller.add(0);
-      expect(c1cnt, 3);
-      expect(c2cnt, 3);
-      expect(subCnt, 1);
-      controller.add(4);
-      expect(c1cnt, 4);
-      expect(c2cnt, 3);
-      expect(subCnt, 1);
-      controller.add(2);
-      expect(c1cnt, 5);
-      expect(c2cnt, 4);
-      expect(subCnt, 2);
-      expectThrow = false;
-      controller.add(1);
-      expect(c1cnt, 7);
-      expect(c2cnt, 6);
-      expect(subCnt, 3);
-      expectThrow = true;
-      controller.add(0);
-      expect(c1cnt, 8);
-      expect(c2cnt, 7);
-      expect(subCnt, 4);
-    } finally {
-      sub.cancel();
-    }
+    expectThrow = true;
+    controller.add(0);
+    expect(c1cnt, 3);
+    expect(c2cnt, 3);
+    expect(subCnt, 1);
+    controller.add(4);
+    expect(c1cnt, 4);
+    expect(c2cnt, 3);
+    expect(subCnt, 1);
+    controller.add(2);
+    expect(c1cnt, 5);
+    expect(c2cnt, 4);
+    expect(subCnt, 2);
+    expectThrow = false;
+    controller.add(1);
+    expect(c1cnt, 7);
+    expect(c2cnt, 6);
+    expect(subCnt, 3);
+    expectThrow = true;
+    controller.add(0);
+    expect(c1cnt, 8);
+    expect(c2cnt, 7);
+    expect(subCnt, 4);
+
+    sub.cancel();
   });
 
   test('abandoned dependencies are dropped', () {
@@ -1461,27 +1408,25 @@ void main() {
       expect(event, expectation);
     }, (e) => fail(e.toString()));
 
-    try {
-      expect(cnt, 2);
-      controller.add(0);
-      expect(cnt, 4);
-      expect(subCnt, 1);
+    expect(cnt, 2);
+    controller.add(0);
+    expect(cnt, 4);
+    expect(subCnt, 1);
 
-      dependOnSource = false;
-      expectation = 1;
-      controller.add(2);
-      expect(cnt, 6);
-      expect(subCnt, 2);
+    dependOnSource = false;
+    expectation = 1;
+    controller.add(2);
+    expect(cnt, 6);
+    expect(subCnt, 2);
 
-      // From this point on c is regarded as a constant
-      // Thus, adding items to the stream does not trigger a re-computation
+    // From this point on c is regarded as a constant
+    // Thus, adding items to the stream does not trigger a re-computation
 
-      controller.add(3);
-      expect(cnt, 6);
-      expect(subCnt, 2);
-    } finally {
-      sub.cancel();
-    }
+    controller.add(3);
+    expect(cnt, 6);
+    expect(subCnt, 2);
+
+    sub.cancel();
   });
 
   test('can add new dependencies on subsequent calls', () async {
@@ -1512,25 +1457,23 @@ void main() {
       expect(event, expectation);
     }, (e) => fail(e.toString()));
 
-    try {
-      expect(cnt, 2);
-      controller1.add(0);
-      expect(cnt, 4);
-      expect(subCnt, 1);
+    expect(cnt, 2);
+    controller1.add(0);
+    expect(cnt, 4);
+    expect(subCnt, 1);
 
-      dependOnSource2 = true;
-      controller1.add(1);
-      expect(cnt,
-          6); // Attempted evaluation, failed with NoValueException on source2
-      expect(subCnt, 1);
+    dependOnSource2 = true;
+    controller1.add(1);
+    expect(cnt,
+        6); // Attempted evaluation, failed with NoValueException on source2
+    expect(subCnt, 1);
 
-      expectation = 3;
-      controller2.add(2);
-      expect(cnt, 8);
-      expect(subCnt, 2);
-    } finally {
-      sub.cancel();
-    }
+    expectation = 3;
+    controller2.add(2);
+    expect(cnt, 8);
+    expect(subCnt, 2);
+
+    sub.cancel();
   });
 
   test(
@@ -1563,22 +1506,20 @@ void main() {
       expect(event, expectation);
     }, (e) => fail(e.toString()));
 
-    try {
-      await Future.value();
-      expect(subCnt, 0);
-      expectation = 3;
-      controller1.add(1);
-      controller2.add(2);
-      await Future.value();
-      expect(subCnt, 1);
-      dependOnC2 = true;
-      expectation = 5;
-      controller1.add(3);
-      await Future.value();
-      expect(subCnt, 2);
-    } finally {
-      sub.cancel();
-    }
+    await Future.value();
+    expect(subCnt, 0);
+    expectation = 3;
+    controller1.add(1);
+    controller2.add(2);
+    await Future.value();
+    expect(subCnt, 1);
+    dependOnC2 = true;
+    expectation = 5;
+    controller1.add(3);
+    await Future.value();
+    expect(subCnt, 2);
+
+    sub.cancel();
   });
 
   test(
@@ -1604,22 +1545,20 @@ void main() {
       expect(event, 0);
     }, (e) => fail(e.toString()));
 
-    try {
-      await Future.value();
-      expect(subCnt, 0);
-      controller1.add(0);
-      await Future.value();
-      expect(subCnt, 1);
-      dependOnC2 = false;
-      controller1.add(1);
-      await Future.value();
-      expect(subCnt, 1);
-      controller1.add(2);
-      await Future.value();
-      expect(subCnt, 1);
-    } finally {
-      sub.cancel();
-    }
+    await Future.value();
+    expect(subCnt, 0);
+    controller1.add(0);
+    await Future.value();
+    expect(subCnt, 1);
+    dependOnC2 = false;
+    controller1.add(1);
+    await Future.value();
+    expect(subCnt, 1);
+    controller1.add(2);
+    await Future.value();
+    expect(subCnt, 1);
+
+    sub.cancel();
   });
 
   group('prev', () {
@@ -1649,16 +1588,14 @@ void main() {
           subCnt++;
         }, (e) => fail(e.toString()));
 
-        try {
-          expect(subCnt, 0);
-          controller1.add(0);
-          expect(subCnt, 1);
-          expectation = 0;
-          controller1.add(1);
-          expect(subCnt, 2);
-        } finally {
-          sub.cancel();
-        }
+        expect(subCnt, 0);
+        controller1.add(0);
+        expect(subCnt, 1);
+        expectation = 0;
+        controller1.add(1);
+        expect(subCnt, 2);
+
+        sub.cancel();
       }
     });
 
@@ -1694,23 +1631,21 @@ void main() {
         subCnt++;
       }, (e) => fail(e.toString()));
 
-      try {
-        expect(subCnt, 0);
-        controller1.add(0);
-        expect(subCnt, 0);
-        controller2.add(1);
-        expect(subCnt, 1);
-        expectation1 = 0;
-        expectation2 = 1;
-        controller1.add(1);
-        expect(subCnt, 2);
-        expectation1 = 1;
-        expectation2 = 1;
-        controller1.add(2);
-        expect(subCnt, 3);
-      } finally {
-        sub.cancel();
-      }
+      expect(subCnt, 0);
+      controller1.add(0);
+      expect(subCnt, 0);
+      controller2.add(1);
+      expect(subCnt, 1);
+      expectation1 = 0;
+      expectation2 = 1;
+      controller1.add(1);
+      expect(subCnt, 2);
+      expectation1 = 1;
+      expectation2 = 1;
+      controller1.add(2);
+      expect(subCnt, 3);
+
+      sub.cancel();
     });
 
     test('in computations whose value did not change', () async {
@@ -1736,26 +1671,24 @@ void main() {
         subCnt++;
       }, (e) => fail(e.toString()));
 
-      try {
-        expect(subCnt, 0);
-        controller.add(0);
-        expect(subCnt, 1);
-        expectation = 0;
-        controller.add(1);
-        expect(subCnt, 2);
-        expectation = 1;
-        controller.add(-1); // Note that (-1)^2 == 1^2
-        expect(subCnt, 2);
-        // Note that expectation == 1, as the -1 case did not lead to a change in the result
-        controller.add(1);
-        expect(subCnt, 2);
-        controller.add(-1); // Note that (-1)^2 == 1^2
-        expect(subCnt, 2);
-        controller.add(0);
-        expect(subCnt, 3);
-      } finally {
-        sub.cancel();
-      }
+      expect(subCnt, 0);
+      controller.add(0);
+      expect(subCnt, 1);
+      expectation = 0;
+      controller.add(1);
+      expect(subCnt, 2);
+      expectation = 1;
+      controller.add(-1); // Note that (-1)^2 == 1^2
+      expect(subCnt, 2);
+      // Note that expectation == 1, as the -1 case did not lead to a change in the result
+      controller.add(1);
+      expect(subCnt, 2);
+      controller.add(-1); // Note that (-1)^2 == 1^2
+      expect(subCnt, 2);
+      controller.add(0);
+      expect(subCnt, 3);
+
+      sub.cancel();
     });
 
     test('works on computations', () {
@@ -1784,20 +1717,18 @@ void main() {
         subCnt++;
       }, (e) => fail(e.toString()));
 
-      try {
-        controller.add(0);
-        expect(subCnt, 1);
-        expectation = 0;
-        controller.add(1);
-        expect(subCnt, 2);
-        controller.add(-1); // (-1)^2 == 1^2
-        expect(subCnt, 2);
-        expectation = 1; // And not -1
-        controller.add(2);
-        expect(subCnt, 3);
-      } finally {
-        sub.cancel();
-      }
+      controller.add(0);
+      expect(subCnt, 1);
+      expectation = 0;
+      controller.add(1);
+      expect(subCnt, 2);
+      controller.add(-1); // (-1)^2 == 1^2
+      expect(subCnt, 2);
+      expectation = 1; // And not -1
+      controller.add(2);
+      expect(subCnt, 3);
+
+      sub.cancel();
     });
 
     test('computation self .prev works', () async {
@@ -1825,17 +1756,15 @@ void main() {
         subCnt++;
       }, (e) => fail(e.toString()));
 
-      try {
-        await Future.value();
-        expect(subCnt, 0);
-        controller1.add(0);
-        expect(subCnt, 1);
-        expectation = 0;
-        controller1.add(1);
-        expect(subCnt, 2);
-      } finally {
-        sub.cancel();
-      }
+      await Future.value();
+      expect(subCnt, 0);
+      controller1.add(0);
+      expect(subCnt, 1);
+      expectation = 0;
+      controller1.add(1);
+      expect(subCnt, 2);
+
+      sub.cancel();
     });
 
     test('computation withPrev works', () async {
@@ -1859,17 +1788,15 @@ void main() {
           subCnt++;
         }, (e) => fail(e.toString()));
 
-        try {
-          await Future.value();
-          expect(subCnt, 0);
-          controller1.add(1);
-          expect(subCnt, 1);
-          prevExpectation = 1;
-          controller1.add(2);
-          expect(subCnt, 2);
-        } finally {
-          sub.cancel();
-        }
+        await Future.value();
+        expect(subCnt, 0);
+        controller1.add(1);
+        expect(subCnt, 1);
+        prevExpectation = 1;
+        controller1.add(2);
+        expect(subCnt, 2);
+
+        sub.cancel();
       }
     });
 
@@ -1909,23 +1836,21 @@ void main() {
         subCnt++;
       }, (e) => fail(e.toString()));
 
-      try {
-        expect(subCnt, 0);
-        expectError = true;
-        errorMatcher = isA<NoValueException>();
-        controller1.add(0);
-        expect(subCnt, 1);
-        expectError = false;
-        valueExpectation = 0;
-        controller1.addError(1);
-        expect(subCnt, 2);
-        expectError = true;
-        errorMatcher = equals(1);
-        controller1.add(2);
-        expect(subCnt, 3);
-      } finally {
-        sub.cancel();
-      }
+      expect(subCnt, 0);
+      expectError = true;
+      errorMatcher = isA<NoValueException>();
+      controller1.add(0);
+      expect(subCnt, 1);
+      expectError = false;
+      valueExpectation = 0;
+      controller1.addError(1);
+      expect(subCnt, 2);
+      expectError = true;
+      errorMatcher = equals(1);
+      controller1.add(2);
+      expect(subCnt, 3);
+
+      sub.cancel();
     });
 
     test(
@@ -1966,18 +1891,16 @@ void main() {
         subCnt++;
       }, (e) => fail(e.toString()));
 
-      try {
-        await Future.value();
-        expect(subCnt, 1);
-        controller1.add(0);
-        expect(subCnt, 2);
-        expectError = false;
-        valueExpectation = 0;
-        controller1.add(1);
-        expect(subCnt, 3);
-      } finally {
-        sub.cancel();
-      }
+      await Future.value();
+      expect(subCnt, 1);
+      controller1.add(0);
+      expect(subCnt, 2);
+      expectError = false;
+      valueExpectation = 0;
+      controller1.add(1);
+      expect(subCnt, 3);
+
+      sub.cancel();
     });
 
     test(
@@ -2016,35 +1939,33 @@ void main() {
         subCnt++;
       }, (e) => fail(e.toString()));
 
-      try {
-        controller1.add(0);
-        expect(subCnt, 1);
-        expectation1 = 0;
-        controller1.add(1);
-        expect(subCnt, 2);
-        controller2.add(1);
-        expect(subCnt,
-            2); // Does not trigger a re-computation as c has not yet used source2
-        expectation1 = 1;
-        // Note that expectation2 is still null
-        controller1.add(2);
-        expect(subCnt, 3);
-        use2 = true;
-        expectation1 = 2;
-        // Note that expectation2 is still null
-        controller1.add(3);
-        expect(subCnt, 3); // Throws NoValueException on source2
-        // Note that expectation1 did not change: the previous run did not produce a result
-        // And expectation2 is still null
-        controller2.add(4);
-        expect(subCnt, 4);
-        expectation1 = 3;
-        expectation2 = 4;
-        controller2.add(5);
-        expect(subCnt, 5);
-      } finally {
-        sub.cancel();
-      }
+      controller1.add(0);
+      expect(subCnt, 1);
+      expectation1 = 0;
+      controller1.add(1);
+      expect(subCnt, 2);
+      controller2.add(1);
+      expect(subCnt,
+          2); // Does not trigger a re-computation as c has not yet used source2
+      expectation1 = 1;
+      // Note that expectation2 is still null
+      controller1.add(2);
+      expect(subCnt, 3);
+      use2 = true;
+      expectation1 = 2;
+      // Note that expectation2 is still null
+      controller1.add(3);
+      expect(subCnt, 3); // Throws NoValueException on source2
+      // Note that expectation1 did not change: the previous run did not produce a result
+      // And expectation2 is still null
+      controller2.add(4);
+      expect(subCnt, 4);
+      expectation1 = 3;
+      expectation2 = 4;
+      controller2.add(5);
+      expect(subCnt, 5);
+
+      sub.cancel();
     });
   });
 
@@ -2063,11 +1984,9 @@ void main() {
 
       final sub = c.listen((event) {}, (e) => fail(e.toString()));
 
-      try {
-        expect(flag, true);
-      } finally {
-        sub.cancel();
-      }
+      expect(flag, true);
+
+      sub.cancel();
     });
 
     test(
@@ -2086,12 +2005,10 @@ void main() {
         expect(e, isA<CyclicUseException>());
       });
 
-      try {
-        await Future.value();
-        expect(flag, true);
-      } finally {
-        sub.cancel();
-      }
+      await Future.value();
+      expect(flag, true);
+
+      sub.cancel();
     });
 
     test('update computation cyclic dependency', () async {
@@ -2117,20 +2034,18 @@ void main() {
         cnt2++;
       });
 
-      try {
-        controller.add(1);
+      controller.add(1);
 
-        expect(cnt1, 1);
-        expect(cnt2, 0);
+      expect(cnt1, 1);
+      expect(cnt2, 0);
 
-        createCycle = true;
-        controller.add(2);
+      createCycle = true;
+      controller.add(2);
 
-        expect(cnt1, 1);
-        expect(cnt2, 1);
-      } finally {
-        sub.cancel();
-      }
+      expect(cnt1, 1);
+      expect(cnt2, 1);
+
+      sub.cancel();
     });
   });
 }
