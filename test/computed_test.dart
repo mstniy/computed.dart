@@ -571,39 +571,6 @@ void main() {
     sub.cancel();
   });
 
-  test('unsubscribes from the data sources if no listener is left', () async {
-    final controller1 = StreamController<int>.broadcast(
-        sync: true); // Use a broadcast stream to make debugging easier
-    final source1 = controller1.stream;
-
-    var cCnt = 0;
-
-    final c = Computed(() {
-      cCnt++;
-      source1.use;
-    });
-
-    final c2 = Computed(() => c.use);
-
-    var lCnt = 0;
-
-    final sub = c2.listen((event) {
-      lCnt++;
-    }, (e) => fail(e.toString()));
-
-    expect(cCnt, 2);
-    await Future.value();
-    expect(cCnt, 2);
-    expect(lCnt, 0);
-    controller1.add(0);
-    expect(cCnt, 4);
-    expect(lCnt, 1);
-
-    sub.cancel();
-
-    expect(controller1.hasListener, false);
-  });
-
   group('respects topological order', () {
     test('on upstream updates', () {
       for (var streamFirst in [false, true]) {
@@ -719,6 +686,8 @@ void main() {
 
     sub.cancel();
 
+    expect(controller.hasListener, false);
+
     controller.add(1); // Must not trigger a re-calculation
     expect(callCnt1, 4);
     expect(callCnt2, 4);
@@ -742,6 +711,8 @@ void main() {
     expect(checkCnt, 2);
 
     sub.cancel();
+
+    expect(controller.hasListener, false);
   });
 
   test('exceptions raised by computations are propagated', () async {
