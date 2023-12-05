@@ -54,11 +54,29 @@ extension _TestDataSourceComputedExtension<T> on _TestDataSource<T> {
         true,
         value);
   }
+
+  void react(void Function(T) onData, [void Function(Object)? onError]) {
+    final caller = GlobalCtx.currentComputation;
+    caller.dataSourceReact<T>(
+        this,
+        () => this.use,
+        (router) => _TestDataSourceSubscription(
+            this, () => router.onDataSourceData(value)),
+        true,
+        value,
+        onData,
+        onError);
+  }
+
+  T get prev {
+    final caller = GlobalCtx.currentComputation;
+    return caller.dataSourcePrev(this);
+  }
 }
 
 void main() {
   group('sync data sources', () {
-    // TODO: Also test react
+    // TODO: test prev, with use, react and memoized: false
     test('work', () async {
       final s = _TestDataSource(1);
       final c = Computed(() => s.use + s.use);
@@ -97,6 +115,32 @@ void main() {
       await Future.value();
       expect(subCnt, 1);
       expectation = 2;
+      s.value = 1;
+      expect(subCnt, 2);
+
+      sub.cancel();
+    });
+
+    test('can use react', () async {
+      final s = _TestDataSource(0);
+      final c = Computed(() {
+        late int res;
+        s.react((p0) => res = p0);
+        return res;
+      }, memoized: false);
+
+      var expectation = 0;
+      var subCnt = 0;
+
+      final sub = c.listen((event) {
+        subCnt++;
+        expect(event, expectation);
+      }, (e) => fail(e.toString()));
+
+      expect(subCnt, 0);
+      await Future.value();
+      expect(subCnt, 1);
+      expectation = 1;
       s.value = 1;
       expect(subCnt, 2);
 
