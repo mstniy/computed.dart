@@ -512,6 +512,41 @@ void main() {
     sub.cancel();
   });
 
+  test(
+      '.use-ing a computation multiple times doesn\'t run it more times than needed',
+      () async {
+    // TODO: Also test this for sync data sources
+    final controller = StreamController<int>.broadcast(
+        sync: true); // Use a broadcast stream to make debugging easier
+    final source = controller.stream;
+
+    for (var hasInitialValue in [false, true]) {
+      var cnt = 0;
+
+      final c = Computed(() {
+        cnt++;
+        return hasInitialValue ? 42 : source.use;
+      });
+      final c2 = Computed(() => c.use + c.use);
+
+      final sub = c2.listen((event) {}, (e) => fail(e.toString()));
+
+      expect(cnt, 2);
+      await Future.value();
+      expect(cnt, 2);
+      if (!hasInitialValue) {
+        controller.add(0);
+        expect(cnt, 4);
+        controller.add(0);
+        expect(cnt, 4);
+        controller.add(1);
+        expect(cnt, 6);
+      }
+
+      sub.cancel();
+    }
+  });
+
   test('latest pattern works', () {
     final controller1 = StreamController<int>.broadcast(
         sync: true); // Use a broadcast stream to make debugging easier

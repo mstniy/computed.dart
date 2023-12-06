@@ -119,8 +119,6 @@ class GlobalCtx {
   static final _routerExpando = Expando<_RouterValueOrException>('computed');
 
   static _UpdateToken? _currentUpdate;
-
-  static var _runningGraph = false;
 }
 
 class ComputedImpl<T> with Computed<T> {
@@ -337,7 +335,6 @@ class ComputedImpl<T> with Computed<T> {
   void _rerunGraph() {
     GlobalCtx._currentUpdate ??=
         _UpdateToken(); // Guaranteed to be unique thanks to GC
-    GlobalCtx._runningGraph = true;
     try {
       final numUnsatDep = <ComputedImpl, int>{};
       final noUnsatDep = <ComputedImpl>{this};
@@ -394,7 +391,6 @@ class ComputedImpl<T> with Computed<T> {
       }
     } finally {
       GlobalCtx._currentUpdate = null;
-      GlobalCtx._runningGraph = false;
     }
   }
 
@@ -427,46 +423,42 @@ class ComputedImpl<T> with Computed<T> {
           // Throw it here
           throw _reactSuppressedException!;
         }
-        if (oldComputation == null) {
-          // If we are the first _evalF in the call stack,
-          // run f() a second time to make sure it returns the same result.
-          // Nested _evalF-s don't do this to avoid calling
-          // deeply nested computations exponentially many times.
-          ast() {
-            T? f2;
-            try {
-              f2 = _f();
-            } catch (_) {
-              return false;
-            }
-            return f2 == newResult._value;
+        // If we are the first _evalF in the call stack,
+        // run f() a second time to make sure it returns the same result.
+        // Nested _evalF-s don't do this to avoid calling
+        // deeply nested computations exponentially many times.
+        ast() {
+          T? f2;
+          try {
+            f2 = _f();
+          } catch (_) {
+            return false;
           }
-
-          assert(ast(),
-              "Computed expressions must be purely functional. Please use listeners for side effects.");
+          return f2 == newResult._value;
         }
+
+        assert(ast(),
+            "Computed expressions must be purely functional. Please use listeners for side effects.");
         _lastResult = newResult;
       } on NoValueException {
         gotNVE = true;
         // Not much we can do
         // Run the computation once again and make sure
         // it throws NoValueException again
-        if (oldComputation == null) {
-          ast() {
-            try {
-              _f();
-            } on NoValueException {
-              // Good
-              return true;
-            } catch (_) {
-              // Pass
-            }
-            return false;
+        ast() {
+          try {
+            _f();
+          } on NoValueException {
+            // Good
+            return true;
+          } catch (_) {
+            // Pass
           }
-
-          assert(ast(),
-              "Computed expressions must be purely functional. Please use listeners for side effects.");
+          return false;
         }
+
+        assert(ast(),
+            "Computed expressions must be purely functional. Please use listeners for side effects.");
         rethrow;
       } catch (e) {
         // Do not re-run f in this path to check for side effects
@@ -639,7 +631,7 @@ class ComputedImpl<T> with Computed<T> {
         caller._curUpstreamComputations![this]?._memoized ?? true,
         _lastResult);
 
-    if ((!GlobalCtx._runningGraph || _lastUpdate != GlobalCtx._currentUpdate) &&
+    if (_lastUpdate != GlobalCtx._currentUpdate &&
         (_dss == null || _lastResult == null)) {
       // This means that this [use] happened outside the control of [_rerunGraph]
       // so be prudent and force a re-computation.
