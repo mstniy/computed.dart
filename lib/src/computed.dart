@@ -40,9 +40,10 @@ class _RouterValueOrException<T> {
 
 class _DataSourceAndSubscription<T> {
   final Object _ds;
+  _UpdateToken? _lastEmit;
   final DataSourceSubscription<T> _dss;
 
-  _DataSourceAndSubscription(this._ds, this._dss);
+  _DataSourceAndSubscription(this._ds, this._lastEmit, this._dss);
 }
 
 class _ComputedSubscriptionImpl<T> implements ComputedSubscription<T> {
@@ -102,8 +103,11 @@ class GlobalCtx {
       rvoe = _RouterValueOrException(ComputedImpl(dataSourceUser, true),
           hasCurrentValue ? _ValueOrException.value(currentValue as T) : null);
       GlobalCtx._routerExpando[dataSource] = rvoe;
-      rvoe._router._dss ??=
-          _DataSourceAndSubscription<T>(dataSource, dss(rvoe._router));
+      rvoe._router._dss ??= _DataSourceAndSubscription<T>(
+          dataSource,
+          hasCurrentValue ? GlobalCtx._currentUpdate! : null,
+          dss(rvoe._router));
+      if (hasCurrentValue) rvoe._router._evalF();
     }
 
     return rvoe;
@@ -115,10 +119,8 @@ class GlobalCtx {
   static final _routerExpando = Expando<_RouterValueOrException>('computed');
 
   static _UpdateToken? _currentUpdate;
-  // Note that _currentUpdateTriggerer might be null even if
-  // _currentUpdate is not if the current run is triggered by a (un)mock
-  // on a computation
-  static Object? _currentUpdateTriggerer;
+
+  static var _runningGraph = false;
 }
 
 class ComputedImpl<T> with Computed<T> {
@@ -182,32 +184,44 @@ class ComputedImpl<T> with Computed<T> {
 
   void onDataSourceData(T data) {
     if (_dss == null) return;
-    final rvoe =
-        GlobalCtx._routerExpando[_dss!._ds] as _RouterValueOrException<T>;
-    if (rvoe._voe == null ||
-        !rvoe._voe!._isValue ||
-        rvoe._voe!._value != data) {
-      // Update the global last value cache
-      rvoe._voe = _ValueOrException<T>.value(data);
-    } else if (_nonMemoizedDownstreamComputations.isEmpty) {
-      return;
-    }
+    GlobalCtx._currentUpdate = _UpdateToken();
+    try {
+      _dss!._lastEmit = GlobalCtx._currentUpdate;
+      final rvoe =
+          GlobalCtx._routerExpando[_dss!._ds] as _RouterValueOrException<T>;
+      if (rvoe._voe == null ||
+          !rvoe._voe!._isValue ||
+          rvoe._voe!._value != data) {
+        // Update the global last value cache
+        rvoe._voe = _ValueOrException<T>.value(data);
+      } else if (_nonMemoizedDownstreamComputations.isEmpty) {
+        return;
+      }
 
-    _rerunGraph();
+      _rerunGraph();
+    } finally {
+      GlobalCtx._currentUpdate = null;
+    }
   }
 
   void onDataSourceError(Object err) {
     if (_dss == null) return;
-    final rvoe =
-        GlobalCtx._routerExpando[_dss!._ds] as _RouterValueOrException<T>;
-    if (rvoe._voe == null || rvoe._voe!._isValue || rvoe._voe!._exc != err) {
-      // Update the global last value cache
-      rvoe._voe = _ValueOrException<T>.exc(err);
-    } else if (_nonMemoizedDownstreamComputations.isEmpty) {
-      return;
-    }
+    GlobalCtx._currentUpdate = _UpdateToken();
+    try {
+      _dss!._lastEmit = GlobalCtx._currentUpdate;
+      final rvoe =
+          GlobalCtx._routerExpando[_dss!._ds] as _RouterValueOrException<T>;
+      if (rvoe._voe == null || rvoe._voe!._isValue || rvoe._voe!._exc != err) {
+        // Update the global last value cache
+        rvoe._voe = _ValueOrException<T>.exc(err);
+      } else if (_nonMemoizedDownstreamComputations.isEmpty) {
+        return;
+      }
 
-    _rerunGraph();
+      _rerunGraph();
+    } finally {
+      GlobalCtx._currentUpdate = null;
+    }
   }
 
   @override
@@ -218,6 +232,7 @@ class ComputedImpl<T> with Computed<T> {
     }
     final sub = _ComputedSubscriptionImpl<T>(this, onData, onError);
     if (_novalue) {
+      GlobalCtx._currentUpdate = _UpdateToken();
       try {
         _evalF();
         // Might set lastResult, won't notify the listener just yet (as that is against the Stream contract)
@@ -231,6 +246,8 @@ class ComputedImpl<T> with Computed<T> {
             onError(e);
           });
         }
+      } finally {
+        GlobalCtx._currentUpdate = null;
       }
     }
     _listeners.add(sub);
@@ -318,9 +335,9 @@ class ComputedImpl<T> with Computed<T> {
   }
 
   void _rerunGraph() {
-    GlobalCtx._currentUpdate =
+    GlobalCtx._currentUpdate ??=
         _UpdateToken(); // Guaranteed to be unique thanks to GC
-    GlobalCtx._currentUpdateTriggerer = _dss?._ds;
+    GlobalCtx._runningGraph = true;
     try {
       final numUnsatDep = <ComputedImpl, int>{};
       final noUnsatDep = <ComputedImpl>{this};
@@ -377,7 +394,7 @@ class ComputedImpl<T> with Computed<T> {
       }
     } finally {
       GlobalCtx._currentUpdate = null;
-      GlobalCtx._currentUpdateTriggerer = null;
+      GlobalCtx._runningGraph = false;
     }
   }
 
@@ -587,8 +604,7 @@ class ComputedImpl<T> with Computed<T> {
     caller._curUpstreamComputations![this] =
         _MemoizedValueOrException(false, _lastResult);
 
-    if (identityHashCode(_dss!._ds) !=
-        identityHashCode(GlobalCtx._currentUpdateTriggerer)) {
+    if (_dss!._lastEmit != GlobalCtx._currentUpdate) {
       // Don't call the functions
       return;
     }
@@ -623,8 +639,7 @@ class ComputedImpl<T> with Computed<T> {
         caller._curUpstreamComputations![this]?._memoized ?? true,
         _lastResult);
 
-    if ((GlobalCtx._currentUpdate == null ||
-            _lastUpdate != GlobalCtx._currentUpdate) &&
+    if ((!GlobalCtx._runningGraph || _lastUpdate != GlobalCtx._currentUpdate) &&
         (_dss == null || _lastResult == null)) {
       // This means that this [use] happened outside the control of [_rerunGraph]
       // so be prudent and force a re-computation.
