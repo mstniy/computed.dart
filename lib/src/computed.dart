@@ -103,10 +103,8 @@ class GlobalCtx {
       rvoe = _RouterValueOrException(ComputedImpl(dataSourceUser, true),
           hasCurrentValue ? _ValueOrException.value(currentValue as T) : null);
       GlobalCtx._routerExpando[dataSource] = rvoe;
-      rvoe._router._dss ??= _DataSourceAndSubscription<T>(
-          dataSource,
-          hasCurrentValue ? GlobalCtx._currentUpdate! : null,
-          dss(rvoe._router));
+      rvoe._router._dss ??= _DataSourceAndSubscription<T>(dataSource,
+          hasCurrentValue ? GlobalCtx._currentUpdate : null, dss(rvoe._router));
       if (hasCurrentValue) rvoe._router._evalF();
     }
 
@@ -118,7 +116,8 @@ class GlobalCtx {
   // This allows most of the logic to only deal with upstream computations.
   static final _routerExpando = Expando<_RouterValueOrException>('computed');
 
-  static _UpdateToken? _currentUpdate;
+  static var _currentUpdate =
+      _UpdateToken(); // Guaranteed to be unique thanks to GC
 }
 
 class ComputedImpl<T> with Computed<T> {
@@ -183,43 +182,36 @@ class ComputedImpl<T> with Computed<T> {
   void onDataSourceData(T data) {
     if (_dss == null) return;
     GlobalCtx._currentUpdate = _UpdateToken();
-    try {
-      _dss!._lastEmit = GlobalCtx._currentUpdate;
-      final rvoe =
-          GlobalCtx._routerExpando[_dss!._ds] as _RouterValueOrException<T>;
-      if (rvoe._voe == null ||
-          !rvoe._voe!._isValue ||
-          rvoe._voe!._value != data) {
-        // Update the global last value cache
-        rvoe._voe = _ValueOrException<T>.value(data);
-      } else if (_nonMemoizedDownstreamComputations.isEmpty) {
-        return;
-      }
-
-      _rerunGraph();
-    } finally {
-      GlobalCtx._currentUpdate = null;
+    _dss!._lastEmit = GlobalCtx._currentUpdate;
+    final rvoe =
+        GlobalCtx._routerExpando[_dss!._ds] as _RouterValueOrException<T>;
+    if (rvoe._voe == null ||
+        !rvoe._voe!._isValue ||
+        rvoe._voe!._value != data) {
+      // Update the global last value cache
+      rvoe._voe = _ValueOrException<T>.value(data);
+    } else if (_nonMemoizedDownstreamComputations.isEmpty) {
+      return;
     }
+
+    _rerunGraph();
   }
 
   void onDataSourceError(Object err) {
     if (_dss == null) return;
     GlobalCtx._currentUpdate = _UpdateToken();
-    try {
-      _dss!._lastEmit = GlobalCtx._currentUpdate;
-      final rvoe =
-          GlobalCtx._routerExpando[_dss!._ds] as _RouterValueOrException<T>;
-      if (rvoe._voe == null || rvoe._voe!._isValue || rvoe._voe!._exc != err) {
-        // Update the global last value cache
-        rvoe._voe = _ValueOrException<T>.exc(err);
-      } else if (_nonMemoizedDownstreamComputations.isEmpty) {
-        return;
-      }
 
-      _rerunGraph();
-    } finally {
-      GlobalCtx._currentUpdate = null;
+    _dss!._lastEmit = GlobalCtx._currentUpdate;
+    final rvoe =
+        GlobalCtx._routerExpando[_dss!._ds] as _RouterValueOrException<T>;
+    if (rvoe._voe == null || rvoe._voe!._isValue || rvoe._voe!._exc != err) {
+      // Update the global last value cache
+      rvoe._voe = _ValueOrException<T>.exc(err);
+    } else if (_nonMemoizedDownstreamComputations.isEmpty) {
+      return;
     }
+
+    _rerunGraph();
   }
 
   @override
@@ -230,7 +222,6 @@ class ComputedImpl<T> with Computed<T> {
     }
     final sub = _ComputedSubscriptionImpl<T>(this, onData, onError);
     if (_novalue) {
-      GlobalCtx._currentUpdate = _UpdateToken();
       try {
         _evalF();
         // Might set lastResult, won't notify the listener just yet (as that is against the Stream contract)
@@ -244,8 +235,6 @@ class ComputedImpl<T> with Computed<T> {
             onError(e);
           });
         }
-      } finally {
-        GlobalCtx._currentUpdate = null;
       }
     }
     _listeners.add(sub);
@@ -323,74 +312,70 @@ class ComputedImpl<T> with Computed<T> {
   @override
   void mock(T Function() mock) {
     _f = mock;
+    GlobalCtx._currentUpdate = _UpdateToken();
     _rerunGraph();
   }
 
   @override
   void unmock() {
     _f = _origF;
+    GlobalCtx._currentUpdate = _UpdateToken();
     _rerunGraph();
   }
 
   void _rerunGraph() {
-    GlobalCtx._currentUpdate ??=
-        _UpdateToken(); // Guaranteed to be unique thanks to GC
-    try {
-      final numUnsatDep = <ComputedImpl, int>{};
-      final noUnsatDep = <ComputedImpl>{this};
-      final done = <ComputedImpl>{};
+    final numUnsatDep = <ComputedImpl, int>{};
+    final noUnsatDep = <ComputedImpl>{this};
+    final done = <ComputedImpl>{};
 
-      while (noUnsatDep.isNotEmpty) {
-        final cur = noUnsatDep.first;
-        noUnsatDep.remove(cur);
-        if (done.contains(cur)) continue;
-        try {
-          if (cur._memoizedDownstreamComputations.isEmpty &&
-              cur._nonMemoizedDownstreamComputations.isEmpty &&
-              cur._listeners.isEmpty) {
+    while (noUnsatDep.isNotEmpty) {
+      final cur = noUnsatDep.first;
+      noUnsatDep.remove(cur);
+      if (done.contains(cur)) continue;
+      try {
+        if (cur._memoizedDownstreamComputations.isEmpty &&
+            cur._nonMemoizedDownstreamComputations.isEmpty &&
+            cur._listeners.isEmpty) {
+          continue;
+        }
+        if (cur._lastUpdate != GlobalCtx._currentUpdate) {
+          try {
+            if (cur == this) {
+              _evalF();
+            } else {
+              cur._maybeEvalF();
+            }
+          } on NoValueException {
+            // Do not evaluate the children
             continue;
           }
-          if (cur._lastUpdate != GlobalCtx._currentUpdate) {
-            try {
-              if (cur == this) {
-                _evalF();
-              } else {
-                cur._maybeEvalF();
-              }
-            } on NoValueException {
-              // Do not evaluate the children
-              continue;
-            }
-          }
-          assert(cur._lastUpdate == GlobalCtx._currentUpdate);
-          for (var down in [
-            ...cur._memoizedDownstreamComputations,
-            ...cur._nonMemoizedDownstreamComputations
-          ]) {
-            if (!done.contains(down)) {
-              var nud = numUnsatDep[down];
-              if (nud == null) {
-                nud = 0;
-                for (var up in down._lastUpstreamComputations.keys) {
-                  nud = nud! + (up._dirty ? 1 : 0);
-                }
-              } else {
-                assert(nud > 0);
-                nud--;
-              }
-              if (nud == 0) {
-                noUnsatDep.add(down);
-              } else {
-                numUnsatDep[down] = nud!;
-              }
-            }
-          }
-        } finally {
-          done.add(cur);
         }
+        assert(cur._lastUpdate == GlobalCtx._currentUpdate);
+        for (var down in [
+          ...cur._memoizedDownstreamComputations,
+          ...cur._nonMemoizedDownstreamComputations
+        ]) {
+          if (!done.contains(down)) {
+            var nud = numUnsatDep[down];
+            if (nud == null) {
+              nud = 0;
+              for (var up in down._lastUpstreamComputations.keys) {
+                nud = nud! + (up._dirty ? 1 : 0);
+              }
+            } else {
+              assert(nud > 0);
+              nud--;
+            }
+            if (nud == 0) {
+              noUnsatDep.add(down);
+            } else {
+              numUnsatDep[down] = nud!;
+            }
+          }
+        }
+      } finally {
+        done.add(cur);
       }
-    } finally {
-      GlobalCtx._currentUpdate = null;
     }
   }
 
@@ -547,14 +532,16 @@ class ComputedImpl<T> with Computed<T> {
     }
   }
 
-  void _removeDataSourcesAndUpstreams() {
+  /// Returns if a data source was unsubscribed from
+  bool _removeDataSourcesAndUpstreams() {
     if (_lastUpstreamComputations.isNotEmpty || _dss != null) {
       _lastResult =
           null; // So that we re-run the next time we are subscribed to
       _lastResultfulUpstreamComputations = null;
     }
+    var res = false;
     for (var upComp in _lastUpstreamComputations.keys) {
-      upComp._removeDownstreamComputation(this);
+      res |= upComp._removeDownstreamComputation(this);
     }
     _lastUpstreamComputations = {};
     if (_dss != null) {
@@ -562,17 +549,22 @@ class ComputedImpl<T> with Computed<T> {
       // Remove ourselves from the expando
       GlobalCtx._routerExpando[_dss!._ds] = null;
       _dss = null;
+      res = true;
     }
+
+    return res;
   }
 
-  void _removeDownstreamComputation(ComputedImpl c) {
+  /// Returns if a data source was unsubscribed from
+  bool _removeDownstreamComputation(ComputedImpl c) {
     assert(_memoizedDownstreamComputations.remove(c) ||
         _nonMemoizedDownstreamComputations.remove(c));
     if (_memoizedDownstreamComputations.isEmpty &&
         _nonMemoizedDownstreamComputations.isEmpty &&
         _listeners.isEmpty) {
-      _removeDataSourcesAndUpstreams();
+      return _removeDataSourcesAndUpstreams();
     }
+    return false;
   }
 
   void _removeListener(ComputedSubscription<T> sub) {
@@ -580,7 +572,10 @@ class ComputedImpl<T> with Computed<T> {
     if (_memoizedDownstreamComputations.isEmpty &&
         _nonMemoizedDownstreamComputations.isEmpty &&
         _listeners.isEmpty) {
-      _removeDataSourcesAndUpstreams();
+      if (_removeDataSourcesAndUpstreams()) {
+        GlobalCtx._currentUpdate =
+            _UpdateToken(); // As we unsubscribed from a data source, and it might change value until we re-subscribe
+      }
     }
   }
 

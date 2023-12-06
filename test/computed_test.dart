@@ -1233,6 +1233,36 @@ void main() {
     sub.cancel();
   });
 
+  test('(regression) additionally listened computation are not recomputed',
+      () async {
+    final controller = StreamController<int>.broadcast(
+        sync: true); // Use a broadcast stream to make debugging easier
+    final source = controller.stream;
+
+    var cnt = 0;
+
+    final c1 = Computed(() {
+      cnt++;
+      return source.use;
+    });
+
+    final c2 = Computed(() => c1.use);
+    final c3 = Computed(() => c1.use);
+
+    expect(cnt, 0);
+    final sub1 = c2.listen((event) {}, (e) => fail(e.toString()));
+    expect(cnt, 2);
+    controller.add(0);
+    expect(cnt, 4);
+    final sub2 = c3.listen((event) {}, (e) => fail(e.toString()));
+    expect(cnt, 4);
+    controller.add(1);
+    expect(cnt, 6);
+
+    sub1.cancel();
+    sub2.cancel();
+  });
+
   group('mocks', () {
     test('fix and unmock works', () async {
       final controller = StreamController<int>.broadcast(
