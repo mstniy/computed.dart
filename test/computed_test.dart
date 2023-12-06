@@ -515,7 +515,6 @@ void main() {
   test(
       '.use-ing a computation multiple times doesn\'t run it more times than needed',
       () async {
-    // TODO: Also test this for sync data sources
     final controller = StreamController<int>.broadcast(
         sync: true); // Use a broadcast stream to make debugging easier
     final source = controller.stream;

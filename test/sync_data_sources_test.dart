@@ -161,5 +161,31 @@ void main() {
 
       sub.cancel();
     });
+
+    test(
+        '.use-ing a computation multiple times doesn\'t run it more times than needed',
+        () async {
+      final source = _TestDataSource(0);
+
+      var cnt = 0;
+
+      final c = Computed(() {
+        cnt++;
+        return source.use;
+      });
+      final c2 = Computed(() => c.use + c.use);
+
+      final sub = c2.listen((event) {}, (e) => fail(e.toString()));
+
+      expect(cnt, 2);
+      await Future.value();
+      expect(cnt, 2);
+      source.value = 0;
+      expect(cnt, 2);
+      source.value = 1;
+      expect(cnt, 4);
+
+      sub.cancel();
+    });
   });
 }
