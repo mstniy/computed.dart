@@ -805,9 +805,10 @@ void main() {
       expect(event, 42);
     }, (e) => fail(e.toString()));
 
+    expect(callCnt, 4); // Gets re-computed
     await Future.value(); // Wait for the update
     expect(checkFlag, true);
-    expect(callCnt, 2); // The constant does not get re-computed
+    expect(callCnt, 4);
 
     sub.cancel();
   });

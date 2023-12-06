@@ -532,16 +532,9 @@ class ComputedImpl<T> with Computed<T> {
     }
   }
 
-  /// Returns if a data source was unsubscribed from
-  bool _removeDataSourcesAndUpstreams() {
-    if (_lastUpstreamComputations.isNotEmpty || _dss != null) {
-      _lastResult =
-          null; // So that we re-run the next time we are subscribed to
-      _lastResultfulUpstreamComputations = null;
-    }
-    var res = false;
+  void _removeDataSourcesAndUpstreams() {
     for (var upComp in _lastUpstreamComputations.keys) {
-      res |= upComp._removeDownstreamComputation(this);
+      upComp._removeDownstreamComputation(this);
     }
     _lastUpstreamComputations = {};
     if (_dss != null) {
@@ -549,22 +542,21 @@ class ComputedImpl<T> with Computed<T> {
       // Remove ourselves from the expando
       GlobalCtx._routerExpando[_dss!._ds] = null;
       _dss = null;
-      res = true;
     }
 
-    return res;
+    _lastResult = null; // So that we re-run the next time we are subscribed to
+    _lastUpdate = null;
+    _lastResultfulUpstreamComputations = null;
   }
 
-  /// Returns if a data source was unsubscribed from
-  bool _removeDownstreamComputation(ComputedImpl c) {
+  void _removeDownstreamComputation(ComputedImpl c) {
     assert(_memoizedDownstreamComputations.remove(c) ||
         _nonMemoizedDownstreamComputations.remove(c));
     if (_memoizedDownstreamComputations.isEmpty &&
         _nonMemoizedDownstreamComputations.isEmpty &&
         _listeners.isEmpty) {
-      return _removeDataSourcesAndUpstreams();
+      _removeDataSourcesAndUpstreams();
     }
-    return false;
   }
 
   void _removeListener(ComputedSubscription<T> sub) {
@@ -572,10 +564,7 @@ class ComputedImpl<T> with Computed<T> {
     if (_memoizedDownstreamComputations.isEmpty &&
         _nonMemoizedDownstreamComputations.isEmpty &&
         _listeners.isEmpty) {
-      if (_removeDataSourcesAndUpstreams()) {
-        GlobalCtx._currentUpdate =
-            _UpdateToken(); // As we unsubscribed from a data source, and it might change value until we re-subscribe
-      }
+      _removeDataSourcesAndUpstreams();
     }
   }
 
