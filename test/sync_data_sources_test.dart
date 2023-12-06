@@ -76,10 +76,17 @@ extension _TestDataSourceComputedExtension<T> on _TestDataSource<T> {
 
 void main() {
   group('sync data sources', () {
-    // TODO: test prev, with use, react and memoized: false
     test('work', () async {
       final s = _TestDataSource(1);
-      final c = Computed(() => s.use + s.use);
+      int? prevExpectation; // If null, expect NVE
+      final c = Computed(() {
+        try {
+          expect(s.prev, prevExpectation);
+        } on NoValueException {
+          expect(prevExpectation, null);
+        }
+        return s.use + s.use;
+      });
 
       var expectation = 2;
       var subCnt = 0;
@@ -92,6 +99,7 @@ void main() {
       expect(subCnt, 0);
       await Future.value();
       expect(subCnt, 1);
+      prevExpectation = 1;
       expectation = 4;
       s.value = 2;
       expect(subCnt, 2);
@@ -123,7 +131,13 @@ void main() {
 
     test('can use react', () async {
       final s = _TestDataSource(0);
+      int? prevExpectation; // If null, expect NVE
       final c = Computed(() {
+        try {
+          expect(s.prev, prevExpectation);
+        } on NoValueException {
+          expect(prevExpectation, null);
+        }
         late int res;
         s.react((p0) => res = p0);
         return res;
@@ -140,6 +154,7 @@ void main() {
       expect(subCnt, 0);
       await Future.value();
       expect(subCnt, 1);
+      prevExpectation = 0;
       expectation = 1;
       s.value = 1;
       expect(subCnt, 2);
