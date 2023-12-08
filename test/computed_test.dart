@@ -9,6 +9,18 @@ void main() {
     Computed(() => fail('must not be computed'));
   });
 
+  test('shorthand notation works', () async {
+    final x = $(() => 42);
+    var flag = false;
+    x.listen((event) {
+      expect(flag, false);
+      flag = true;
+      expect(event, 42);
+    }, (e) => fail(e.toString()));
+    await Future.value();
+    expect(flag, true);
+  });
+
   group('streams', () {
     test('can be used as data source', () async {
       final controller = StreamController<int>.broadcast(

@@ -6,6 +6,10 @@ import 'src/computed.dart';
 import 'src/future_extension.dart';
 import 'src/stream_extension.dart';
 
+/// Shorthand for creating reactive computations
+Computed<T> $<T>(T Function() f, {bool memoized = true}) =>
+    Computed(f, memoized: memoized);
+
 /// Reactive computation with a return type of [T].
 ///
 /// Note that the equality operator [==] should be meaningful for [T],

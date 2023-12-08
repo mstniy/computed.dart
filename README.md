@@ -59,7 +59,7 @@ Assume for the sake of example that your business logic is to multiply the recei
 Here is how you can do this using Computed:
 
 ```
-final c = Computed(() => s.use * 2);
+final c = $(() => s.use * 2);
 final sub = c.asStream.listen((res){
     db.write(res);
 });
@@ -70,7 +70,7 @@ That's it. Computed will take care of re-running the computation and calling the
 You can also have computations which use other computations' results:
 
 ```
-final cPlus1 = Computed(() => c.use + 1);
+final cPlus1 = $(() => c.use + 1);
 ```
 
 ## <a name='Alargerexample'></a>A larger example
@@ -126,7 +126,7 @@ void updateDB() {
 And here is how to do the same using Computed:
 
 ```
-Computed(() {
+$(() {
     final currentThreshold = threshold.use;
     return items.use.
         filter((x) => x > currentThreshold).
@@ -167,7 +167,7 @@ These actions will trigger a re-computation if necessary.
 Here is a simple example that computes the difference between the old and new values of a data source whenever it produces a value:
 
 ```
-final c = Computed(() {
+final c = $(() {
     s.use; // Make sure it has a value
     late int res;
     s.react((val) => res = val - s.prevOr(0));
@@ -192,8 +192,8 @@ final sum = Computed<int>.withPrev((prev) {
 
 ## <a name='FAQ'></a>FAQ
 
-- Q: How to pass an async function into `Computed`?
-- A: Short answer is: you can't. The functions passed to `Computed` should be pure computations, free of side effects. If you are meaning to use an external value as part of the computation, see `.use`. If you want to react to a stream of external events, see `.react`. If you wish to produce external side effects, see `.listen` or `.as[Broadcast]Stream`.
+- Q: How to pass an async function into Computed?
+- A: Short answer is: you can't. The functions passed to Computed should be pure computations, free of side effects. If you are meaning to use an external value as part of the computation, see `.use`. If you want to react to a stream of external events, see `.react`. If you wish to produce external side effects, see `.listen` or `.as[Broadcast]Stream`.
 
 - Q: Why am I getting `Computed expressions must be purely functional. Please use listeners for side effects.`
 - A: On debug mode, Computed runs the given computations twice to make sure they behave identically. If this does not hold, it throws this assertion. Possible reasons include mutating and using a mutable value inside the computation or returning a type which does not implement deep comparisons, like `List` or `Set`.
@@ -208,7 +208,7 @@ Especially if conditionals depending on them are guarding `.use` expressions. He
 Stream<int> value;
 var b = false;
 
-final c = Computed(() => b ? value.use : 42);
+final c = $(() => b ? value.use : 42);
 ```
 
 As this may cause Computed to stop tracking `value`, breaking the reactivity of the computation.

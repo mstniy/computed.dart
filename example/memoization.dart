@@ -8,19 +8,19 @@ void main() async {
       sync: true); // Use a sync controller to make debugging easier
   final source = controller.stream.asBroadcastStream();
 
-  final anyNegative = Computed(() => source.use.any((element) => element < 0));
+  final anyNegative = $(() => source.use.any((element) => element < 0));
 
-  final maybeReversed = Computed(
-      () => anyNegative.use ? source.use.reversed.toBuiltList() : source.use);
+  final maybeReversed =
+      $(() => anyNegative.use ? source.use.reversed.toBuiltList() : source.use);
 
-  final append0 = Computed(() {
+  final append0 = $(() {
     return maybeReversed.use.rebuild((p0) => p0.add(0));
   });
 
   append0.listen((value) => print(value), () => print('Exception!'));
 
   // ignore: unused_local_variable
-  final unused = Computed(() {
+  final unused = $(() {
     while (true) {
       print("Never prints, this computation is never used.");
     }
