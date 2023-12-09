@@ -265,16 +265,7 @@ class ComputedImpl<T> {
     final rvoe = GlobalCtx._maybeCreateRouterFor<DT>(
         dataSource, dss, hasCurrentValue, currentValue);
 
-    if (rvoe._router != this) {
-      // Subscribe to the router instead
-      return rvoe._router.use;
-    }
-    // We are the router (thus, DT == T)
-
-    if (rvoe._voe == null) {
-      throw NoValueException();
-    }
-    return rvoe._voe!.value;
+    return rvoe._router.use;
   }
 
   DT dataSourcePrev<DT>(Object dataSource) {
