@@ -15,7 +15,6 @@ class StreamComputedExtensionImpl<T> {
         (router) => _StreamDataSourceSubscription(s.listen(
             (data) => router.onDataSourceData(data),
             onError: (e) => router.onDataSourceError(e))),
-        false,
         null);
   }
 
@@ -26,7 +25,6 @@ class StreamComputedExtensionImpl<T> {
         (router) => _StreamDataSourceSubscription(s.listen(
             (data) => router.onDataSourceData(data),
             onError: (e) => router.onDataSourceError(e))),
-        false,
         null,
         onData,
         onError);

@@ -50,8 +50,7 @@ extension _TestDataSourceComputedExtension<T> on _TestDataSource<T> {
         this,
         (router) => _TestDataSourceSubscription(
             this, () => router.onDataSourceData(value)),
-        true,
-        value);
+        () => value);
   }
 
   void react(void Function(T) onData, [void Function(Object)? onError]) {
@@ -60,8 +59,7 @@ extension _TestDataSourceComputedExtension<T> on _TestDataSource<T> {
         this,
         (router) => _TestDataSourceSubscription(
             this, () => router.onDataSourceData(value)),
-        true,
-        value,
+        () => value,
         onData,
         onError);
   }

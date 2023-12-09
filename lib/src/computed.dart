@@ -93,8 +93,7 @@ class GlobalCtx {
   static _RouterValueOrException<T> _maybeCreateRouterFor<T>(
       Object dataSource,
       DataSourceSubscription<T> Function(ComputedImpl<T> router) dss,
-      bool hasCurrentValue,
-      T? currentValue) {
+      T Function()? currentValue) {
     var rvoe =
         GlobalCtx._routerExpando[dataSource] as _RouterValueOrException<T>?;
 
@@ -106,11 +105,15 @@ class GlobalCtx {
             }
             return rvoe._voe!.value;
           }, true),
-          hasCurrentValue ? _ValueOrException.value(currentValue as T) : null);
+          currentValue != null
+              ? _ValueOrException.value(currentValue())
+              : null);
       GlobalCtx._routerExpando[dataSource] = rvoe;
-      rvoe._router._dss ??= _DataSourceAndSubscription<T>(dataSource,
-          hasCurrentValue ? GlobalCtx._currentUpdate : null, dss(rvoe._router));
-      if (hasCurrentValue) rvoe._router._evalF();
+      rvoe._router._dss ??= _DataSourceAndSubscription<T>(
+          dataSource,
+          currentValue != null ? GlobalCtx._currentUpdate : null,
+          dss(rvoe._router));
+      if (currentValue != null) rvoe._router._evalF();
     }
 
     return rvoe;
@@ -260,10 +263,9 @@ class ComputedImpl<T> {
   DT dataSourceUse<DT>(
       Object dataSource,
       DataSourceSubscription<DT> Function(ComputedImpl<DT> router) dss,
-      bool hasCurrentValue,
-      DT? currentValue) {
-    final rvoe = GlobalCtx._maybeCreateRouterFor<DT>(
-        dataSource, dss, hasCurrentValue, currentValue);
+      DT Function()? currentValue) {
+    final rvoe =
+        GlobalCtx._maybeCreateRouterFor<DT>(dataSource, dss, currentValue);
 
     return rvoe._router.use;
   }
@@ -288,12 +290,11 @@ class ComputedImpl<T> {
   void dataSourceReact<DT>(
       Object dataSource,
       DataSourceSubscription<DT> Function(ComputedImpl<DT> router) dss,
-      bool hasCurrentValue,
-      DT? currentValue,
+      DT Function()? currentValue,
       void Function(DT) onData,
       void Function(Object)? onError) {
-    final rvoe = GlobalCtx._maybeCreateRouterFor<DT>(
-        dataSource, dss, hasCurrentValue, currentValue);
+    final rvoe =
+        GlobalCtx._maybeCreateRouterFor<DT>(dataSource, dss, currentValue);
 
     // Routers don't call .react on data sources, they call .use
     assert(rvoe._router != this);
