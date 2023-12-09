@@ -120,7 +120,7 @@ class GlobalCtx {
       _UpdateToken(); // Guaranteed to be unique thanks to GC
 }
 
-class ComputedImpl<T> with Computed<T> {
+class ComputedImpl<T> {
   _DataSourceAndSubscription<T>? _dss;
 
   // Whether this node is memoized.
@@ -149,7 +149,6 @@ class ComputedImpl<T> with Computed<T> {
 
   var _dirty = false;
 
-  @override
   T get prev {
     final caller = GlobalCtx.currentComputation;
     if (caller == this) {
@@ -214,7 +213,6 @@ class ComputedImpl<T> with Computed<T> {
     _rerunGraph();
   }
 
-  @override
   ComputedSubscription<T> listen(
       void Function(T event)? onData, Function? onError) {
     if (GlobalCtx._currentComputation != null) {
@@ -309,14 +307,12 @@ class ComputedImpl<T> with Computed<T> {
     rvoe._router._react(onData, onError);
   }
 
-  @override
   void mock(T Function() mock) {
     _f = mock;
     GlobalCtx._currentUpdate = _UpdateToken();
     _rerunGraph();
   }
 
-  @override
   void unmock() {
     _f = _origF;
     GlobalCtx._currentUpdate = _UpdateToken();
@@ -601,7 +597,6 @@ class ComputedImpl<T> with Computed<T> {
     }
   }
 
-  @override
   T get use {
     if (_computing) throw CyclicUseException();
 

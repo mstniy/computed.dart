@@ -1,15 +1,13 @@
 import 'dart:async';
 
 import '../computed.dart';
-import 'computed.dart';
 
 class ComputedStreamExtensionImpl<T> {
-  final ComputedImpl<T> _parent;
+  final Computed<T> _parent;
   StreamController<T>? _controller;
   ComputedSubscription<T>? _computedSubscription;
 
-  ComputedStreamExtensionImpl(Computed<T> parent)
-      : _parent = parent as ComputedImpl<T>;
+  ComputedStreamExtensionImpl(this._parent);
 
   Stream<T> get asStream {
     _controller ??=

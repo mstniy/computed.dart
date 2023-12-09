@@ -14,22 +14,22 @@ Computed<T> $<T>(T Function() f, {bool memoized = true}) =>
 ///
 /// Note that the equality operator [==] should be meaningful for [T],
 /// as it is used for memoization.
-abstract class Computed<T> {
+class Computed<T> {
   /// Creates a reactive computation whose value is computed by the given function.
   ///
   /// If [memoized] is set to false, listeners of this computation as well as
   /// other computations using its value will be re-run every time this computation
   /// is re-run, even if it's value stays the same, except for the extra computations
   /// being done in debug mode to check for non-idempotency.
-  factory Computed(T Function() f, {bool memoized = true}) =>
-      ComputedImpl(f, memoized);
+  Computed(T Function() f, {bool memoized = true})
+      : _impl = ComputedImpl(f, memoized);
 
   /// As [Computed], but calls the given function with its last value.
   ///
   /// If the computation has no value yet, [prev] is set to [initialPrev].
-  factory Computed.withPrev(T Function(T prev) f,
-          {required T initialPrev, bool memoized = true}) =>
-      ComputedImpl.withPrev(f, initialPrev, memoized);
+  Computed.withPrev(T Function(T prev) f,
+      {required T initialPrev, bool memoized = true})
+      : _impl = ComputedImpl.withPrev(f, initialPrev, memoized);
 
   /// Subscribes to this computation.
   ///
@@ -40,7 +40,8 @@ abstract class Computed<T> {
   /// For memoized computations, the listener will be called only
   /// when the result of the computation changes.
   ComputedSubscription<T> listen(
-      void Function(T event)? onData, Function? onError);
+          void Function(T event)? onData, Function? onError) =>
+      _impl.listen(onData, onError);
 
   /// Fixes the result of this computation to the given value.
   ///
@@ -62,11 +63,11 @@ abstract class Computed<T> {
   ///
   /// This will trigger a re-computation.
   @visibleForTesting
-  void mock(T Function() mock);
+  void mock(T Function() mock) => _impl.mock(mock);
 
   /// Replaces [f] with the original, undoing [fix], [fixThrow] and [mock].
   @visibleForTesting
-  void unmock();
+  void unmock() => _impl.unmock();
 
   /// Returns the current value of this computation, if one exists, and subscribes to it.
   ///
@@ -75,7 +76,7 @@ abstract class Computed<T> {
   /// Throws [NoValueException] if a data source [use]d by this
   /// computation or another computation [use]d by it has no value yet.
   /// Throws [CyclicUseException] if this usage would cause a cyclic dependency.
-  T get use;
+  T get use => _impl.use;
 
   /// Returns the result of this computation during the last run of the current computation which notified the current computation's downstream, if one exists.
   /// If called on the current computation, returns its last result which was different to the previous one.
@@ -85,7 +86,9 @@ abstract class Computed<T> {
   /// Throws [NoValueException] if the current computation did not [use] this computation
   /// during its previous run.
   /// Note that [prev] does not subscribe to this computation. To do that, see [use].
-  T get prev;
+  T get prev => _impl.prev;
+
+  final ComputedImpl<T> _impl;
 }
 
 /// The result of [Computed.listen].
