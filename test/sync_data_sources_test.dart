@@ -48,7 +48,6 @@ extension _TestDataSourceComputedExtension<T> on _TestDataSource<T> {
     final caller = GlobalCtx.currentComputation;
     return caller.dataSourceUse(
         this,
-        () => this.use,
         (router) => _TestDataSourceSubscription(
             this, () => router.onDataSourceData(value)),
         true,
@@ -59,7 +58,6 @@ extension _TestDataSourceComputedExtension<T> on _TestDataSource<T> {
     final caller = GlobalCtx.currentComputation;
     caller.dataSourceReact<T>(
         this,
-        () => this.use,
         (router) => _TestDataSourceSubscription(
             this, () => router.onDataSourceData(value)),
         true,

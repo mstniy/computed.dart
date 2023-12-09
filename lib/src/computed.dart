@@ -92,7 +92,6 @@ class GlobalCtx {
 
   static _RouterValueOrException<T> _maybeCreateRouterFor<T>(
       Object dataSource,
-      T Function() dataSourceUser,
       DataSourceSubscription<T> Function(ComputedImpl<T> router) dss,
       bool hasCurrentValue,
       T? currentValue) {
@@ -100,7 +99,13 @@ class GlobalCtx {
         GlobalCtx._routerExpando[dataSource] as _RouterValueOrException<T>?;
 
     if (rvoe == null) {
-      rvoe = _RouterValueOrException(ComputedImpl(dataSourceUser, true),
+      rvoe = _RouterValueOrException(
+          ComputedImpl(() {
+            if (rvoe!._voe == null) {
+              throw NoValueException();
+            }
+            return rvoe._voe!.value;
+          }, true),
           hasCurrentValue ? _ValueOrException.value(currentValue as T) : null);
       GlobalCtx._routerExpando[dataSource] = rvoe;
       rvoe._router._dss ??= _DataSourceAndSubscription<T>(dataSource,
@@ -254,12 +259,11 @@ class ComputedImpl<T> {
 
   DT dataSourceUse<DT>(
       Object dataSource,
-      DT Function() dataSourceUser,
       DataSourceSubscription<DT> Function(ComputedImpl<DT> router) dss,
       bool hasCurrentValue,
       DT? currentValue) {
     final rvoe = GlobalCtx._maybeCreateRouterFor<DT>(
-        dataSource, dataSourceUser, dss, hasCurrentValue, currentValue);
+        dataSource, dss, hasCurrentValue, currentValue);
 
     if (rvoe._router != this) {
       // Subscribe to the router instead
@@ -292,14 +296,13 @@ class ComputedImpl<T> {
 
   void dataSourceReact<DT>(
       Object dataSource,
-      DT Function() dataSourceUser,
       DataSourceSubscription<DT> Function(ComputedImpl<DT> router) dss,
       bool hasCurrentValue,
       DT? currentValue,
       void Function(DT) onData,
       void Function(Object)? onError) {
     final rvoe = GlobalCtx._maybeCreateRouterFor<DT>(
-        dataSource, dataSourceUser, dss, hasCurrentValue, currentValue);
+        dataSource, dss, hasCurrentValue, currentValue);
 
     // Routers don't call .react on data sources, they call .use
     assert(rvoe._router != this);

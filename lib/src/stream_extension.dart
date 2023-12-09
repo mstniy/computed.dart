@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'computed.dart';
-import '../computed.dart';
 import 'data_source_subscription.dart';
 
 class StreamComputedExtensionImpl<T> {
@@ -13,7 +12,6 @@ class StreamComputedExtensionImpl<T> {
     final caller = GlobalCtx.currentComputation;
     return caller.dataSourceUse(
         s,
-        () => s.use,
         (router) => _StreamDataSourceSubscription(s.listen(
             (data) => router.onDataSourceData(data),
             onError: (e) => router.onDataSourceError(e))),
@@ -25,7 +23,6 @@ class StreamComputedExtensionImpl<T> {
     final caller = GlobalCtx.currentComputation;
     caller.dataSourceReact<T>(
         s,
-        () => s.use,
         (router) => _StreamDataSourceSubscription(s.listen(
             (data) => router.onDataSourceData(data),
             onError: (e) => router.onDataSourceError(e))),
