@@ -1,3 +1,13 @@
+## 0.3.0 - 2023-12-11
+
+- Removed `.useAll`, replace with `.react`.
+- Introduced non-memoized computations.
+- Removed `.withSelf`, replaced with `.withPrev`.
+- Introduced `prevOr`: Returns a given fallback value instead of throwing `NoValueException`.
+- Bugfixes
+- Introduced a shorthand dollar notation for defining computed values.
+- Allow data source initial values to be specified as functionals.
+
 ## 0.2.2 - 2023-11-28
 
 - Improve dependencies
