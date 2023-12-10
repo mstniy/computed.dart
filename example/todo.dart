@@ -10,15 +10,34 @@ typedef TodoItem = String;
 typedef AppState = BuiltMap<int, TodoItem>;
 
 class FictionaryDatabase {
-  Future<AppState?> loadState() {
-    // 1 second delay for dramatic effect
-    print('Reading DB...');
-    return Future.delayed(
-        const Duration(seconds: 1), () => AppState({0: "todo1"}));
+  AppState? _state;
+  final _stateStream = StreamController<AppState>.broadcast();
+  Stream<AppState> loadState() async* {
+    if (_state == null) {
+      print('Reading DB...');
+      _state = AppState({0: "todo1"});
+    }
+    yield _state!;
+    yield* _stateStream.stream;
+  }
+
+  // In a real-world application, a reactive db would provide this functionality
+  Stream<int> largestIdQuery() async* {
+    await for (var state in loadState()) {
+      yield state.isEmpty ? 0 : state.keys.reduce(math.max);
+    }
+  }
+
+  // Simulates the database mysteriously changing, eg. by another tab on web
+  void injectState(AppState state) {
+    if (_state == state) return;
+    _state = state;
+    _stateStream.add(state);
   }
 
   Future<void> saveState(AppState state) {
     print('DB saving state: $state');
+    injectState(state);
     return Future.value();
   }
 }
@@ -37,31 +56,26 @@ void main() async {
       sync: true); // Use a sync controller to make debugging easier
   final uiCreate = uiCreateController.stream;
 
-  final dbFuture = db.loadState();
-  final largestId = Computed<int>.withPrev((prev) {
-    var id = prev;
-    uiCreate.react((p0) => id++);
+  final dbStream = db.loadState().asBroadcastStream();
 
-    return id;
-  },
-      initialPrev:
-          ((await dbFuture) ?? BuiltMap<int, String>()).keys.reduce(math.max));
+  final largestIdStream = db.largestIdQuery();
 
   final appState = Computed<AppState>.withPrev((prev) {
-    // Apply UI changes, if there are any
+    // Apply UI or DB changes, if there are any
     return prev.rebuild(
       (b) {
+        dbStream.react(b.replace);
         uiDelete.react(b.remove);
         uiUpdate.react((t) {
           b[t.item1] = t.item2;
         });
-        final id = largestId.use;
+        final id = largestIdStream.use + 1;
         uiCreate.react((t) {
           b[id] = t;
         });
       },
     );
-  }, initialPrev: (await dbFuture) ?? AppState());
+  }, initialPrev: await dbStream.first);
 
   final stateIsInitial = Computed.withPrev(
       (prev) => Tuple2(prev == null, appState.use),
@@ -72,15 +86,17 @@ void main() async {
     if (!state!.item1) db.saveState(state.item2);
   }, (e) => print('Exception: ${e.toString()}'));
 
-  await Future.delayed(const Duration(seconds: 2));
-
-  await Future.value();
   uiCreateController.add('new todo');
-  await Future.value();
+  await Future.delayed(Duration.zero);
   uiDeleteController.add(0);
-  await Future.value();
+  await Future.delayed(Duration.zero);
   uiUpdateController.add(Tuple2(1, 'new todo edited'));
-  await Future.value();
+  await Future.delayed(Duration.zero);
   uiDeleteController.add(1);
-  await Future.value();
+  await Future.delayed(Duration.zero);
+  db.injectState({2: 'mysterious todo'}.build());
+  await Future.delayed(Duration.zero);
+  uiCreateController.add('newer todo');
+  await Future.delayed(Duration.zero);
+  uiUpdateController.add(Tuple2(2, 'mysterious todo edited'));
 }
