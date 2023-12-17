@@ -7,7 +7,7 @@ A straightforward, reliable, performant and testable reactive state management s
 
 ---
 
-Computed makes it a breeze to write code that reacts to external events. Just define how you compute your app state based on external data sources, and what effects you want as a result, and Computed will take care of everything else, allowing you to define your app state decleratively, rather than imperatively.
+Computed makes it a breeze to write code that reacts to external events. Just define how you compute your app state based on external data sources, and what effects you want as a result, and Computed will take care of everything else, allowing you to define your app state declaratively, rather than imperatively.
 
 Computed:
 
