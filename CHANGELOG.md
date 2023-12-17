@@ -1,3 +1,10 @@
+## 0.3.1 - 2023-12-17
+
+- Disallow computations from doing most async operations
+- Bugfix for non-memoized computations
+- Avoid modifying internal state in asserts
+- Move `_reacting` to the global context to save memory
+
 ## 0.3.0 - 2023-12-11
 
 - Removed `.useAll`, replace with `.react`.
