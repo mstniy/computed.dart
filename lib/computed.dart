@@ -178,3 +178,6 @@ class NoValueException implements Exception {}
 /// Thrown by [Computed.use] if this usage
 /// would cause a cyclic dependency.
 class CyclicUseException implements Exception {}
+
+/// Thrown when a computations attempt to do async operations
+class ComputedAsyncError extends Error {}

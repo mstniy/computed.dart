@@ -2,10 +2,13 @@ import 'dart:async';
 
 import '../computed.dart';
 import 'data_source_subscription.dart';
+import 'sync_zone.dart';
 
-class _UpdateToken {
-  _UpdateToken();
+class _Token {
+  _Token();
 }
+
+final _isComputedZone = _Token();
 
 class _ValueOrException<T> {
   final bool _isValue;
@@ -40,7 +43,7 @@ class _RouterValueOrException<T> {
 
 class _DataSourceAndSubscription<T> {
   final Object _ds;
-  _UpdateToken? _lastEmit;
+  _Token? _lastEmit;
   final DataSourceSubscription<T> _dss;
 
   _DataSourceAndSubscription(this._ds, this._lastEmit, this._dss);
@@ -109,10 +112,10 @@ class GlobalCtx {
               ? _ValueOrException.value(currentValue())
               : null);
       GlobalCtx._routerExpando[dataSource] = rvoe;
-      rvoe._router._dss ??= _DataSourceAndSubscription<T>(
-          dataSource,
-          currentValue != null ? GlobalCtx._currentUpdate : null,
-          dss(rvoe._router));
+      final sub = Zone.current.parent!.run(() => dss(rvoe!._router));
+
+      rvoe._router._dss ??= _DataSourceAndSubscription<T>(dataSource,
+          currentValue != null ? GlobalCtx._currentUpdate : null, sub);
       if (currentValue != null) rvoe._router._evalF();
     }
 
@@ -124,8 +127,7 @@ class GlobalCtx {
   // This allows most of the logic to only deal with upstream computations.
   static final _routerExpando = Expando<_RouterValueOrException>('computed');
 
-  static var _currentUpdate =
-      _UpdateToken(); // Guaranteed to be unique thanks to GC
+  static var _currentUpdate = _Token(); // Guaranteed to be unique thanks to GC
 
   static var _reacting = false;
 }
@@ -137,7 +139,7 @@ class ComputedImpl<T> {
   // Always true for routers, which might have both memoized (.use)
   // and non-memoized (.react) listeners.
   final bool _memoized;
-  _UpdateToken? _lastUpdate;
+  _Token? _lastUpdate;
 
   bool get _novalue => _lastResult == null;
   _ValueOrException<T>? _lastResult;
@@ -189,7 +191,7 @@ class ComputedImpl<T> {
 
   void onDataSourceData(T data) {
     if (_dss == null) return;
-    GlobalCtx._currentUpdate = _UpdateToken();
+    GlobalCtx._currentUpdate = _Token();
     _dss!._lastEmit = GlobalCtx._currentUpdate;
     final rvoe =
         GlobalCtx._routerExpando[_dss!._ds] as _RouterValueOrException<T>;
@@ -207,7 +209,7 @@ class ComputedImpl<T> {
 
   void onDataSourceError(Object err) {
     if (_dss == null) return;
-    GlobalCtx._currentUpdate = _UpdateToken();
+    GlobalCtx._currentUpdate = _Token();
 
     _dss!._lastEmit = GlobalCtx._currentUpdate;
     final rvoe =
@@ -305,13 +307,13 @@ class ComputedImpl<T> {
 
   void mock(T Function() mock) {
     _f = mock;
-    GlobalCtx._currentUpdate = _UpdateToken();
+    GlobalCtx._currentUpdate = _Token();
     _rerunGraph();
   }
 
   void unmock() {
     _f = _origF;
-    GlobalCtx._currentUpdate = _UpdateToken();
+    GlobalCtx._currentUpdate = _Token();
     _rerunGraph();
   }
 
@@ -383,6 +385,14 @@ class ComputedImpl<T> {
     }
   }
 
+  T _evalFInSyncZone() {
+    final zone = Zone.current[_isComputedZone] != null
+        ? Zone.current
+        : Zone.current.fork(
+            specification: computedZone, zoneValues: {_isComputedZone: true});
+    return zone.run(_f);
+  }
+
   // Also notifies the listeners (but not downstream computations) if necessary
   void _evalF() {
     _dirty = false;
@@ -395,7 +405,7 @@ class ComputedImpl<T> {
       _curUpstreamComputations = {};
       try {
         GlobalCtx._currentComputation = this;
-        final newResult = _ValueOrException.value(_f());
+        final newResult = _ValueOrException.value(_evalFInSyncZone());
         if (_reactSuppressedException != null) {
           // Throw it here
           throw _reactSuppressedException!;
@@ -407,7 +417,7 @@ class ComputedImpl<T> {
         ast() {
           T? f2;
           try {
-            f2 = _f();
+            f2 = _evalFInSyncZone();
           } catch (_) {
             return false;
           }
@@ -424,7 +434,7 @@ class ComputedImpl<T> {
         // it throws NoValueException again
         ast() {
           try {
-            _f();
+            _evalFInSyncZone();
           } on NoValueException {
             // Good
             return true;
