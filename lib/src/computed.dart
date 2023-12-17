@@ -442,8 +442,8 @@ class ComputedImpl<T> {
         _lastResult = _ValueOrException.exc(e);
       } finally {
         _reactSuppressedException = null;
-        final shouldNotify =
-            _prevResult?.shouldNotifyMemoized(_lastResult) ?? true;
+        final shouldNotify = !_memoized ||
+            (_prevResult?.shouldNotifyMemoized(_lastResult) ?? true);
         if (gotNVE || shouldNotify) {
           // Commit the changes to the DAG
           for (var e in _curUpstreamComputations!.entries) {
@@ -470,9 +470,9 @@ class ComputedImpl<T> {
       for (var down in _nonMemoizedDownstreamComputations) {
         if (!down._computing) down._dirty = true;
       }
-      final shouldNotify =
-          _prevResult?.shouldNotifyMemoized(_lastResult) ?? true;
-      if (!_memoized || shouldNotify) {
+      final shouldNotify = !_memoized ||
+          (_prevResult?.shouldNotifyMemoized(_lastResult) ?? true);
+      if (shouldNotify) {
         _lastResultfulUpstreamComputations = _lastUpstreamComputations;
         for (var down in _memoizedDownstreamComputations) {
           if (!down._computing) down._dirty = true;

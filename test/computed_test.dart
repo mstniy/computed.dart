@@ -251,6 +251,29 @@ void main() {
       sub.cancel();
     });
 
+    test(
+        '(regression) non-memoized computation crash on changed upstream dependencies',
+        () async {
+      final controller = StreamController<int>.broadcast(
+          sync: true); // Use a broadcast stream to make debugging easier
+      final s = controller.stream;
+
+      var c = $(() => s.use);
+      final widgetc = $(() {
+        c.use;
+      }, memoized: false);
+
+      final sub = widgetc.listen((event) {}, null);
+
+      controller.add(0);
+
+      c = $(() => s.use);
+
+      controller.add(1);
+
+      sub.cancel();
+    });
+
     test('can be used as listeners', () async {
       final controller = StreamController<int>.broadcast(
           sync: true); // Use a broadcast stream to make debugging easier
