@@ -126,6 +126,8 @@ class GlobalCtx {
 
   static var _currentUpdate =
       _UpdateToken(); // Guaranteed to be unique thanks to GC
+
+  static var _reacting = false;
 }
 
 class ComputedImpl<T> {
@@ -146,7 +148,6 @@ class ComputedImpl<T> {
   var _lastUpstreamComputations = <ComputedImpl, _MemoizedValueOrException>{};
 
   bool get _computing => _curUpstreamComputations != null;
-  bool _reacting = false;
   Object? _reactSuppressedException;
   Map<ComputedImpl, _MemoizedValueOrException>? _curUpstreamComputations;
 
@@ -565,7 +566,7 @@ class ComputedImpl<T> {
     // As otherwise the meaning of .prev becomes ambiguous
     assert(_dss != null);
     final caller = GlobalCtx.currentComputation;
-    if (caller._reacting) {
+    if (GlobalCtx._reacting) {
       throw StateError("`use` and `react` not allowed inside react callbacks.");
     }
     // Make sure the caller is subscribed
@@ -577,7 +578,7 @@ class ComputedImpl<T> {
       return;
     }
 
-    caller._reacting = true;
+    GlobalCtx._reacting = true;
     try {
       if (_lastResult!._isValue) {
         onData(_lastResult!._value as T);
@@ -589,7 +590,7 @@ class ComputedImpl<T> {
         caller._reactSuppressedException ??= _lastResult!._exc;
       }
     } finally {
-      caller._reacting = false;
+      GlobalCtx._reacting = false;
     }
   }
 
@@ -597,7 +598,7 @@ class ComputedImpl<T> {
     if (_computing) throw CyclicUseException();
 
     final caller = GlobalCtx.currentComputation;
-    if (caller._reacting) {
+    if (GlobalCtx._reacting) {
       throw StateError("`use` and `react` not allowed inside react callbacks.");
     }
     // Make sure the caller is subscribed
