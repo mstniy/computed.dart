@@ -541,8 +541,9 @@ class ComputedImpl<T> {
   }
 
   void _removeDownstreamComputation(ComputedImpl c) {
-    assert(_memoizedDownstreamComputations.remove(c) ||
-        _nonMemoizedDownstreamComputations.remove(c));
+    bool removed = _memoizedDownstreamComputations.remove(c) ||
+        _nonMemoizedDownstreamComputations.remove(c);
+    assert(removed, "Corrupted internal state");
     if (_memoizedDownstreamComputations.isEmpty &&
         _nonMemoizedDownstreamComputations.isEmpty &&
         _listeners.isEmpty) {
