@@ -112,6 +112,7 @@ class GlobalCtx {
               ? _ValueOrException.value(currentValue())
               : null);
       GlobalCtx._routerExpando[dataSource] = rvoe;
+      assert(Zone.current[_isComputedZone] == true, "Corrupt internal state");
       final sub = Zone.current.parent!.run(() => dss(rvoe!._router));
 
       rvoe._router._dss ??= _DataSourceAndSubscription<T>(dataSource,
