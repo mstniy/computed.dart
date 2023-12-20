@@ -78,6 +78,15 @@ class Computed<T> {
   /// Throws [CyclicUseException] if this usage would cause a cyclic dependency.
   T get use => _impl.use;
 
+  /// As [use], but returns [value] instead of throwing [NoValueException].
+  T useOr(T value) {
+    try {
+      return use;
+    } on NoValueException {
+      return value;
+    }
+  }
+
   /// Returns the result of this computation during the last run of the current computation which notified the current computation's downstream, if one exists.
   /// If called on the current computation, returns its last result which was different to the previous one.
   ///
@@ -122,6 +131,9 @@ extension StreamComputedExtension<T> on Stream<T> {
   /// If the last item in this stream is an error, throws it.
   /// Throws [NoValueException] if this stream does not have a known value yet.
   T get use => StreamComputedExtensionImpl<T>(this).use;
+
+  /// As [use], but returns [value] instead of throwing [NoValueException].
+  T useOr(T value) => StreamComputedExtensionImpl<T>(this).useOr(value);
 
   /// If this stream has produced a value or error since the last time the current computation notified its downstream, runs the given functional on the value or error produced by this stream.
   ///
@@ -169,6 +181,9 @@ extension FutureComputedExtension<T> on Future<T> {
   /// If the future gets resolved with an error, throws it.
   /// Throws [NoValueException] if this future has not been resolved yet.
   T get use => FutureComputedExtensionImpl<T>(this).use;
+
+  /// As [use], but returns [value] instead of throwing [NoValueException].
+  T useOr(T value) => FutureComputedExtensionImpl<T>(this).useOr(value);
 }
 
 /// Thrown when a data source [use]d by a computation

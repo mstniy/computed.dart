@@ -1,3 +1,5 @@
+import 'package:computed/computed.dart';
+
 import 'computed.dart';
 import 'data_source_subscription.dart';
 
@@ -9,6 +11,14 @@ class FutureComputedExtensionImpl<T> {
     final caller = GlobalCtx.currentComputation;
     return caller.dataSourceUse(
         f, (router) => _FutureDataSourceSubscription<T>(f, router), null);
+  }
+
+  T useOr(T value) {
+    try {
+      return use;
+    } on NoValueException {
+      return value;
+    }
   }
 }
 

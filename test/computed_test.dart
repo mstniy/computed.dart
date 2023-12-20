@@ -41,6 +41,31 @@ void main() {
       sub.cancel();
     });
 
+    test('useOr works', () async {
+      final controller = StreamController<int>.broadcast(
+          sync: true); // Use a broadcast stream to make debugging easier
+      final source = controller.stream;
+
+      var lCnt = 0;
+      int? lastRes;
+
+      final sub = Computed(() => source.useOr(21) * 2).listen((event) {
+        lCnt++;
+        lastRes = event;
+      }, (e) => fail(e.toString()));
+
+      expect(lCnt, 0);
+      await Future.value();
+      expect(lCnt, 1);
+      expect(lastRes, 42);
+
+      controller.add(0);
+      expect(lCnt, 2);
+      expect(lastRes, 0);
+
+      sub.cancel();
+    });
+
     test('react does not memoize the values produced by the stream', () async {
       final controller = StreamController<int>.broadcast(
           sync: true); // Use a broadcast stream to make debugging easier
@@ -401,6 +426,33 @@ void main() {
       sub.cancel();
     });
 
+    test('useOr works', () async {
+      final completer = Completer<int>();
+      final future = completer.future;
+
+      final x = Computed(() => future.useOr(42));
+
+      var callCnt = 0;
+      int? lastEvent;
+
+      final sub = x.listen((event) {
+        callCnt++;
+        lastEvent = event;
+      }, (e) => fail(e.toString()));
+
+      expect(callCnt, 0);
+      await Future.value();
+      expect(callCnt, 1);
+      expect(lastEvent, 42);
+
+      completer.complete(1);
+      await Future.value();
+      expect(callCnt, 2);
+      expect(lastEvent, 1);
+
+      sub.cancel();
+    });
+
     test('can pass rejections to computations', () async {
       final completer = Completer<int>();
       final future = completer.future;
@@ -507,6 +559,34 @@ void main() {
     expect(lastRes, 1);
     controller.add(1);
     expect(lastRes, 3);
+
+    sub.cancel();
+  });
+
+  test('useOr works on computations', () async {
+    final controller = StreamController<int>.broadcast(
+        sync: true); // Use a broadcast stream to make debugging easier
+    final source = controller.stream;
+
+    int? lastRes;
+
+    final x2 = Computed(() => source.use * 2);
+
+    var lCnt = 0;
+
+    final sub = Computed(() => x2.useOr(41) + 1).listen((event) {
+      lCnt++;
+      lastRes = event;
+    }, (e) => fail(e.toString()));
+
+    expect(lCnt, 0);
+    await Future.value();
+    expect(lCnt, 1);
+    expect(lastRes, 42);
+
+    controller.add(0);
+    expect(lCnt, 2);
+    expect(lastRes, 1);
 
     sub.cancel();
   });

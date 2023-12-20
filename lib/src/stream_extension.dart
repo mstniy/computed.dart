@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:computed/computed.dart';
+
 import 'computed.dart';
 import 'data_source_subscription.dart';
 
@@ -16,6 +18,14 @@ class StreamComputedExtensionImpl<T> {
             (data) => router.onDataSourceData(data),
             onError: (e) => router.onDataSourceError(e))),
         null);
+  }
+
+  T useOr(T value) {
+    try {
+      return use;
+    } on NoValueException {
+      return value;
+    }
   }
 
   void react(void Function(T) onData, void Function(Object)? onError) {
