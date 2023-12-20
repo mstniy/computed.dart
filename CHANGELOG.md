@@ -1,3 +1,8 @@
+## 0.3.2 - 2023-12-21
+
+- Allow computations to use other computations via `.asStream`
+- Added `useOr`
+
 ## 0.3.1 - 2023-12-17
 
 - Disallow computations from doing most async operations
