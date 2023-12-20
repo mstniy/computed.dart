@@ -227,9 +227,6 @@ class ComputedImpl<T> {
 
   ComputedSubscription<T> listen(
       void Function(T event)? onData, Function? onError) {
-    if (GlobalCtx._currentComputation != null) {
-      throw StateError('`listen` is not allowed inside computations.');
-    }
     final sub = _ComputedSubscriptionImpl<T>(this, onData, onError);
     if (_novalue) {
       try {

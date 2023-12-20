@@ -640,6 +640,72 @@ void main() {
     sub.cancel();
   });
 
+  test('computed query pattern works', () async {
+    final controller = StreamController<int>.broadcast(
+        sync: true); // Use a broadcast stream to make debugging easier
+    final source = controller.stream;
+
+    final queryStream = Computed(() => source.use)
+        .asStream
+        .map((key) => Future.microtask(() => key));
+
+    var cCnt = 0;
+
+    final result = $(() {
+      cCnt++;
+      return queryStream.use.use;
+    });
+
+    var expectation = 0;
+    var callCnt = 0;
+
+    final sub = result.listen((event) {
+      callCnt++;
+      expect(event, expectation);
+    }, (e) => fail(e.toString()));
+
+    await Future.value();
+    expect(cCnt, 2);
+    expect(callCnt, 0);
+
+    controller.add(0);
+
+    expect(cCnt, 2);
+
+    await Future.value(); // For the asStream to propagate the result
+
+    expect(cCnt, 4);
+    expect(callCnt, 0);
+
+    await Future.value(); // For the "query" to complete
+
+    expect(cCnt, 6);
+    expect(callCnt, 1);
+
+    controller.add(0);
+
+    await Future.value();
+    await Future.value();
+
+    expect(cCnt, 6); // First computation terminates propagation
+    expect(callCnt, 1);
+
+    expectation = 1;
+    controller.add(1);
+
+    await Future.value(); // For the asStream to propagate the result
+
+    expect(cCnt, 8);
+    expect(callCnt, 1);
+
+    await Future.value(); // For the "query" to complete
+
+    expect(cCnt, 10);
+    expect(callCnt, 2);
+
+    sub.cancel();
+  });
+
   group('respects topological order', () {
     test('on upstream updates', () {
       for (var streamFirst in [false, true]) {
@@ -894,8 +960,7 @@ void main() {
     }, (e) {
       expect(flag, false);
       flag = true;
-      expect(e, isA<StateError>());
-      expect(e.message, '`listen` is not allowed inside computations.');
+      expect(e, isA<ComputedAsyncError>());
     });
 
     await Future.value();
