@@ -14,6 +14,7 @@ extension FutureComputedExtension<T> on Future<T> {
 }
 
 extension ComputedFutureUnwrapExtension<T> on Computed<Future<T>> {
+  /// Returns a computation representing the value the last [Future] returned by this computation resolves to.
   Computed<T> get unwrap {
     return $(() => use.use);
   }

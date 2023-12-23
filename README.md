@@ -26,6 +26,7 @@ Computed:
 - [A larger example](#Alargerexample)
 - [Testing](#Testing)
 - [Looking at the past](#Lookingatthepast)
+- [Computed queries](#Computedqueries)
 - [FAQ](#FAQ)
 - [Pitfalls](#Pitfalls)
   - [Do not use mutable values in computations](#Donotusemutablevaluesincomputations)
@@ -192,6 +193,27 @@ final sum = Computed<int>.withPrev((prev) {
     return res;
 }, initialPrev: 0);
 ```
+
+## <a name='Computedqueries'></a>Computed queries
+
+Your application might need to run queries with computed state as its parameters. You can achieve this using `async: true` and `unwrap`:
+
+```
+class FictionaryDatabase {
+    Future<List<Object>> filterByCategory(int category, bool includeDeleted);
+}
+
+Stream<int> category; // Assume connected to the UI
+Stream<bool> includeDeleted; // Assume connected to the UI
+FictionaryDatabase db; // Assume connected to a database
+
+final query = $(() => db.filterByCategory(category.use, includeDeleted.use), async: true).unwrap;
+```
+
+Passing `async: true` disables some checks which don't apply for computations starting and returning asynchronous operations.  
+`unwrap` returns a computation representing the last value produced by the last asynchronous operation returned by the computation it is applied to. In this example, it converts the computation from the type `Computed<Future<int>>` to `Computed<int>`.  
+`unwrap` is defined for computations returning `Stream` and `Future`, so the computation in the example would also work if the database returned a `Stream` instead of a `Future`. A database supporting reactive queries might do that.  
+Of course, other computations can use the result of the computed query, as it is a computation itself.
 
 ## <a name='FAQ'></a>FAQ
 
