@@ -245,7 +245,7 @@ As this will lead to an infinite loop.
 
 ### <a name='`future`s-returned-from-computations-are-not-awaited'></a>`Future`s returned from computations are not awaited
 
-At least for memoization purposes. The re-run pass never awaits, even if a computation returns a `Future`. They will be passed as-is to downstream computations, which might of course `.use` them, then they would effectively be `await`ing them.
+At least for memoization purposes. The re-run pass never awaits, even if a computation returns a `Future`. They will be passed as-is to downstream computations. If you want to instead return the values produced by the asynchronous operations returned by a computation, see `.unwrap`.
 
 ### <a name='do-not-forget-to-`.use`-or-`.react`-your-data-sources'></a>Do not forget to `.use` or `.react` your data sources
 
