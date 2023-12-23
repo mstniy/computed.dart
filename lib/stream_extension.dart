@@ -15,9 +15,7 @@ extension ComputedStreamExtension<T> on Computed<T> {
 
 extension ComputedStreamUnwrapExtension<T> on Computed<Stream<T>> {
   /// Returns a computation representing the last value produced by the last [Stream] returned by this computation.
-  Computed<T> get unwrap {
-    return $(() => use.use);
-  }
+  Computed<T> get unwrap => $(() => use.use);
 }
 
 extension StreamComputedExtension<T> on Stream<T> {
