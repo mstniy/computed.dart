@@ -1,3 +1,4 @@
+import 'computed.dart';
 import 'src/future_extension.dart';
 
 extension FutureComputedExtension<T> on Future<T> {
@@ -10,4 +11,10 @@ extension FutureComputedExtension<T> on Future<T> {
 
   /// As [use], but returns [value] instead of throwing [NoValueException].
   T useOr(T value) => FutureComputedExtensionImpl<T>(this).useOr(value);
+}
+
+extension ComputedFutureUnwrapExtension<T> on Computed<Future<T>> {
+  Computed<T> get unwrap {
+    return $(() => use.use);
+  }
 }

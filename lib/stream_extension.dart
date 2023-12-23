@@ -13,6 +13,12 @@ extension ComputedStreamExtension<T> on Computed<T> {
       ComputedStreamExtensionImpl<T>(this).asBroadcastStream;
 }
 
+extension ComputedStreamUnwrapExtension<T> on Computed<Stream<T>> {
+  Computed<T> get unwrap {
+    return $(() => use.use);
+  }
+}
+
 extension StreamComputedExtension<T> on Stream<T> {
   /// Returns the current value of this stream and subscribes to it.
   ///

@@ -112,8 +112,11 @@ class GlobalCtx {
               ? _ValueOrException.value(currentValue())
               : null);
       GlobalCtx._routerExpando[dataSource] = rvoe;
-      assert(Zone.current[_isComputedZone] == true, "Corrupt internal state");
-      final sub = Zone.current.parent!.run(() => dss(rvoe!._router));
+      // Run the subscriber outside the sync zone
+      final zone = Zone.current[_isComputedZone] == true
+          ? Zone.current.parent!
+          : Zone.current;
+      final sub = zone.run(() => dss(rvoe!._router));
 
       rvoe._router._dss ??= _DataSourceAndSubscription<T>(dataSource,
           currentValue != null ? GlobalCtx._currentUpdate : null, sub);
@@ -402,6 +405,8 @@ class ComputedImpl<T> {
 
   // Also notifies the listeners (but not downstream computations) if necessary
   void _evalF() {
+    const idempotencyFailureMessage =
+        "Computed expressions must be purely functional. Please use listeners for side effects. For computations creating and returning asynchronous operations, make sure to set `async: true`.";
     _dirty = false;
     final oldComputation = GlobalCtx._currentComputation;
     var gotNVE = false;
@@ -423,7 +428,7 @@ class ComputedImpl<T> {
           // run f() a second time to make sure it returns the same result.
           // Nested _evalF-s don't do this to avoid calling
           // deeply nested computations exponentially many times.
-          ast() {
+          ensureIdempotent() {
             T? f2;
             try {
               f2 = _evalFInZone();
@@ -433,8 +438,7 @@ class ComputedImpl<T> {
             return f2 == newResult._value;
           }
 
-          assert(ast(),
-              "Computed expressions must be purely functional. Please use listeners for side effects.");
+          assert(ensureIdempotent(), idempotencyFailureMessage);
         }
         _lastResult = newResult;
       } on NoValueException {
@@ -443,7 +447,7 @@ class ComputedImpl<T> {
         if (!_async) {
           // Run the computation once again and make sure
           // it throws NoValueException again
-          ast() {
+          ensureIdempotent() {
             try {
               _evalFInZone();
             } on NoValueException {
@@ -455,8 +459,7 @@ class ComputedImpl<T> {
             return false;
           }
 
-          assert(ast(),
-              "Computed expressions must be purely functional. Please use listeners for side effects.");
+          assert(ensureIdempotent(), idempotencyFailureMessage);
         }
         rethrow;
       } catch (e) {

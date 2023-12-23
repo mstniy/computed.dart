@@ -402,6 +402,77 @@ void main() {
 
       sub.cancel();
     });
+
+    test('unwrap works', () async {
+      final innerStreams = <StreamController<int>>[];
+      Stream<int> streamFor(int value) {
+        final stream = StreamController<int>();
+        stream.add(value);
+        stream.add(value + 1);
+        innerStreams.add(stream);
+        return stream.stream;
+      }
+
+      final controller = StreamController<int>(sync: true);
+      final outerStream = controller.stream;
+
+      var cCnt = 0;
+
+      final c = $(() {
+        cCnt++;
+        return streamFor(outerStream.use);
+      }, async: true)
+          .unwrap;
+
+      var lCnt = 0;
+      int? lastRes;
+
+      final sub = c.listen((event) {
+        lCnt++;
+        lastRes = event;
+      }, (e) => fail(e.toString()));
+
+      expect(cCnt, 1);
+      await Future.value();
+      expect(cCnt, 1);
+      expect(lCnt, 0);
+
+      controller.add(0);
+      expect(innerStreams.length, 1);
+      expect(cCnt, 2);
+      expect(lCnt, 0);
+      await Future.value();
+      expect(cCnt, 2);
+      expect(lCnt, 1);
+      expect(lastRes, 0);
+      for (var i = 0; i < 2; i++) {
+        await Future.value();
+        expect(cCnt, 2);
+        expect(lCnt, 2);
+        expect(lastRes, 1);
+      }
+
+      controller.add(2);
+      expect(innerStreams.length, 2);
+      expect(innerStreams[0].hasListener, false);
+      expect(cCnt, 3);
+      expect(lCnt, 2);
+      await Future.value();
+      expect(cCnt, 3);
+      expect(lCnt, 3);
+      expect(lastRes, 2);
+      for (var i = 0; i < 2; i++) {
+        await Future.value();
+        expect(cCnt, 3);
+        expect(lCnt, 4);
+        expect(lastRes, 3);
+      }
+
+      sub.cancel();
+
+      expect(innerStreams.length, 2);
+      expect(innerStreams[1].hasListener, false);
+    });
   });
 
   group('futures', () {
@@ -501,6 +572,55 @@ void main() {
       await Future.value();
 
       // Nothing should be run
+    });
+
+    test('unwrap works', () async {
+      final controller = StreamController<int>(sync: true);
+      final stream = controller.stream;
+
+      var cCnt = 0;
+
+      final c = $(() {
+        cCnt++;
+        final val = stream.use;
+        return Future.microtask(() => val);
+      }, async: true)
+          .unwrap;
+
+      var lCnt = 0;
+      int? lastRes;
+
+      final sub = c.listen((event) {
+        lCnt++;
+        lastRes = event;
+      }, (e) => fail(e.toString()));
+
+      expect(cCnt, 1);
+      await Future.value();
+      expect(cCnt, 1);
+      expect(lCnt, 0);
+
+      controller.add(0);
+      expect(cCnt, 2);
+      expect(lCnt, 0);
+      for (var i = 0; i < 2; i++) {
+        await Future.value();
+        expect(cCnt, 2);
+        expect(lCnt, 1);
+        expect(lastRes, 0);
+      }
+
+      controller.add(1);
+      expect(cCnt, 3);
+      expect(lCnt, 1);
+      for (var i = 0; i < 2; i++) {
+        await Future.value();
+        expect(cCnt, 3);
+        expect(lCnt, 2);
+        expect(lastRes, 1);
+      }
+
+      sub.cancel();
     });
   });
 
