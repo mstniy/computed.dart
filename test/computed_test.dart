@@ -840,7 +840,7 @@ void main() {
     sub.cancel();
   });
 
-  test('computed query pattern works', () async {
+  test('computations can use others via .asStream', () async {
     final controller = StreamController<int>.broadcast(
         sync: true); // Use a broadcast stream to make debugging easier
     final source = controller.stream;
