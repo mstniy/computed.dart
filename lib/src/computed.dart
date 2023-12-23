@@ -423,11 +423,6 @@ class ComputedImpl<T> {
           throw _reactSuppressedException!;
         }
         if (!_async) {
-          //TODO: The comment below seems outdated
-          // If we are the first _evalF in the call stack,
-          // run f() a second time to make sure it returns the same result.
-          // Nested _evalF-s don't do this to avoid calling
-          // deeply nested computations exponentially many times.
           ensureIdempotent() {
             T? f2;
             try {
