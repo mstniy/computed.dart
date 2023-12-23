@@ -210,7 +210,7 @@ FictionaryDatabase db; // Assume connected to a database
 final query = $(() => db.filterByCategory(category.use, includeDeleted.use), async: true).unwrap;
 ```
 
-Passing `async: true` disables some checks which don't apply for computations starting and returning asynchronous operations.  
+Passing `async: true` disables some checks which don't apply for computations starting asynchronous operations.  
 `unwrap` returns a computation representing the last value produced by the last asynchronous operation returned by the computation it is applied to. In this example, it converts the computation from the type `Computed<Future<int>>` to `Computed<int>`.  
 `unwrap` is defined for computations returning `Stream` and `Future`, so the computation in the example would also work if the database returned a `Stream` instead of a `Future`. A database supporting reactive queries might do that.  
 Of course, other computations can use the result of the computed query, as it is a computation itself.
