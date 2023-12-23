@@ -29,7 +29,9 @@ Computed:
 - [FAQ](#FAQ)
 - [Pitfalls](#Pitfalls)
   - [Do not use mutable values in computations](#Donotusemutablevaluesincomputations)
-  - [Do not create new `Future`s inside computations](#DonotcreatenewFuturesinsidecomputations)
+  - [Use the async mode for computations kicking off async operations](#Usetheasyncmodeforcomputationskickingoffasyncoperations)
+  - [Don't `.use` a `Future`/`Stream` inside the computation that created it](#Dont.useaFutureStreaminsidethecomputationthatcreatedit)
+  - [`Future`s returned from computations are not awaited](#Futuresreturnedfromcomputationsarenotawaited)
   - [Do not forget to `.use` or `.react` your data sources](#Donotforgetto.useor.reactyourdatasources)
   - [Keep in mind that `.prev` does not subscribe](#Keepinmindthat.prevdoesnotsubscribe)
   - [`.react` is not `.listen`](#.reactisnot.listen)
@@ -193,9 +195,6 @@ final sum = Computed<int>.withPrev((prev) {
 
 ## <a name='FAQ'></a>FAQ
 
-- Q: How to pass an async function into Computed?
-- A: Short answer is: you can't. The functions passed to Computed should be pure computations, free of side effects. If you are meaning to use an external value as part of the computation, see `.use`. If you want to react to a stream of external events, see `.react`. If you wish to produce external side effects, see `.listen` or `.as[Broadcast]Stream`.
-
 - Q: Why am I getting `Computed expressions must be purely functional. Please use listeners for side effects.`
 - A: On debug mode, Computed runs the given computations twice and checks if both calls return the same value. If this does not hold, it throws this assertion. Possible reasons include mutating and using a mutable value inside the computation or returning a type which does not implement deep comparisons, like `List` or `Set`.
 
@@ -214,9 +213,17 @@ final c = $(() => b ? value.use : 42);
 
 As this may cause Computed to stop tracking `value`, breaking the reactivity of the computation.
 
-### <a name='DonotcreatenewFuturesinsidecomputations'></a>Do not create new `Future`s inside computations
+### <a name='Usetheasyncmodeforcomputationskickingoffasyncoperations'></a>Use the async mode for computations kicking off async operations
 
-This will lead to an infinite loop, assuming you `.use` them afterwards, as each run of the computation will produce a new `Future`.
+This will disable some checks which don't make sense for such computations.
+
+### <a name='Dont.useaFutureStreaminsidethecomputationthatcreatedit'></a>Don't `.use` a `Future`/`Stream` inside the computation that created it
+
+As this will lead to an infinite loop.
+
+### <a name='Futuresreturnedfromcomputationsarenotawaited'></a>`Future`s returned from computations are not awaited
+
+At least for memoization purposes. The re-run pass never awaits, even if a computation returns a `Future`. They will be passed as-is to downstream computations, which might of course `.use` them, then they would effectively be `await`ing them.
 
 ### <a name='Donotforgetto.useor.reactyourdatasources'></a>Do not forget to `.use` or `.react` your data sources
 

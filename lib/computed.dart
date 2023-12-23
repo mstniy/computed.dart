@@ -197,5 +197,5 @@ class NoValueException implements Exception {}
 /// would cause a cyclic dependency.
 class CyclicUseException implements Exception {}
 
-/// Thrown when a computations attempt to do async operations
+/// Thrown when non-async computations attempt to do async operations
 class ComputedAsyncError extends Error {}
