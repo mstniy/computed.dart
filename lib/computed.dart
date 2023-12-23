@@ -6,9 +6,9 @@ import 'src/computed.dart';
 import 'src/future_extension.dart';
 import 'src/stream_extension.dart';
 
-/// Shorthand for creating reactive computations
-Computed<T> $<T>(T Function() f, {bool memoized = true}) =>
-    Computed(f, memoized: memoized);
+/// Shorthand for creating reactive computations. See [Computed].
+Computed<T> $<T>(T Function() f, {bool memoized = true, bool async = false}) =>
+    Computed(f, memoized: memoized, async: async);
 
 /// Reactive computation with a return type of [T].
 ///
@@ -21,15 +21,18 @@ class Computed<T> {
   /// other computations using its value will be re-run every time this computation
   /// is re-run, even if it's value stays the same, except for the extra computations
   /// being done in debug mode to check for non-idempotency.
-  Computed(T Function() f, {bool memoized = true})
-      : _impl = ComputedImpl(f, memoized);
+  /// If [async] is set to true, the computation is allowed to run asynchronous operations
+  /// and will only be re-run if absolutely necessary. This disables some idempotency and
+  /// cyclic dependency checks.
+  Computed(T Function() f, {bool memoized = true, bool async = false})
+      : _impl = ComputedImpl(f, memoized, async);
 
   /// As [Computed], but calls the given function with its last value.
   ///
   /// If the computation has no value yet, [prev] is set to [initialPrev].
   Computed.withPrev(T Function(T prev) f,
-      {required T initialPrev, bool memoized = true})
-      : _impl = ComputedImpl.withPrev(f, initialPrev, memoized);
+      {required T initialPrev, bool memoized = true, bool async = false})
+      : _impl = ComputedImpl.withPrev(f, initialPrev, memoized, async);
 
   /// Subscribes to this computation.
   ///

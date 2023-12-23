@@ -107,7 +107,7 @@ class GlobalCtx {
               throw NoValueException();
             }
             return rvoe._voe!.value;
-          }, true),
+          }, true, false),
           currentValue != null
               ? _ValueOrException.value(currentValue())
               : null);
@@ -140,6 +140,7 @@ class ComputedImpl<T> {
   // Always true for routers, which might have both memoized (.use)
   // and non-memoized (.react) listeners.
   final bool _memoized;
+  final bool _async;
   _Token? _lastUpdate;
 
   bool get _novalue => _lastResult == null;
@@ -179,12 +180,13 @@ class ComputedImpl<T> {
   T Function() _f;
   final T Function() _origF;
 
-  ComputedImpl(this._f, this._memoized) : _origF = _f;
+  ComputedImpl(this._f, this._memoized, this._async) : _origF = _f;
 
   static ComputedImpl<T> withPrev<T>(
-      T Function(T prev) f, T initialPrev, bool memoized) {
+      T Function(T prev) f, T initialPrev, bool memoized, bool async) {
     late ComputedImpl<T> c;
-    c = ComputedImpl<T>(() => f(c._prevResult?.value ?? initialPrev), memoized);
+    c = ComputedImpl<T>(
+        () => f(c._prevResult?.value ?? initialPrev), memoized, async);
     c._initialPrev = initialPrev;
 
     return c;
@@ -383,11 +385,18 @@ class ComputedImpl<T> {
     }
   }
 
-  T _evalFInSyncZone() {
-    final zone = Zone.current[_isComputedZone] != null
-        ? Zone.current
-        : Zone.current.fork(
-            specification: computedZone, zoneValues: {_isComputedZone: true});
+  T _evalFInZone() {
+    final Zone zone;
+    final inSyncZone = Zone.current[_isComputedZone] != null;
+    if (_async) {
+      zone = inSyncZone ? Zone.current.parent! : Zone.current;
+    } else {
+      zone = inSyncZone
+          ? Zone.current
+          : Zone.current.fork(
+              specification: computedZone, zoneValues: {_isComputedZone: true});
+    }
+
     return zone.run(_f);
   }
 
@@ -403,47 +412,52 @@ class ComputedImpl<T> {
       _curUpstreamComputations = {};
       try {
         GlobalCtx._currentComputation = this;
-        final newResult = _ValueOrException.value(_evalFInSyncZone());
+        final newResult = _ValueOrException.value(_evalFInZone());
         if (_reactSuppressedException != null) {
           // Throw it here
           throw _reactSuppressedException!;
         }
-        // If we are the first _evalF in the call stack,
-        // run f() a second time to make sure it returns the same result.
-        // Nested _evalF-s don't do this to avoid calling
-        // deeply nested computations exponentially many times.
-        ast() {
-          T? f2;
-          try {
-            f2 = _evalFInSyncZone();
-          } catch (_) {
-            return false;
+        if (!_async) {
+          //TODO: The comment below seems outdated
+          // If we are the first _evalF in the call stack,
+          // run f() a second time to make sure it returns the same result.
+          // Nested _evalF-s don't do this to avoid calling
+          // deeply nested computations exponentially many times.
+          ast() {
+            T? f2;
+            try {
+              f2 = _evalFInZone();
+            } catch (_) {
+              return false;
+            }
+            return f2 == newResult._value;
           }
-          return f2 == newResult._value;
-        }
 
-        assert(ast(),
-            "Computed expressions must be purely functional. Please use listeners for side effects.");
+          assert(ast(),
+              "Computed expressions must be purely functional. Please use listeners for side effects.");
+        }
         _lastResult = newResult;
       } on NoValueException {
         gotNVE = true;
         // Not much we can do
-        // Run the computation once again and make sure
-        // it throws NoValueException again
-        ast() {
-          try {
-            _evalFInSyncZone();
-          } on NoValueException {
-            // Good
-            return true;
-          } catch (_) {
-            // Pass
+        if (!_async) {
+          // Run the computation once again and make sure
+          // it throws NoValueException again
+          ast() {
+            try {
+              _evalFInZone();
+            } on NoValueException {
+              // Good
+              return true;
+            } catch (_) {
+              // Pass
+            }
+            return false;
           }
-          return false;
-        }
 
-        assert(ast(),
-            "Computed expressions must be purely functional. Please use listeners for side effects.");
+          assert(ast(),
+              "Computed expressions must be purely functional. Please use listeners for side effects.");
+        }
         rethrow;
       } catch (e) {
         // Do not re-run f in this path to check for side effects
@@ -615,11 +629,19 @@ class ComputedImpl<T> {
         caller._curUpstreamComputations![this]?._memoized ?? true,
         _lastResult);
 
-    if (_lastUpdate != GlobalCtx._currentUpdate &&
-        (_dss == null || _lastResult == null)) {
+    final bool shouldEval;
+    if (!_async) {
+      shouldEval = _lastUpdate != GlobalCtx._currentUpdate &&
+          (_dss == null || _lastResult == null);
       // This means that this [use] happened outside the control of [_rerunGraph]
       // so be prudent and force a re-computation.
       // The main benefit is that this helps us detect cyclic dependencies.
+    } else {
+      shouldEval =
+          _lastUpdate != GlobalCtx._currentUpdate && _lastResult == null;
+    }
+
+    if (shouldEval) {
       _evalF();
     }
 

@@ -2297,4 +2297,67 @@ void main() {
       sub.cancel();
     });
   });
+
+  group('async mode', () {
+    test('disables the sync zone and idempotency checks', () async {
+      var cCnt = 0;
+
+      final c = $(() {
+        cCnt++;
+        return Future.microtask(() => 42);
+      }, async: true);
+
+      var lCnt = 0;
+      Future<int>? lastRes;
+
+      final sub = c.listen((event) {
+        lCnt++;
+        lastRes = event;
+      }, (e) => fail(e.toString()));
+
+      expect(cCnt, 1);
+      expect(lCnt, 0);
+      await Future.value();
+      expect(cCnt, 1);
+      expect(lCnt, 1);
+      expect(await lastRes, 42);
+
+      sub.cancel();
+    });
+
+    test('disables cycle check re-runs', () async {
+      var c1Cnt = 0;
+      final c1 = $(() {
+        c1Cnt++;
+        return 42;
+      }, async: true);
+
+      final completer = Completer<int>();
+
+      final c2 = $(() => c1.use + completer.future.useOr(0));
+
+      var lCnt = 0;
+      int? lastRes;
+
+      final sub = c2.listen((event) {
+        lCnt++;
+        lastRes = event;
+      }, (e) => fail(e.toString()));
+
+      expect(c1Cnt, 1);
+      expect(lCnt, 0);
+      await Future.value();
+      expect(c1Cnt, 1);
+      expect(lCnt, 1);
+      expect(lastRes, 42);
+
+      completer.complete(1);
+      await Future.value();
+      expect(c1Cnt, 1);
+      expect(lCnt, 2);
+      expect(lastRes, 43);
+
+      sub.cancel();
+    });
+  });
 }
