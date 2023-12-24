@@ -24,6 +24,46 @@ void main() {
       expect(lastEvent, 1);
     });
 
+    test('dedups equal values', () async {
+      final s = ValueStream(sync: true);
+
+      var lCnt = 0;
+      int? lastEvent;
+
+      var eCnt = 0;
+      int? lastError;
+
+      s.listen((event) {
+        lCnt++;
+        lastEvent = event;
+      }, onError: (err) {
+        eCnt++;
+        lastError = err;
+      });
+
+      s.add(0);
+      expect(lCnt, 1);
+      expect(lastEvent, 0);
+      s.add(0);
+      expect(lCnt, 1);
+      s.add(1);
+      expect(lCnt, 2);
+      expect(lastEvent, 1);
+      expect(eCnt, 0);
+      s.addError(1);
+      expect(eCnt, 1);
+      expect(lCnt, 2);
+      expect(lastError, 1);
+      s.addError(1);
+      expect(eCnt, 2);
+      expect(lCnt, 2);
+      expect(lastError, 1);
+      s.add(1);
+      expect(eCnt, 2);
+      expect(lCnt, 3);
+      expect(lastEvent, 1);
+    });
+
     test('can add values after attaching listeners', () async {
       final s = ValueStream(sync: true);
 

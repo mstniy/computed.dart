@@ -29,9 +29,10 @@ class ValueStream<T> extends Stream<T> {
     _setController();
   }
 
-  /// Adds the given value to this stream.
+  /// Adds the given value to this stream, unless if it compares `==` to the last added value.
   /// If there are no listeners, buffers the last value.
   void add(T t) {
+    if (_lastWasError == false && _lastValue == t) return;
     _lastWasError = false;
     _lastValue = t;
     if (_controller.hasListener) {
