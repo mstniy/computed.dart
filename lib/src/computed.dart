@@ -432,6 +432,7 @@ class ComputedImpl<T> {
     _dirty = false;
     final oldComputation = GlobalCtx._currentComputation;
     var gotNVE = false;
+    bool shouldNotify = false;
     try {
       final oldPrevResult = _prevResult;
       final oldUpstreamComputations = _lastUpstreamComputations;
@@ -464,8 +465,9 @@ class ComputedImpl<T> {
         _lastResult = newResult._voe;
       }
 
-      final shouldNotify = !_memoized ||
-          (_prevResult?.shouldNotifyMemoized(_lastResult) ?? true);
+      shouldNotify = !gotNVE &&
+          (!_memoized ||
+              (_prevResult?.shouldNotifyMemoized(_lastResult) ?? true));
       if (gotNVE || shouldNotify) {
         // Commit the changes to the DAG
         for (var e in _curUpstreamComputations!.entries) {
@@ -500,7 +502,6 @@ class ComputedImpl<T> {
           for (var down in _memoizedDownstreamComputations) {
             if (!down._computing) down._dirty = true;
           }
-          _notifyListeners();
         } else {
           // If the result of the computation is the same as the last time,
           // undo its effects on the node state to preserve prev values.
@@ -510,6 +511,10 @@ class ComputedImpl<T> {
         }
       }
     } finally {
+      if (shouldNotify) {
+        GlobalCtx._currentComputation = null;
+        _notifyListeners();
+      }
       GlobalCtx._currentComputation = oldComputation;
     }
   }

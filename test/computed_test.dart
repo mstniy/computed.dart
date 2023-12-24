@@ -1563,6 +1563,34 @@ void main() {
     sub2.cancel();
   });
 
+  test('(regression) listeners cannot .use', () async {
+    final s = ValueStream<int>();
+    s.add(0);
+
+    final c1 = Computed(() => s.use);
+    final c2 = Computed(() => c1.use);
+
+    var flag = false;
+
+    final sub = c2.listen((event) {
+      try {
+        s.use;
+        fail("Must have thrown");
+      } catch (e) {
+        expect(e, isA<StateError>());
+        expect((e as StateError).message,
+            "`use` and `prev` are only allowed inside computations.");
+        flag = true;
+      }
+    }, (e) => fail(e.toString()));
+
+    await Future.value();
+
+    expect(flag, true);
+
+    sub.cancel();
+  });
+
   group('mocks', () {
     test('fix and unmock works', () async {
       final controller = StreamController<int>.broadcast(
