@@ -347,7 +347,7 @@ class ComputedImpl<T> {
             if (cur == this) {
               _evalF();
             } else {
-              cur._maybeEvalF();
+              cur.onDependencyUpdated();
             }
           } on NoValueException {
             // Do not evaluate the children
@@ -383,7 +383,7 @@ class ComputedImpl<T> {
     }
   }
 
-  void _maybeEvalF() {
+  void onDependencyUpdated() {
     if (_lastResult == null || _dss != null) {
       _evalF();
       return;
