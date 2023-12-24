@@ -34,6 +34,13 @@ class _ValueOrException<T> {
   }
 }
 
+class _StackTraceValueOrException<T> {
+  final StackTrace? _st;
+  final _ValueOrException<T> _voe;
+
+  _StackTraceValueOrException(this._st, this._voe);
+}
+
 class _RouterValueOrException<T> {
   final ComputedImpl<T> _router;
   _ValueOrException<T>? _voe;
@@ -403,6 +410,21 @@ class ComputedImpl<T> {
     return zone.run(_f);
   }
 
+  _StackTraceValueOrException<T> _evalFGuarded() {
+    try {
+      final result = _ValueOrException.value(_evalFInZone());
+      if (_reactSuppressedException != null) {
+        // Throw it here
+        final exc = _reactSuppressedException!;
+        _reactSuppressedException = null;
+        throw exc;
+      }
+      return _StackTraceValueOrException(null, result);
+    } catch (e, s) {
+      return _StackTraceValueOrException(s, _ValueOrException.exc(e));
+    }
+  }
+
   // Also notifies the listeners (but not downstream computations) if necessary
   void _evalF() {
     const idempotencyFailureMessage =
@@ -415,96 +437,77 @@ class ComputedImpl<T> {
       final oldUpstreamComputations = _lastUpstreamComputations;
       _prevResult = _lastResult;
       _curUpstreamComputations = {};
-      try {
-        GlobalCtx._currentComputation = this;
-        final newResult = _ValueOrException.value(_evalFInZone());
-        if (_reactSuppressedException != null) {
-          // Throw it here
-          throw _reactSuppressedException!;
-        }
-        if (!_async) {
-          ensureIdempotent() {
-            T? f2;
-            try {
-              f2 = _evalFInZone();
-            } catch (_) {
-              return false;
-            }
-            return f2 == newResult._value;
+      GlobalCtx._currentComputation = this;
+      final newResult = _evalFGuarded();
+      if (!_async &&
+          (newResult._voe._isValue ||
+              newResult._voe._exc is NoValueException)) {
+        // Run f() once again and see if it behaves identically
+        bool ensureIdempotent() {
+          final idempotentResult = _evalFGuarded();
+          if (newResult._voe._isValue) {
+            return idempotentResult._voe._isValue &&
+                idempotentResult._voe._value == newResult._voe._value;
+          } else {
+            assert(newResult._voe._exc is NoValueException);
+            return !idempotentResult._voe._isValue &&
+                idempotentResult._voe._exc is NoValueException;
           }
-
-          assert(ensureIdempotent(), idempotencyFailureMessage);
         }
-        _lastResult = newResult;
-      } on NoValueException {
+
+        assert(ensureIdempotent(), idempotencyFailureMessage);
+      }
+
+      if (!newResult._voe._isValue && newResult._voe._exc is NoValueException) {
         gotNVE = true;
-        // Not much we can do
-        if (!_async) {
-          // Run the computation once again and make sure
-          // it throws NoValueException again
-          ensureIdempotent() {
-            try {
-              _evalFInZone();
-            } on NoValueException {
-              // Good
-              return true;
-            } catch (_) {
-              // Pass
-            }
-            return false;
-          }
+      } else {
+        _lastResult = newResult._voe;
+      }
 
-          assert(ensureIdempotent(), idempotencyFailureMessage);
-        }
-        rethrow;
-      } catch (e) {
-        // Do not re-run f in this path to check for side effects
-        // as thrown objects might not implement ==
-        _lastResult = _ValueOrException.exc(e);
-      } finally {
-        _reactSuppressedException = null;
-        final shouldNotify = !_memoized ||
-            (_prevResult?.shouldNotifyMemoized(_lastResult) ?? true);
-        if (gotNVE || shouldNotify) {
-          // Commit the changes to the DAG
-          for (var e in _curUpstreamComputations!.entries) {
-            final up = e.key;
-            up._addDownstreamComputation(this, e.value._memoized);
-          }
-          final oldDiffNew = _lastUpstreamComputations.keys
-              .toSet()
-              .difference(_curUpstreamComputations!.keys.toSet());
-          for (var up in oldDiffNew) {
-            up._removeDownstreamComputation(this);
-          }
-        }
-        // Even for the non "resultful" case.
-        // So that we can memoize that f threw NoValueException
-        // when ran with a specific set of dependencies, for example.
-        _lastUpstreamComputations = _curUpstreamComputations!;
-        _curUpstreamComputations = null;
-        // Bookkeep the fact the we ran/tried to run this computation
-        // so that we can unlock its downstream during the DAG walk
-        _lastUpdate = GlobalCtx._currentUpdate;
-      }
-      // The "resultful" case (the function either returned or threw an exception other than NoValueException)
-      for (var down in _nonMemoizedDownstreamComputations) {
-        if (!down._computing) down._dirty = true;
-      }
       final shouldNotify = !_memoized ||
           (_prevResult?.shouldNotifyMemoized(_lastResult) ?? true);
-      if (shouldNotify) {
-        _lastResultfulUpstreamComputations = _lastUpstreamComputations;
-        for (var down in _memoizedDownstreamComputations) {
+      if (gotNVE || shouldNotify) {
+        // Commit the changes to the DAG
+        for (var e in _curUpstreamComputations!.entries) {
+          final up = e.key;
+          up._addDownstreamComputation(this, e.value._memoized);
+        }
+        final oldDiffNew = _lastUpstreamComputations.keys
+            .toSet()
+            .difference(_curUpstreamComputations!.keys.toSet());
+        for (var up in oldDiffNew) {
+          up._removeDownstreamComputation(this);
+        }
+      }
+
+      // Even if f() throws NoValueException
+      // So that we can memoize that f threw NoValueException
+      // when ran with a specific set of dependencies, for example.
+      _lastUpstreamComputations = _curUpstreamComputations!;
+      _curUpstreamComputations = null;
+      // Bookkeep the fact the we ran/tried to run this computation
+      // so that we can unlock its downstream during the DAG walk
+      _lastUpdate = GlobalCtx._currentUpdate;
+
+      if (gotNVE) {
+        Error.throwWithStackTrace(newResult._voe._exc!, newResult._st!);
+      } else {
+        for (var down in _nonMemoizedDownstreamComputations) {
           if (!down._computing) down._dirty = true;
         }
-        _notifyListeners();
-      } else {
-        // If the result of the computation is the same as the last time,
-        // undo its effects on the node state to preserve prev values.
-        _lastResult = _prevResult;
-        _prevResult = oldPrevResult;
-        _lastUpstreamComputations = oldUpstreamComputations;
+        if (shouldNotify) {
+          _lastResultfulUpstreamComputations = _lastUpstreamComputations;
+          for (var down in _memoizedDownstreamComputations) {
+            if (!down._computing) down._dirty = true;
+          }
+          _notifyListeners();
+        } else {
+          // If the result of the computation is the same as the last time,
+          // undo its effects on the node state to preserve prev values.
+          _lastResult = _prevResult;
+          _prevResult = oldPrevResult;
+          _lastUpstreamComputations = oldUpstreamComputations;
+        }
       }
     } finally {
       GlobalCtx._currentComputation = oldComputation;
