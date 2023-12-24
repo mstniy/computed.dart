@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:computed/computed.dart';
 import 'package:computed/src/computed.dart';
+import 'package:computed/utils/streams.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -2414,6 +2415,56 @@ void main() {
 
       sub.cancel();
     });
+
+    test('unexpected .use does not re-compute upstream', () async {
+      final s1 = ValueStream<int>(sync: true);
+      s1.add(0);
+      var c1Cnt = 0;
+
+      final c1 = $(() {
+        c1Cnt++;
+        return s1.use;
+      });
+
+      final sub1 = c1.listen((event) {}, (e) => fail(e.toString()));
+
+      expect(c1Cnt, 2);
+
+      await Future.value();
+
+      expect(c1Cnt, 4);
+
+      final s2 = ValueStream<int>(sync: true);
+      s2.add(0);
+      var use1 = false;
+
+      var c2Cnt = 0;
+
+      final c2 = $(() {
+        c2Cnt++;
+        return s2.use + (use1 ? c1.use : 0);
+      });
+
+      final sub2 = c2.listen((event) {}, (e) => fail(e.toString()));
+
+      expect(c2Cnt, 2);
+
+      await Future.value();
+
+      expect(c1Cnt, 4);
+      expect(c2Cnt, 4);
+
+      use1 = true;
+      s2.add(1);
+
+      await Future.value();
+
+      expect(c1Cnt, 4);
+      expect(c2Cnt, 6);
+
+      sub1.cancel();
+      sub2.cancel();
+    });
   });
 
   group('async mode', () {
@@ -2439,41 +2490,6 @@ void main() {
       expect(cCnt, 1);
       expect(lCnt, 1);
       expect(await lastRes, 42);
-
-      sub.cancel();
-    });
-
-    test('disables cycle check re-runs', () async {
-      var c1Cnt = 0;
-      final c1 = Computed.async(() {
-        c1Cnt++;
-        return 42;
-      });
-
-      final completer = Completer<int>();
-
-      final c2 = $(() => c1.use + completer.future.useOr(0));
-
-      var lCnt = 0;
-      int? lastRes;
-
-      final sub = c2.listen((event) {
-        lCnt++;
-        lastRes = event;
-      }, (e) => fail(e.toString()));
-
-      expect(c1Cnt, 1);
-      expect(lCnt, 0);
-      await Future.value();
-      expect(c1Cnt, 1);
-      expect(lCnt, 1);
-      expect(lastRes, 42);
-
-      completer.complete(1);
-      await Future.value();
-      expect(c1Cnt, 1);
-      expect(lCnt, 2);
-      expect(lastRes, 43);
 
       sub.cancel();
     });

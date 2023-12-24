@@ -23,8 +23,8 @@ class Computed<T> {
       : _impl = ComputedImpl(f, memoized, false);
 
   /// Creates an "async" computation, which is allowed to run asynchronous operations
-  /// and will only be re-run if absolutely necessary. This disables some idempotency and
-  /// cyclic dependency checks.
+  /// and will only be re-run if absolutely necessary. This also disables the idempotency
+  /// check in debug mode.
   Computed.async(T Function() f, {bool memoized = true})
       : _impl = ComputedImpl(f, memoized, true);
 

@@ -614,6 +614,22 @@ class ComputedImpl<T> {
     }
   }
 
+  void _checkCycle(ComputedImpl caller) {
+    final seen = <ComputedImpl>{};
+    void dfs(ComputedImpl c) {
+      if (seen.contains(c)) return;
+      seen.add(c);
+      seen.addAll(c._lastUpstreamComputations.keys);
+      for (var up in c._lastUpstreamComputations.keys) {
+        dfs(up);
+      }
+    }
+
+    dfs(this);
+
+    if (seen.contains(caller)) throw CyclicUseException();
+  }
+
   T get use {
     if (_computing) throw CyclicUseException();
 
@@ -621,25 +637,17 @@ class ComputedImpl<T> {
     if (GlobalCtx._reacting) {
       throw StateError("`use` and `react` not allowed inside react callbacks.");
     }
-    // Make sure the caller is subscribed
-    caller._curUpstreamComputations![this] = _MemoizedValueOrException(
-        // If the caller is subscribed in a non-memoizing way, keep it.
-        caller._curUpstreamComputations![this]?._memoized ?? true,
-        _lastResult);
-
-    final bool shouldEval;
-    if (!_async) {
-      shouldEval = _lastUpdate != GlobalCtx._currentUpdate &&
-          (_dss == null || _lastResult == null);
-      // This means that this [use] happened outside the control of [_rerunGraph]
-      // so be prudent and force a re-computation.
-      // The main benefit is that this helps us detect cyclic dependencies.
-    } else {
-      shouldEval =
-          _lastUpdate != GlobalCtx._currentUpdate && _lastResult == null;
+    if (caller._curUpstreamComputations![this] == null) {
+      // Check for cycles
+      _checkCycle(caller);
+      // Make sure the caller is subscribed
+      caller._curUpstreamComputations![this] = _MemoizedValueOrException(
+          // If the caller is subscribed in a non-memoizing way, keep it.
+          caller._curUpstreamComputations![this]?._memoized ?? true,
+          _lastResult);
     }
 
-    if (shouldEval) {
+    if (_lastUpdate != GlobalCtx._currentUpdate && _lastResult == null) {
       _evalF();
     }
 
