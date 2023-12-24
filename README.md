@@ -27,6 +27,7 @@ Computed:
 - [Testing](#testing)
 - [Looking at the past](#looking-at-the-past)
 - [Computed queries](#computed-queries)
+- [Stream utilities](#stream-utilities)
 - [FAQ](#faq)
 - [Pitfalls](#pitfalls)
   - [Do not use mutable values in computations](#do-not-use-mutable-values-in-computations)
@@ -215,6 +216,10 @@ Using `Computed.async` disables some checks which don't apply for computations s
 `unwrap` returns a computation representing the last value produced by the last asynchronous operation returned by the computation it is applied to. In this example, it converts the computation from the type `Computed<Future<int>>` to `Computed<int>`.  
 `unwrap` is defined for computations returning `Stream` and `Future`, so the computation in the example would also work if the database returned a `Stream` instead of a `Future`. A database supporting reactive queries might do that.  
 Of course, other computations can use the result of the computed query, as it is a computation itself.
+
+## <a name='stream-utilities'></a>Stream utilities
+
+Computed includes a minimal set of `Stream`s likely to be useful in a reactive setting. You can find them at [lib/utils](lib/utils).
 
 ## <a name='faq'></a>FAQ
 
