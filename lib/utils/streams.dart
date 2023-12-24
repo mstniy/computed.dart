@@ -1,5 +1,15 @@
 import 'dart:async';
 
+/// A [StreamController]-like class.
+///
+/// This class:
+/// - Is a [Stream] by itself.
+/// - Is not a broadcast stream (cannot have multiple listeners).
+/// - Does not buffer added values/errors if there are no listeners, except for the last one.
+/// - Can be re-listened after the existing listener is cancelled.
+/// - Produces the last value or error to new listeners, if there is any.
+///
+/// Note that most of these properties are similar to rxdart's BehaviorSubject.
 class ValueStream<T> extends Stream<T> {
   late StreamController<T> _controller;
   T? _lastValue;
@@ -19,6 +29,8 @@ class ValueStream<T> extends Stream<T> {
     _setController();
   }
 
+  /// Adds the given value to this stream.
+  /// If there are no listeners, buffers the last value.
   void add(T t) {
     _lastWasError = false;
     _lastValue = t;
@@ -28,6 +40,8 @@ class ValueStream<T> extends Stream<T> {
     }
   }
 
+  /// Adds the given error to this stream.
+  /// If there are no listeners, buffers the last error.
   void addError(Object o) {
     _lastWasError = true;
     _lastError = o;
@@ -64,7 +78,14 @@ class ValueStream<T> extends Stream<T> {
   }
 }
 
+/// A [Stream] of resources.
+///
+/// This class is similar in semantics to [ValueStream], except that it creates new resources
+/// using the provided function when a new listener is attached, unless if there is an existing
+/// non-disposed resource, and disposes of the existing resource, if there is any, upon listener
+/// cancellation and the addition of a new resource/error.
 class ResourceStream<T> extends ValueStream<T> {
+  /// A [ResourceStream] with functions to create and dispose of resources.
   ResourceStream(this._create, this._dispose,
       {void Function()? onListen,
       FutureOr<void> Function()? onCancel,
@@ -94,12 +115,18 @@ class ResourceStream<T> extends ValueStream<T> {
     super._onCancel();
   }
 
+  /// Adds the given resource to this stream.
+  /// If there is an existing resource, disposes of it.
+  /// If there are no listeners, buffers the last resource.
   @override
   void add(T t) {
     _maybeDispose();
     super.add(t);
   }
 
+  /// Adds the given error to this stream.
+  /// If there is an existing resource, disposes of it.
+  /// If there are no listeners, buffers the last error.
   @override
   void addError(Object o) {
     _maybeDispose();
