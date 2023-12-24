@@ -418,11 +418,10 @@ void main() {
 
       var cCnt = 0;
 
-      final c = $(() {
+      final c = Computed.async(() {
         cCnt++;
         return streamFor(outerStream.use);
-      }, async: true)
-          .unwrap;
+      }).unwrap;
 
       var lCnt = 0;
       int? lastRes;
@@ -580,12 +579,11 @@ void main() {
 
       var cCnt = 0;
 
-      final c = $(() {
+      final c = Computed.async(() {
         cCnt++;
         final val = stream.use;
         return Future.microtask(() => val);
-      }, async: true)
-          .unwrap;
+      }).unwrap;
 
       var lCnt = 0;
       int? lastRes;
@@ -2422,10 +2420,10 @@ void main() {
     test('disables the sync zone and idempotency checks', () async {
       var cCnt = 0;
 
-      final c = $(() {
+      final c = Computed.async(() {
         cCnt++;
         return Future.microtask(() => 42);
-      }, async: true);
+      });
 
       var lCnt = 0;
       Future<int>? lastRes;
@@ -2447,10 +2445,10 @@ void main() {
 
     test('disables cycle check re-runs', () async {
       var c1Cnt = 0;
-      final c1 = $(() {
+      final c1 = Computed.async(() {
         c1Cnt++;
         return 42;
-      }, async: true);
+      });
 
       final completer = Completer<int>();
 

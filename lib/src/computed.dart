@@ -406,7 +406,7 @@ class ComputedImpl<T> {
   // Also notifies the listeners (but not downstream computations) if necessary
   void _evalF() {
     const idempotencyFailureMessage =
-        "Computed expressions must be purely functional. Please use listeners for side effects. For computations creating asynchronous operations, make sure to set `async: true`.";
+        "Computed expressions must be purely functional. Please use listeners for side effects. For computations creating asynchronous operations, make sure to use `Computed.async`.";
     _dirty = false;
     final oldComputation = GlobalCtx._currentComputation;
     var gotNVE = false;
