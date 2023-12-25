@@ -13,14 +13,11 @@ final _isComputedZone = _Token();
 class _ValueOrException<T> {
   final bool _isValue;
   Object? _exc;
+  StackTrace? _st;
   T? _value;
 
-  _ValueOrException.value(T value)
-      : _isValue = true,
-        _value = value;
-  _ValueOrException.exc(Object exc)
-      : _isValue = false,
-        _exc = exc;
+  _ValueOrException.value(this._value) : _isValue = true;
+  _ValueOrException.exc(this._exc, this._st) : _isValue = false;
 
   T get value {
     if (_isValue) return _value as T;
@@ -32,13 +29,6 @@ class _ValueOrException<T> {
         (_isValue && _value != other?._value) ||
         (!_isValue && _exc != other?._exc);
   }
-}
-
-class _StackTraceValueOrException<T> {
-  final StackTrace? _st;
-  final _ValueOrException<T> _voe;
-
-  _StackTraceValueOrException(this._st, this._voe);
 }
 
 class _RouterValueOrException<T> {
@@ -163,6 +153,7 @@ class ComputedImpl<T> {
 
   bool get _computing => _curUpstreamComputations != null;
   Object? _reactSuppressedException;
+  StackTrace? _reactSuppressedExceptionStackTrace;
   Map<ComputedImpl, _MemoizedValueOrException>? _curUpstreamComputations;
 
   final _memoizedDownstreamComputations = <ComputedImpl>{};
@@ -229,7 +220,7 @@ class ComputedImpl<T> {
         GlobalCtx._routerExpando[_dss!._ds] as _RouterValueOrException<T>;
     if (rvoe._voe == null || rvoe._voe!._isValue || rvoe._voe!._exc != err) {
       // Update the global last value cache
-      rvoe._voe = _ValueOrException<T>.exc(err);
+      rvoe._voe = _ValueOrException<T>.exc(err, StackTrace.current);
     } else if (_nonMemoizedDownstreamComputations.isEmpty) {
       return;
     }
@@ -246,23 +237,20 @@ class ComputedImpl<T> {
         // Might set lastResult, won't notify the listener just yet (as that is against the Stream contract)
       } on NoValueException {
         // It is fine if we don't have a value yet
-      } catch (e) {
-        // For any other exception,
-        // schedule an onError call
-        if (onError != null) {
-          scheduleMicrotask(() {
-            onError(e);
-          });
-        }
       }
     }
     _listeners.add(sub);
     if (!_novalue) {
-      if (!_lastResult!._isValue && onError != null) {
+      if (!_lastResult!._isValue) {
         final lastError = _lastResult!._exc!;
-        scheduleMicrotask(() {
-          onError(lastError);
-        });
+        final lastST = _lastResult!._st!;
+        if (onError != null) {
+          scheduleMicrotask(() {
+            onError(lastError);
+          });
+        } else if (_listeners.length == 1) {
+          Zone.current.handleUncaughtError(lastError, lastST);
+        }
       } else if (_lastResult!._isValue && onData != null) {
         final lastResult = _lastResult!._value as T;
         scheduleMicrotask(() {
@@ -410,18 +398,20 @@ class ComputedImpl<T> {
     return zone.run(_f);
   }
 
-  _StackTraceValueOrException<T> _evalFGuarded() {
+  _ValueOrException<T> _evalFGuarded() {
     try {
       final result = _ValueOrException.value(_evalFInZone());
       if (_reactSuppressedException != null) {
         // Throw it here
         final exc = _reactSuppressedException!;
+        final st = _reactSuppressedExceptionStackTrace!;
         _reactSuppressedException = null;
-        throw exc;
+        _reactSuppressedExceptionStackTrace = null;
+        Error.throwWithStackTrace(exc, st);
       }
-      return _StackTraceValueOrException(null, result);
+      return result;
     } catch (e, s) {
-      return _StackTraceValueOrException(s, _ValueOrException.exc(e));
+      return _ValueOrException.exc(e, s);
     }
   }
 
@@ -439,30 +429,33 @@ class ComputedImpl<T> {
       _prevResult = _lastResult;
       _curUpstreamComputations = {};
       GlobalCtx._currentComputation = this;
-      final newResult = _evalFGuarded();
+      var newResult = _evalFGuarded();
       if (!_async &&
-          (newResult._voe._isValue ||
-              newResult._voe._exc is NoValueException)) {
+          (newResult._isValue || newResult._exc is NoValueException)) {
         // Run f() once again and see if it behaves identically
         bool ensureIdempotent() {
           final idempotentResult = _evalFGuarded();
-          if (newResult._voe._isValue) {
-            return idempotentResult._voe._isValue &&
-                idempotentResult._voe._value == newResult._voe._value;
+          if (newResult._isValue) {
+            return idempotentResult._isValue &&
+                idempotentResult._value == newResult._value;
           } else {
-            assert(newResult._voe._exc is NoValueException);
-            return !idempotentResult._voe._isValue &&
-                idempotentResult._voe._exc is NoValueException;
+            assert(newResult._exc is NoValueException);
+            return !idempotentResult._isValue &&
+                idempotentResult._exc is NoValueException;
           }
         }
 
-        assert(ensureIdempotent(), idempotencyFailureMessage);
+        try {
+          assert(ensureIdempotent(), idempotencyFailureMessage);
+        } on AssertionError catch (e, s) {
+          newResult = _ValueOrException.exc(e, s);
+        }
       }
 
-      if (!newResult._voe._isValue && newResult._voe._exc is NoValueException) {
+      if (!newResult._isValue && newResult._exc is NoValueException) {
         gotNVE = true;
       } else {
-        _lastResult = newResult._voe;
+        _lastResult = newResult;
       }
 
       shouldNotify = !gotNVE &&
@@ -492,7 +485,7 @@ class ComputedImpl<T> {
       _lastUpdate = GlobalCtx._currentUpdate;
 
       if (gotNVE) {
-        Error.throwWithStackTrace(newResult._voe._exc!, newResult._st!);
+        Error.throwWithStackTrace(newResult._exc!, newResult._st!);
       } else {
         for (var down in _nonMemoizedDownstreamComputations) {
           if (!down._computing) down._dirty = true;
@@ -522,8 +515,16 @@ class ComputedImpl<T> {
   void _notifyListeners() {
     if (!_lastResult!._isValue) {
       // Exception
+      var onErrorNotified = false;
       for (var listener in _listeners) {
-        if (listener._onError != null) listener._onError!(_lastResult!._exc!);
+        if (listener._onError != null) {
+          onErrorNotified = true;
+          listener._onError!(_lastResult!._exc!);
+        }
+      }
+      if (_listeners.isNotEmpty && !onErrorNotified) {
+        // Propagate to the Zone
+        Zone.current.handleUncaughtError(_lastResult!._exc!, _lastResult!._st!);
       }
     } else {
       for (var listener in _listeners) {
@@ -616,6 +617,7 @@ class ComputedImpl<T> {
         // Do not throw the exception here,
         // as this might cause other .react/.use-s to get skipped
         caller._reactSuppressedException ??= _lastResult!._exc;
+        caller._reactSuppressedExceptionStackTrace ??= _lastResult!._st;
       }
     } finally {
       GlobalCtx._reacting = false;

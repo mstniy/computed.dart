@@ -640,6 +640,48 @@ void main() {
     });
   });
 
+  test('listen invokes handleUncaughtError if needed', () async {
+    var ueCount = 0;
+    Object? lastError;
+    void hUE(Zone self, ZoneDelegate parent, Zone zone, Object error,
+        StackTrace stackTrace) {
+      expect(stackTrace.toString(), contains('myThrower'));
+      ueCount++;
+      lastError = error;
+    }
+
+    void myThrower(int toThrow) => throw toThrow;
+
+    final s = ValueStream(sync: true);
+    s.add(0);
+
+    final c = $(() => myThrower(s.use));
+    final zone = Zone.current
+        .fork(specification: ZoneSpecification(handleUncaughtError: hUE));
+    final sub1 = zone.run(() => c.listen((event) {}, null));
+    await Future.value();
+    expect(ueCount, 1);
+    expect(lastError, 0);
+
+    s.add(1);
+    expect(ueCount, 2);
+    expect(lastError, 1);
+
+    final sub2 = zone.run(() => c.listen((event) {}, (err) {}));
+
+    s.add(2);
+    expect(ueCount, 2);
+
+    sub2.cancel();
+
+    s.add(3);
+    expect(ueCount, 3);
+    expect(lastError, 3);
+
+    sub1.cancel();
+    sub2.cancel();
+  });
+
   test('computation listeners can be changed', () {
     final controller = StreamController<int>.broadcast(
         sync: true); // Use a broadcast stream to make debugging easier
