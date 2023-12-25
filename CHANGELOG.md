@@ -1,3 +1,7 @@
+## 0.4.1 - 2023-12-26
+
+- `ValueStream`: Support initial values
+
 ## 0.4.0 - 2023-12-25
 
 - Added effects: A simpler way to express side effects using multiple data sources/computations
