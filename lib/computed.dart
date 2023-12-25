@@ -36,9 +36,8 @@ class Computed<T> {
       : _impl = ComputedImpl.withPrev(f, initialPrev, memoized, async);
 
   /// Defines an "effect", which is a computation meant to have side effects.
-  static ComputedSubscription<void> effect(void Function() f) {
-    return Computed.async(f).listen(null, null);
-  }
+  static ComputedSubscription<void> effect(void Function() f) =>
+      Computed.async(f).listen(null, null);
 
   /// Subscribes to this computation.
   ///
