@@ -1,3 +1,14 @@
+## 0.4.0 - 2023-12-25
+
+- Added effects: A simpler way to express side effects using multiple data sources/computations
+- Async mode for computations starting async operations
+- `.unwrap` to make computed async operations easier to use
+- Stream utils: `ValueStream` and `ResourceStream`
+- Cycle detection: Walk the dag explicitly instead of recomputing the upstream
+- Unset `_currentComputation` before notifying listeners
+- Subclass-customizable behaviour for when a computation's dependency has changed
+- Trigger the current Zone's `handleUncaughtError` if a computation which has listeners throws but none of the listeners have an error handler
+
 ## 0.3.2 - 2023-12-21
 
 - Allow computations to use other computations via `.asStream`
