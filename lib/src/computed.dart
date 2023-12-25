@@ -342,7 +342,6 @@ class ComputedImpl<T> {
             continue;
           }
         }
-        assert(cur._lastUpdate == GlobalCtx._currentUpdate);
         for (var down in [
           ...cur._memoizedDownstreamComputations,
           ...cur._nonMemoizedDownstreamComputations
@@ -504,6 +503,7 @@ class ComputedImpl<T> {
         }
       }
     } finally {
+      assert(_lastUpdate == GlobalCtx._currentUpdate);
       if (shouldNotify) {
         GlobalCtx._currentComputation = null;
         _notifyListeners();
