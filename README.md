@@ -141,7 +141,7 @@ $(() {
 
 ## <a name='effects'></a>Effects
 
-Effects allow you to define computations with side effects. Like `.listen` and getters which convert computations to data sources (such as `.asStream`), effects ultimately trigger the computation graph.  
+Effects allow you to define computations with side effects. Like `.listen`, effects ultimately trigger the computation graph for the computations they use.  
 Effects are particularly useful if you wish to define side effects depending on multiple data sources or computations:
 
 ```
