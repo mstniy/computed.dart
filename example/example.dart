@@ -17,7 +17,7 @@ void main() async {
     return maybeReversed.use.rebuild((p0) => p0.add(0));
   });
 
-  append0.listen((value) => print(value), () => print('Exception!'));
+  Computed.effect(() => print(append0.use));
 
   // ignore: unused_local_variable
   final unused = $(() {

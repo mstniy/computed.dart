@@ -26,6 +26,7 @@ Computed:
 
 - [Here is how it works](#here-is-how-it-works)
 - [A larger example](#a-larger-example)
+- [Effects](#effects)
 - [Testing](#testing)
 - [Looking at the past](#looking-at-the-past)
 - [Computed queries](#computed-queries)
@@ -65,10 +66,7 @@ Assume for the sake of example that your business logic is to multiply the recei
 Here is how you can do this using Computed:
 
 ```
-final c = $(() => s.use * 2);
-final sub = c.asStream.listen((res){
-    db.write(res);
-});
+$(() => s.use * 2).asStream.listen(db.write);
 ```
 
 That's it. Computed will take care of re-running the computation and calling the listener as needed. Note how you did not need to specify a dependency list for the computation, Computed discovers it automatically. You don't even have any mutable state in your app code.
@@ -139,6 +137,18 @@ $(() {
         filter((x) => x > currentThreshold).
         toList();
 }).asStream.listen(db.write);
+```
+
+## <a name='effects'></a>Effects
+
+Effects allow you to define computations with side effects. Like `.listen` and getters which convert computations to data sources (such as `.asStream`), effects ultimately trigger the computation graph.  
+Effects are particularly useful if you wish to define side effects depending on multiple data sources or computations:
+
+```
+Stream<PageType> activePage;
+Stream<bool> isDarkMode;
+
+Computed.effect(() => sendAnalytics(activePage.use, isDarkMode.use));
 ```
 
 ## <a name='testing'></a>Testing

@@ -81,10 +81,10 @@ void main() async {
       (prev) => Tuple2(prev == null, appState.use),
       initialPrev: null);
 
-  stateIsInitial.listen((state) {
+  Computed.effect(() {
     // Do not save the initial state
-    if (!state!.item1) db.saveState(state.item2);
-  }, (e) => print('Exception: ${e.toString()}'));
+    if (!stateIsInitial.use!.item1) db.saveState(stateIsInitial.use!.item2);
+  });
 
   uiCreateController.add('new todo');
   await Future.delayed(Duration.zero);
