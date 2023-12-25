@@ -22,6 +22,23 @@ void main() {
     expect(flag, true);
   });
 
+  test('effect works', () async {
+    final s = ValueStream(sync: true);
+    s.add(42);
+    int flag = 0;
+
+    final c = $(() => s.use);
+    final effect = Computed.effect(() => flag = c.use);
+
+    await Future.value();
+
+    expect(flag, 42);
+    s.add(43);
+    expect(flag, 43);
+
+    effect.cancel();
+  });
+
   group('streams', () {
     test('can be used as data source', () async {
       final controller = StreamController<int>.broadcast(

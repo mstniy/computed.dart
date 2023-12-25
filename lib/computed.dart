@@ -35,6 +35,11 @@ class Computed<T> {
       {required T initialPrev, bool memoized = true, bool async = false})
       : _impl = ComputedImpl.withPrev(f, initialPrev, memoized, async);
 
+  /// Defines an "effect", which is a computation meant to have side effects.
+  static ComputedSubscription<void> effect(void Function() f) {
+    return Computed.async(f).listen(null, null);
+  }
+
   /// Subscribes to this computation.
   ///
   /// For non-memoized computations, the listener will be called every time
