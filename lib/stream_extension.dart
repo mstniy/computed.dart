@@ -35,7 +35,7 @@ extension StreamComputedExtension<T> on Stream<T> {
   /// If this stream has produced a value or error since the last time the current computation notified its downstream, runs the given functional on the value or error produced by this stream.
   ///
   /// If no onError is provided and the stream has produced an error, the current computation
-  /// will be assumed to have thrown that error at the end.
+  /// will be assumed to have thrown that error at the end if it returns a value.
   /// Also subscribes the current computation to all values and errors produced by this stream.
   /// As a rule of thumb, you should use [react] over [use] if this stream
   /// represents a sequence of events rather than a state.
