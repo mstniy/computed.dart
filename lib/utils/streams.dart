@@ -29,6 +29,17 @@ class ValueStream<T> extends Stream<T> {
     _setController();
   }
 
+  /// Constructs a [ValueStream] with an initial value
+  factory ValueStream.seeded(T initialValue,
+      {void Function()? onListen,
+      FutureOr<void> Function()? onCancel,
+      bool sync = false}) {
+    final res =
+        ValueStream<T>(onListen: onListen, onCancel: onCancel, sync: sync);
+    res.add(initialValue);
+    return res;
+  }
+
   /// Adds the given value to this stream, unless if it compares `==` to the last added value.
   /// If there are no listeners, buffers the last value.
   void add(T t) {

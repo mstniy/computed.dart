@@ -183,6 +183,27 @@ void main() {
             (e as StateError).message, 'Stream has already been listened to.');
       }
     });
+
+    test('seeded works', () async {
+      final s = ValueStream.seeded(0);
+
+      var lCnt = 0;
+      int? lastEvent;
+
+      s.listen((event) {
+        lCnt++;
+        lastEvent = event;
+      }, onError: (e) => fail(e.toString()));
+
+      await Future.value();
+
+      expect(lCnt, 1);
+      expect(lastEvent, 0);
+
+      await Future.value();
+
+      expect(lCnt, 1);
+    });
   });
 
   group('ResourceStream', () {
