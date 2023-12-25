@@ -11,6 +11,8 @@ Computed makes it a breeze to write code that reacts to external events. Just de
 
 Computed:
 
+- Integrates with all the standard data sources and sinks (`Future` and `Stream` on Dart, `Listenable` and `ValueListenable` on Flutter with Computed Flutter)
+- Can be extended to include support for new data sources and sinks (Computed Flutter extends Computed to add support for Flutter-specific types)
 - Automatically discovers and tracks computations' dependencies
 - Re-computes the computations when needed
 - Memoizes computation results
