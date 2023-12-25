@@ -655,27 +655,29 @@ void main() {
     final s = ValueStream(sync: true);
     s.add(0);
 
-    final c = $(() => myThrower(s.use));
+    final c = $(() => myThrower(s.useOr(42)));
     final zone = Zone.current
         .fork(specification: ZoneSpecification(handleUncaughtError: hUE));
     final sub1 = zone.run(() => c.listen((event) {}, null));
-    await Future.value();
     expect(ueCount, 1);
+    expect(lastError, 42);
+    await Future.value();
+    expect(ueCount, 2);
     expect(lastError, 0);
 
     s.add(1);
-    expect(ueCount, 2);
+    expect(ueCount, 3);
     expect(lastError, 1);
 
     final sub2 = zone.run(() => c.listen((event) {}, (err) {}));
 
     s.add(2);
-    expect(ueCount, 2);
+    expect(ueCount, 3);
 
     sub2.cancel();
 
     s.add(3);
-    expect(ueCount, 3);
+    expect(ueCount, 4);
     expect(lastError, 3);
 
     sub1.cancel();
