@@ -163,6 +163,32 @@ class ComputedImpl<T> {
 
   var _dirty = false;
 
+  T get use {
+    if (_computing) throw CyclicUseException();
+
+    final caller = GlobalCtx.currentComputation;
+    if (GlobalCtx._reacting) {
+      throw StateError("`use` and `react` not allowed inside react callbacks.");
+    }
+    if (caller._curUpstreamComputations![this] == null) {
+      // Check for cycles
+      _checkCycle(caller);
+      // Make sure the caller is subscribed
+      caller._curUpstreamComputations![this] = _MemoizedValueOrException(
+          // If the caller is subscribed in a non-memoizing way, keep it.
+          caller._curUpstreamComputations![this]?._memoized ?? true,
+          _lastResult);
+    }
+
+    if (_lastUpdate != GlobalCtx._currentUpdate && _lastResult == null) {
+      _evalF();
+    }
+
+    if (_lastResult == null) throw NoValueException();
+
+    return _lastResult!.value;
+  }
+
   T get prev {
     final caller = GlobalCtx.currentComputation;
     if (caller == this) {
@@ -315,6 +341,19 @@ class ComputedImpl<T> {
     _rerunGraph();
   }
 
+  // This is public so that it can be customized by subclasses
+  void onDependencyUpdated() {
+    if (_lastResult == null || _dss != null) {
+      _evalF();
+      return;
+    }
+    if (!_dirty) {
+      _lastUpdate = GlobalCtx._currentUpdate;
+    } else {
+      _evalF();
+    }
+  }
+
   void _rerunGraph() {
     final numUnsatDep = <ComputedImpl, int>{};
     final noUnsatDep = <ComputedImpl>{this};
@@ -367,18 +406,6 @@ class ComputedImpl<T> {
       } finally {
         done.add(cur);
       }
-    }
-  }
-
-  void onDependencyUpdated() {
-    if (_lastResult == null || _dss != null) {
-      _evalF();
-      return;
-    }
-    if (!_dirty) {
-      _lastUpdate = GlobalCtx._currentUpdate;
-    } else {
-      _evalF();
     }
   }
 
@@ -638,31 +665,5 @@ class ComputedImpl<T> {
     dfs(this);
 
     if (seen.contains(caller)) throw CyclicUseException();
-  }
-
-  T get use {
-    if (_computing) throw CyclicUseException();
-
-    final caller = GlobalCtx.currentComputation;
-    if (GlobalCtx._reacting) {
-      throw StateError("`use` and `react` not allowed inside react callbacks.");
-    }
-    if (caller._curUpstreamComputations![this] == null) {
-      // Check for cycles
-      _checkCycle(caller);
-      // Make sure the caller is subscribed
-      caller._curUpstreamComputations![this] = _MemoizedValueOrException(
-          // If the caller is subscribed in a non-memoizing way, keep it.
-          caller._curUpstreamComputations![this]?._memoized ?? true,
-          _lastResult);
-    }
-
-    if (_lastUpdate != GlobalCtx._currentUpdate && _lastResult == null) {
-      _evalF();
-    }
-
-    if (_lastResult == null) throw NoValueException();
-
-    return _lastResult!.value;
   }
 }
