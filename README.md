@@ -66,10 +66,17 @@ Assume for the sake of example that your business logic is to multiply the recei
 Here is how you can do this using Computed:
 
 ```
-$(() => s.use * 2).asStream.listen(db.write);
+final sub = $(() => s.use * 2).
+  asStream.listen(db.write);
 ```
 
 That's it. Computed will take care of re-running the computation and calling the listener as needed. Note how you did not need to specify a dependency list for the computation, Computed discovers it automatically. You don't even have any mutable state in your app code.
+
+To cancel the listener, you can use `.cancel()`:
+
+```
+sub.cancel();
+```
 
 You can also have computations which use other computations' results:
 
@@ -148,7 +155,13 @@ Effects are particularly useful if you wish to define side effects depending on 
 Stream<PageType> activePage;
 Stream<bool> isDarkMode;
 
-Computed.effect(() => sendAnalytics(activePage.use, isDarkMode.use));
+final sub = Computed.effect(() => sendAnalytics(activePage.use, isDarkMode.use));
+```
+
+Like listeners effects can be cancelled with `.cancel()`:
+
+```
+sub.cancel();
 ```
 
 ## <a name='testing'></a>Testing
