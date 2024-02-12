@@ -1,4 +1,4 @@
-import 'package:computed/computed.dart';
+import '../computed.dart';
 
 import 'computed.dart';
 import 'data_source_subscription.dart';
