@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:computed/computed.dart';
+import '../computed.dart';
 
 /// A zone that disallows most async operations.
 ///

@@ -244,7 +244,7 @@ Of course, other computations can use the result of the computed query, as it is
 
 ## <a name='stream-utilities'></a>Stream utilities
 
-Computed includes a minimal set of `Stream`s likely to be useful in a reactive setting. You can find them at [lib/utils](lib/utils).
+Computed includes a minimal set of `Stream`s likely to be useful in a reactive setting. You can find them at [packages/computed/lib/utils](packages/computed/lib/utils).
 
 ## <a name='faq'></a>FAQ
 
