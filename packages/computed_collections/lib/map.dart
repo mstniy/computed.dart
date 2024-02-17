@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:computed/computed.dart';
+import 'package:computed_collections/change_record.dart';
 import 'package:computed_collections/src/imapspy.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
@@ -30,7 +31,9 @@ class ComputedIMap<K, V> {
   IMap<K, V> lastPrev;
   _ValueOrException<IMap<K, V>>? curRes;
   final _listeners = <ComputedSubscription<IMap<K, V>>>{};
-  final _keyStreams = <K, Set<ValueStream<V?>>>{};
+  final _keyChangeStreams = <K, Set<ValueStream<ChangeRecord<K, V>>>>{};
+  final _keyValueStreams = <K, Set<ValueStream<V?>>>{};
+  final _keyComputations = <K, Computed<V>>{};
   ComputedIMap(IMap<K, V> Function(IMap<K, V> prev) f,
       {required IMap<K, V> initialPrev,
       bool memoized = true,
@@ -40,6 +43,11 @@ class ComputedIMap<K, V> {
       lastPrev = prev;
       return f(IMapSpy.wrap(prev));
     }, initialPrev: initialPrev, memoized: memoized, async: async);
+  }
+
+  Computed<ChangeRecord<K, V>> changes;
+  Computed<ChangeRecord<K, V>> lastChangeFor(K key) {
+    throw "implement";
   }
 
   ComputedSubscription<IMap<K, V>> listen(
@@ -119,19 +127,21 @@ class ComputedIMap<K, V> {
     }
   }
 
-  Stream<V?> operator [](K key) {
-    final streams = _keyStreams.putIfAbsent(key, () => <ValueStream<V?>>{});
-    late ValueStream<V?> stream;
-    stream = streams.isNotEmpty
-        ? streams.first
-        : ValueStream<V?>.seeded(curRes!.value[key], onListen: () {
-            final streams =
-                _keyStreams.putIfAbsent(key, () => <ValueStream<V?>>{});
-            streams.add(stream);
-          }, onCancel: () {
-            final streams = _keyStreams[key]!;
-            streams.remove(stream);
-          });
+  Computed<V?> operator [](K key) {
+    final streams =
+        _keyValueStreams.putIfAbsent(key, () => <ValueStream<V?>>{});
+    ValueStream<V?> stream;
+    if (streams.isNotEmpty) {
+      stream = streams.first;
+    } else {
+      stream = ValueStream<V?>.seeded(ChangeRcurRes!.value[key], onListen: () {
+        final streams = _keyStreams.putIfAbsent(key, () => <ValueStream<V?>>{});
+        streams.add(stream);
+      }, onCancel: () {
+        final streams = _keyStreams[key]!;
+        streams.remove(stream);
+      });
+    }
     return stream;
   }
 }
