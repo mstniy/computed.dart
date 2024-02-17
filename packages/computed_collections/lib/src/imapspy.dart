@@ -5,6 +5,9 @@ class IMapSpy<K, V> {
   final IMap<K, V> wrapped;
   final ISet<K> changedKeys;
 
+  @override
+  int get hashCode => imap.hashCode;
+
   IMapSpy(this.imap, this.wrapped, this.changedKeys);
   IMapSpy.wrap(this.imap)
       : wrapped = imap,
@@ -61,7 +64,6 @@ class IMapSpy<K, V> {
   // TODO: implement comparableEntries
   Iterable<Entry<K, V>> get comparableEntries => throw UnimplementedError();
 
-  // TODO: implement config
   ConfigMap get config => imap.config;
 
   bool contains(K key, V value) {
@@ -313,8 +315,7 @@ class IMapSpy<K, V> {
   // TODO: implement withIdentityEquals
   IMap<K, V> get withIdentityEquals => throw UnimplementedError();
 
-  // TODO: implement toString
-  String toString([bool? prettyPrint]) => throw UnimplementedError();
+  String toString([bool? prettyPrint]) => imap.toString(prettyPrint);
 
   // Weird comparison semantics
   bool operator ==(Object other) {
