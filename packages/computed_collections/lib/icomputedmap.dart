@@ -1,18 +1,20 @@
-import 'dart:async';
-
 import 'package:computed/computed.dart';
 import 'package:computed_collections/change_record.dart';
-import 'package:computed_collections/src/imapspy.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
-import 'package:computed/utils/streams.dart';
 import 'package:meta/meta.dart';
+
+import 'src/computedmap.dart';
 
 /// An in-memory, partially- or fully-observable key-value store.
 /// Similar to the ObservableMap from the `observable` package, but with the following upsides:
 /// - Individual keys can be observed
 /// - Supports immutable snapshots (using fast_immutable_collections)
 abstract class IComputedMap<K, V> {
+  factory IComputedMap.fromChangeStream(
+      Computed<Set<ChangeRecord<K, V>>> stream) {
+    return ChangeStreamComputedMap(stream);
+  }
   Computed<ChangeRecord<K, V>> get changes;
   Computed<ChangeRecord<K, V>> changesFor(K key);
 

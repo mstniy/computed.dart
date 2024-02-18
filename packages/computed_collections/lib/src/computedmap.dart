@@ -1,36 +1,15 @@
 import 'package:computed/computed.dart';
 import 'package:computed_collections/change_record.dart';
 import 'package:computed_collections/icomputedmap.dart';
-import 'package:computed_collections/src/imapspy.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import 'package:computed/utils/streams.dart';
 import 'package:meta/meta.dart';
 
-class _ValueOrException<T> {
-  final bool _isValue;
-  Object? _exc;
-  T? _value;
-
-  _ValueOrException.value(this._value) : _isValue = true;
-  _ValueOrException.exc(this._exc) : _isValue = false;
-
-  T get value {
-    if (_isValue) return _value as T;
-    throw _exc!;
-  }
-}
-
-/// An in-memory, partially- or fully-observable key-value store.
-/// Similar to the ObservableMap from the `observable` package, but with the following upsides:
-/// - Individual keys can be observed
-/// - Supports immutable snapshots (using fast_immutable_collections)
-class ComputedMap<K, V> extends IComputedMap<K, V> {
-  late final Computed<IMapSpy<K, V>> _c;
-  late final Computed<IMap<K, V>> _snapshot;
-  final _cSubs = <ComputedSubscription<IMapSpy<K, V>>>{};
-  IMapSpy<K, V> lastPrev;
-  _ValueOrException<IMapSpy<K, V>>? curRes;
+class ChangeStreamComputedMap<K, V> implements IComputedMap<K, V> {
+  final Computed<Set<ChangeRecord<K, V>>> _stream;
+  late final Computed<IMap<K, V>> _c;
+  final _cSubs = <ComputedSubscription<IMap<K, V>>>{};
   // These are set because we create them lazily, and forget about them when they lose all subscribers
   // But they may gain subscribers later in the future, and at that point there might already be
   // (an)other stream(s)/computation(s).
@@ -38,25 +17,58 @@ class ComputedMap<K, V> extends IComputedMap<K, V> {
   final _keyChangeStreamComputations = <K, Set<Computed<ChangeRecord<K, V>>>>{};
   final _keyValueStreams = <K, Set<ValueStream<V?>>>{};
   final _keyValueComputations = <K, Set<Computed<V?>>>{};
-  ComputedMap(IMapSpy<K, V> Function(IMapSpy<K, V> prev) f,
-      {required IMap<K, V> initialPrev,
-      bool memoized = true,
-      bool async = false})
-      : lastPrev = IMapSpy.wrap(initialPrev) {
+  Set<ChangeRecord<K, V>>? _lastChange;
+  IMap<K, V>?
+      _curRes; // TODO: After adding support for disposing computations to Computed, set this to null as the disposer
+  ChangeStreamComputedMap(this._stream) {
     _c = Computed.withPrev((prev) {
-      lastPrev = prev;
-      return f(IMapSpy.wrap(prev.imap));
-    },
-        initialPrev: IMapSpy.wrap(initialPrev),
-        memoized: memoized,
-        async: async);
-    _snapshot = $(() => _c.use.imap);
+      Set<ChangeRecord<K, V>> changes;
+      try {
+        changes = _stream.use;
+      } on NoValueException {
+        // No changes
+        return prev;
+      }
+      Set<K>? keysToNotify = <K>{}; // If null -> notify all listeners
+      for (var change in changes) {
+        if (change is ChangeRecordInsert<K, V>) {
+          keysToNotify?.add(change.key);
+          prev = prev.add(change.key, change.value);
+        } else if (change is ChangeRecordUpdate<K, V>) {
+          keysToNotify?.add(change.key);
+          prev = prev.add(change.key, change.newValue);
+        } else if (change is ChangeRecordDelete<K, V>) {
+          keysToNotify?.add(change.key);
+          prev = prev.remove(change.key);
+        } else if (change is ChangeRecordReplace<K, V>) {
+          keysToNotify = null;
+          prev = change.newCollection;
+        } else {
+          assert(false);
+        }
+      }
+
+      _curRes = prev;
+
+      if (!identical(changes, _lastChange)) {
+        // We cheat here a bit to avoid notifying listeners a second time
+        //  in case Computed runs us twice (eg. in debug mode)
+        _lastChange = changes;
+        if (keysToNotify == null) {
+          _notifyAllKeyStreams();
+        } else {
+          _notifyKeyStreams(keysToNotify);
+        }
+      }
+
+      return prev;
+    }, initialPrev: <K, V>{}.lock);
   }
 
   @visibleForTesting
   void fix(IMap<K, V> value) {
     // ignore: invalid_use_of_visible_for_testing_member
-    _c.fix(IMapSpy.wrap(value));
+    _c.fix(value);
   }
 
   @visibleForTesting
@@ -67,53 +79,23 @@ class ComputedMap<K, V> extends IComputedMap<K, V> {
 
   @visibleForTesting
   // ignore: invalid_use_of_visible_for_testing_member
-  void mock(IMap<K, V> Function() mock) => _c.mock(() => IMapSpy.wrap(mock()));
+  void mock(IMap<K, V> Function() mock) => _c.mock(mock);
 
   @visibleForTesting
   // ignore: invalid_use_of_visible_for_testing_member
   void unmock() => _c.unmock();
 
-  void _cListenerValue(IMapSpy<K, V> event) {
-    curRes = _ValueOrException.value(event);
-    if (event is! IMapSpy) {
-      // The user f returned a non-spied IMap, we don't know what has changed, so notify all listeners
-      _notifyAllKeyStreams();
-    } else {
-      final ress = event as IMapSpy<K, V>;
-      if (!identical(ress.wrapped, lastPrev)) {
-        // The user f returned an IMap not related to the previous one, we don't know what has changed, so notify all listeners
-        _notifyAllKeyStreams();
-      } else {
-        _notifyKeyStreams(ress.changedKeys);
-      }
-    }
-  }
-
-  void _cListenerError(Object e) {
-    // TODO: Make Computed support passing stacktraces to listeners
-    curRes = _ValueOrException.exc(e);
-    _notifyAllKeyStreams();
-  }
-
   void _notifyAllKeyStreams() {
-    if (curRes!._isValue) {
-      for (var entry in curRes!.value.entries) {
-        for (var stream in _keyValueStreams[entry.key] ?? <ValueStream<V?>>{}) {
-          stream.add(entry.value);
-        }
-      }
-    } else {
-      for (var entry in _keyValueStreams.entries) {
-        for (var stream in entry.value) {
-          stream.addError(curRes!._exc!);
-        }
+    for (var entry in _curRes!.entries) {
+      for (var stream in _keyValueStreams[entry.key] ?? <ValueStream<V?>>{}) {
+        stream.add(entry.value);
       }
     }
   }
 
   void _notifyKeyStreams(Iterable<K> keys) {
     for (var key in keys) {
-      final value = curRes!.value[key];
+      final value = _curRes![key];
       for (var stream in _keyValueStreams[key] ?? <ValueStream<V?>>{}) {
         stream.add(value);
       }
@@ -132,7 +114,7 @@ class ComputedMap<K, V> extends IComputedMap<K, V> {
 
     // Otherwise, create a new stream-computation pair and subscribe to the user computation
     late final ValueStream<V?> stream;
-    late final ComputedSubscription<IMapSpy<K, V>> sub;
+    late final ComputedSubscription<IMap<K, V>> sub;
     final computation = $(() => stream.use);
     stream = ValueStream<V?>(onListen: () {
       final streams =
@@ -141,7 +123,14 @@ class ComputedMap<K, V> extends IComputedMap<K, V> {
       final computations =
           _keyValueComputations.putIfAbsent(key, () => <Computed<V?>>{});
       computations.add(computation);
-      sub = _c.listen(_cListenerValue, _cListenerError);
+      // TODO: It kinda defeats the purpose to have one listener per key
+      //  Better way to do this: Share a single "keep-alive" listener across
+      //  all keys. onCancel: if there are no key-specific listeners left,
+      //  cancel the keep-alive listener.
+      //  No need to worry about snapshot listeners, Computed handles those.
+      //  But key-specific listeners are out responsibilty.
+      sub = _c.listen((e) {},
+          null); // Dummy event to trigger the computation. Note that the "real" event propagation happens through the ValueStream-s
       _cSubs.add(sub);
     }, onCancel: () {
       final streams = _keyValueStreams[key]!;
@@ -152,13 +141,12 @@ class ComputedMap<K, V> extends IComputedMap<K, V> {
       _cSubs.remove(sub);
     });
 
-    if (curRes != null) {
-      // Seed the stream
-      if (curRes!._isValue) {
-        stream.add(curRes!.value[key]);
-      } else {
-        stream.addError(curRes!._exc!);
-      }
+    // Seed the stream
+    if (_curRes != null) {
+      stream.add(_curRes![key]);
+    } else {
+      // Note that this might be (quickly) overwritten if there is already a change stream event
+      stream.add(null);
     }
 
     return computation;
@@ -275,7 +263,7 @@ class ComputedMap<K, V> extends IComputedMap<K, V> {
   }
 
   @override
-  Computed<IMap<K, V>> get snapshot => _snapshot;
+  Computed<IMap<K, V>> get snapshot => _c;
 
   @override
   IComputedMap<K, V> update(K key, V Function(V value) update,

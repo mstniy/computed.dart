@@ -1,29 +1,38 @@
+import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:meta/meta.dart';
 
 @immutable
 class ChangeRecord<K, V> {
-  final K key;
-
-  ChangeRecord(this.key);
+  ChangeRecord();
 }
 
 @immutable
 class ChangeRecordInsert<K, V> extends ChangeRecord<K, V> {
+  final K key;
   final V value;
 
-  ChangeRecordInsert(K key, this.value) : super(key);
+  ChangeRecordInsert(this.key, this.value);
 }
 
 @immutable
 class ChangeRecordDelete<K, V> extends ChangeRecord<K, V> {
+  final K key;
   final V oldValue;
 
-  ChangeRecordDelete(K key, this.oldValue) : super(key);
+  ChangeRecordDelete(this.key, this.oldValue);
 }
 
 @immutable
 class ChangeRecordUpdate<K, V> extends ChangeRecord<K, V> {
+  final K key;
   final V oldValue, newValue;
 
-  ChangeRecordUpdate(K key, this.oldValue, this.newValue) : super(key);
+  ChangeRecordUpdate(this.key, this.oldValue, this.newValue);
+}
+
+@immutable
+class ChangeRecordReplace<K, V> extends ChangeRecord<K, V> {
+  final IMap<K, V> newCollection;
+
+  ChangeRecordReplace(this.newCollection);
 }
