@@ -35,10 +35,10 @@ void main() {
     test('operator[] works', () async {
       final s = ValueStream<Set<ChangeRecord<int, int>>>(sync: true);
       final m = IComputedMap.fromChangeStream($(() => s.use));
-      final c = m[0];
+
       var callCnt1 = 0;
       int? lastRes1;
-      final sub1 = c.listen((event) {
+      final sub1 = m[0].listen((event) {
         callCnt1++;
         lastRes1 = event;
       }, (e) => fail(e.toString()));
@@ -51,6 +51,7 @@ void main() {
       s.add({ChangeRecordInsert(0, 1)});
       expect(callCnt1, 2);
       expect(lastRes1, 1);
+
       s.add({ChangeRecordInsert(1, 2)});
       expect(callCnt1, 2);
       s.add({ChangeRecordUpdate(1, 2, 3)});
@@ -58,24 +59,10 @@ void main() {
       s.add({ChangeRecordUpdate(0, 1, 4)});
       expect(callCnt1, 3);
       expect(lastRes1, 4);
-      s.add({ChangeRecordDelete(0, 4)});
-      expect(callCnt1, 4);
-      expect(lastRes1, null);
-      s.add({ChangeRecordDelete(1, 3)});
-      expect(callCnt1, 4);
-      s.add({
-        ChangeRecordReplace({4: 5}.lock)
-      });
-      expect(callCnt1, 4);
-      s.add({
-        ChangeRecordReplace({0: 0, 1: 1}.lock)
-      });
-      expect(callCnt1, 5);
-      expect(lastRes1, 0);
 
-      int? lastRes2;
       var callCnt2 = 0;
-      final sub2 = m[1].listen((event) {
+      int? lastRes2;
+      final sub2 = m[0].listen((event) {
         callCnt2++;
         lastRes2 = event;
       }, (e) => fail(e.toString()));
@@ -83,16 +70,51 @@ void main() {
       expect(callCnt2, 0);
       await Future.value();
       expect(callCnt2, 1);
-      expect(lastRes2, 1);
+      expect(lastRes2, 4);
+
+      s.add({ChangeRecordDelete(0, 4)});
+      expect(callCnt1, 4);
+      expect(lastRes1, null);
+      expect(callCnt2, 2);
+      expect(lastRes2, null);
+      s.add({ChangeRecordDelete(1, 3)});
+      expect(callCnt1, 4);
+      expect(callCnt2, 2);
+      s.add({
+        ChangeRecordReplace({4: 5}.lock)
+      });
+      expect(callCnt1, 4);
+      expect(callCnt2, 2);
+      s.add({
+        ChangeRecordReplace({0: 0, 1: 1}.lock)
+      });
+      expect(callCnt1, 5);
+      expect(lastRes1, 0);
+      expect(callCnt2, 3);
+      expect(lastRes1, 0);
+
+      int? lastRes3;
+      var callCnt3 = 0;
+      final sub3 = m[1].listen((event) {
+        callCnt3++;
+        lastRes3 = event;
+      }, (e) => fail(e.toString()));
+
+      expect(callCnt3, 0);
+      await Future.value();
+      expect(callCnt3, 1);
+      expect(lastRes3, 1);
 
       s.add({ChangeRecordUpdate(1, 1, 2)});
       expect(callCnt1, 5);
-      expect(callCnt2, 2);
-      expect(lastRes2, 2);
+      expect(callCnt2, 3);
+      expect(callCnt3, 2);
+      expect(lastRes3, 2);
 
       await Future.value(); // No more updates
       expect(callCnt1, 5);
-      expect(callCnt2, 2);
+      expect(callCnt2, 3);
+      expect(callCnt3, 2);
 
       sub1.cancel();
 
@@ -100,16 +122,20 @@ void main() {
         ChangeRecordReplace({0: 1, 1: 3}.lock)
       });
       expect(callCnt1, 5); // The listener has been cancelled
-      expect(callCnt2, 3);
-      expect(lastRes2, 3);
+      expect(callCnt2, 4);
+      expect(lastRes2, 1);
+      expect(callCnt3, 3);
+      expect(lastRes3, 3);
 
+      sub3.cancel();
       sub2.cancel();
 
       s.add({
         ChangeRecordReplace({0: 2, 1: 4}.lock)
       });
-      expect(callCnt1, 5); // The listener has been cancelled
-      expect(callCnt2, 3); // The listener has been cancelled
+      expect(callCnt1, 5);
+      expect(callCnt2, 4);
+      expect(callCnt3, 3);
     });
   });
 }

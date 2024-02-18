@@ -16,9 +16,7 @@ class ChangeStreamComputedMap<K, V> implements IComputedMap<K, V> {
   // (an)other stream(s)/computation(s).
   final _keyChangeStreams = <K, Set<ValueStream<ChangeRecord<K, V>>>>{};
   final _keyChangeStreamComputations = <K, Set<Computed<ChangeRecord<K, V>>>>{};
-  final _keyValueStreams =
-      <K, Set<ValueStream<V?>>>{}; // TODO: Store these in a single collection
-  final _keyValueComputations = <K, Set<Computed<V?>>>{};
+  final _keyValueStreams = <K, Map<ValueStream<V?>, Computed<V?>>>{};
   Set<ChangeRecord<K, V>>? _lastChange;
   IMap<K, V>?
       _curRes; // TODO: After adding support for disposing computations to Computed, set this to null as the disposer
@@ -71,25 +69,39 @@ class ChangeStreamComputedMap<K, V> implements IComputedMap<K, V> {
   void fix(IMap<K, V> value) {
     // ignore: invalid_use_of_visible_for_testing_member
     _c.fix(value);
+    _curRes = value;
+    _notifyAllKeyStreams();
   }
 
   @visibleForTesting
   void fixThrow(Object e) {
     // ignore: invalid_use_of_visible_for_testing_member
     _c.fixThrow(e);
+    // TODO: We DO need the value or exception logic
+    //  As the change stream itself might throw an exception
+    //_curRes = value;
+    _notifyAllKeyStreams();
   }
 
   @visibleForTesting
   // ignore: invalid_use_of_visible_for_testing_member
-  void mock(IMap<K, V> Function() mock) => _c.mock(mock);
+  void mock(IMap<K, V> Function() mock) => _c.mock(() {
+        final mockRes = mock();
+        _curRes = mockRes;
+        // TODO: Nothing on which we can do the double-run check here, refactor it to a Token-based logic
+        _notifyAllKeyStreams();
+        return mockRes;
+      });
 
   @visibleForTesting
-  // ignore: invalid_use_of_visible_for_testing_member
-  void unmock() => _c.unmock();
+  void unmock() => _c
+      // ignore: invalid_use_of_visible_for_testing_member
+      .unmock(); // No need to do additional bookkeeping here as Computed will call the original computation anyway
 
   void _notifyAllKeyStreams() {
     for (var entry in _curRes!.entries) {
-      for (var stream in _keyValueStreams[entry.key] ?? <ValueStream<V?>>{}) {
+      for (var stream
+          in _keyValueStreams[entry.key]?.keys ?? <ValueStream<V?>>[]) {
         stream.add(entry.value);
       }
     }
@@ -98,7 +110,7 @@ class ChangeStreamComputedMap<K, V> implements IComputedMap<K, V> {
   void _notifyKeyStreams(Iterable<K> keys) {
     for (var key in keys) {
       final value = _curRes![key];
-      for (var stream in _keyValueStreams[key] ?? <ValueStream<V?>>{}) {
+      for (var stream in _keyValueStreams[key]?.keys ?? <ValueStream<V?>>[]) {
         stream.add(value);
       }
     }
@@ -106,13 +118,8 @@ class ChangeStreamComputedMap<K, V> implements IComputedMap<K, V> {
 
   Computed<V?> operator [](K key) {
     // If there is an existing (cached) computation, return it
-    final computations =
-        _keyValueComputations.putIfAbsent(key, () => <Computed<V?>>{});
-    if (computations.isNotEmpty) return computations.first;
-
-    // As there is a strict one-to-one correspondence between streams and computations,
-    // we expect this to hold
-    assert(!_keyValueStreams.containsKey(key));
+    final streams = _keyValueStreams[key];
+    if (streams != null) return streams.values.first;
 
     // Otherwise, create a new stream-computation pair and subscribe to the user computation
     late final ValueStream<V?> stream;
@@ -120,12 +127,9 @@ class ChangeStreamComputedMap<K, V> implements IComputedMap<K, V> {
     stream = ValueStream<V?>(
         sync: true,
         onListen: () {
-          final streams =
-              _keyValueStreams.putIfAbsent(key, () => <ValueStream<V?>>{});
-          streams.add(stream);
-          final computations =
-              _keyValueComputations.putIfAbsent(key, () => <Computed<V?>>{});
-          computations.add(computation);
+          final streams = _keyValueStreams.putIfAbsent(
+              key, () => <ValueStream<V?>, Computed<V?>>{});
+          streams[stream] = computation;
           _cSub ??= _c.listen((e) {}, null);
         },
         onCancel: () {
@@ -134,12 +138,7 @@ class ChangeStreamComputedMap<K, V> implements IComputedMap<K, V> {
           if (streams.isEmpty) {
             _keyValueStreams.remove(key);
           }
-          final computations = _keyValueComputations[key]!;
-          computations.remove(computation);
-          if (computations.isEmpty) {
-            _keyValueComputations.remove(key);
-          }
-          if (_keyValueComputations.isEmpty) {
+          if (_keyValueStreams.isEmpty) {
             _cSub!.cancel();
             _cSub = null;
           }
