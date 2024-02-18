@@ -9,13 +9,15 @@ import 'package:meta/meta.dart';
 class ChangeStreamComputedMap<K, V> implements IComputedMap<K, V> {
   final Computed<Set<ChangeRecord<K, V>>> _stream;
   late final Computed<IMap<K, V>> _c;
-  final _cSubs = <ComputedSubscription<IMap<K, V>>>{};
+  // The "keep-alive" subscription used by key streams, as we explicitly break the dependency DAG of Computed.
+  ComputedSubscription<IMap<K, V>>? _cSub;
   // These are set because we create them lazily, and forget about them when they lose all subscribers
   // But they may gain subscribers later in the future, and at that point there might already be
   // (an)other stream(s)/computation(s).
   final _keyChangeStreams = <K, Set<ValueStream<ChangeRecord<K, V>>>>{};
   final _keyChangeStreamComputations = <K, Set<Computed<ChangeRecord<K, V>>>>{};
-  final _keyValueStreams = <K, Set<ValueStream<V?>>>{};
+  final _keyValueStreams =
+      <K, Set<ValueStream<V?>>>{}; // TODO: Store these in a single collection
   final _keyValueComputations = <K, Set<Computed<V?>>>{};
   Set<ChangeRecord<K, V>>? _lastChange;
   IMap<K, V>?
@@ -114,32 +116,34 @@ class ChangeStreamComputedMap<K, V> implements IComputedMap<K, V> {
 
     // Otherwise, create a new stream-computation pair and subscribe to the user computation
     late final ValueStream<V?> stream;
-    late final ComputedSubscription<IMap<K, V>> sub;
     final computation = $(() => stream.use);
-    stream = ValueStream<V?>(onListen: () {
-      final streams =
-          _keyValueStreams.putIfAbsent(key, () => <ValueStream<V?>>{});
-      streams.add(stream);
-      final computations =
-          _keyValueComputations.putIfAbsent(key, () => <Computed<V?>>{});
-      computations.add(computation);
-      // TODO: It kinda defeats the purpose to have one listener per key
-      //  Better way to do this: Share a single "keep-alive" listener across
-      //  all keys. onCancel: if there are no key-specific listeners left,
-      //  cancel the keep-alive listener.
-      //  No need to worry about snapshot listeners, Computed handles those.
-      //  But key-specific listeners are out responsibilty.
-      sub = _c.listen((e) {},
-          null); // Dummy event to trigger the computation. Note that the "real" event propagation happens through the ValueStream-s
-      _cSubs.add(sub);
-    }, onCancel: () {
-      final streams = _keyValueStreams[key]!;
-      streams.remove(stream);
-      final computations = _keyValueComputations[key]!;
-      computations.remove(computation);
-      sub.cancel();
-      _cSubs.remove(sub);
-    });
+    stream = ValueStream<V?>(
+        sync: true,
+        onListen: () {
+          final streams =
+              _keyValueStreams.putIfAbsent(key, () => <ValueStream<V?>>{});
+          streams.add(stream);
+          final computations =
+              _keyValueComputations.putIfAbsent(key, () => <Computed<V?>>{});
+          computations.add(computation);
+          _cSub ??= _c.listen((e) {}, null);
+        },
+        onCancel: () {
+          final streams = _keyValueStreams[key]!;
+          streams.remove(stream);
+          if (streams.isEmpty) {
+            _keyValueStreams.remove(key);
+          }
+          final computations = _keyValueComputations[key]!;
+          computations.remove(computation);
+          if (computations.isEmpty) {
+            _keyValueComputations.remove(key);
+          }
+          if (_keyValueComputations.isEmpty) {
+            _cSub!.cancel();
+            _cSub = null;
+          }
+        });
 
     // Seed the stream
     if (_curRes != null) {
