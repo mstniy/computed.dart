@@ -337,6 +337,7 @@ class ComputedImpl<T> {
 
   void unmock() {
     _f = _origF;
+    _prevResult = null; // Invalid
     GlobalCtx._currentUpdate = _Token();
     _rerunGraph();
   }

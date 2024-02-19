@@ -52,10 +52,9 @@ packages:
   computed:
     dependency: "direct main"
     description:
-      name: computed
-      sha256: "195201845afaab1ff30365e8794f2f521738e6536f76ae0b8468f8893b421706"
-      url: "https://pub.dev"
-    source: hosted
+      path: "../computed"
+      relative: true
+    source: path
     version: "0.4.1"
   convert:
     dependency: transitive

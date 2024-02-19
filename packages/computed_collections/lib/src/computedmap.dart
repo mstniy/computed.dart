@@ -102,6 +102,7 @@ class ChangeStreamComputedMap<K, V> implements IComputedMap<K, V> {
   void fixThrow(Object e) {
     // ignore: invalid_use_of_visible_for_testing_member
     _c.fixThrow(e);
+    // TODO: Maybe refactor this logic out? Currently it is duplicated here and in the original computation
     _curRes = _ValueOrException.exc(e);
     _notifyAllKeyStreams();
   }
