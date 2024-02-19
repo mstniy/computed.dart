@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:computed/computed.dart';
 import 'package:computed_collections/change_record.dart';
 import 'package:computed_collections/icomputedmap.dart';
@@ -5,6 +7,20 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import 'package:computed/utils/streams.dart';
 import 'package:meta/meta.dart';
+
+class _ValueOrException<T> {
+  final bool _isValue;
+  Object? _exc;
+  T? _value;
+
+  _ValueOrException.value(this._value) : _isValue = true;
+  _ValueOrException.exc(this._exc) : _isValue = false;
+
+  T get value {
+    if (_isValue) return _value as T;
+    throw _exc!;
+  }
+}
 
 class ChangeStreamComputedMap<K, V> implements IComputedMap<K, V> {
   final Computed<Set<ChangeRecord<K, V>>> _stream;
@@ -18,50 +34,59 @@ class ChangeStreamComputedMap<K, V> implements IComputedMap<K, V> {
   final _keyChangeStreamComputations = <K, Set<Computed<ChangeRecord<K, V>>>>{};
   final _keyValueStreams = <K, Map<ValueStream<V?>, Computed<V?>>>{};
   Set<ChangeRecord<K, V>>? _lastChange;
-  IMap<K, V>?
+  _ValueOrException<IMap<K, V>>?
       _curRes; // TODO: After adding support for disposing computations to Computed, set this to null as the disposer
   ChangeStreamComputedMap(this._stream) {
     _c = Computed.withPrev((prev) {
-      Set<ChangeRecord<K, V>> changes;
       try {
-        changes = _stream.use;
-      } on NoValueException {
-        // No changes
+        Set<K>? keysToNotify = <K>{}; // If null -> notify all listeners
+        Set<ChangeRecord<K, V>> changes;
+        try {
+          changes = _stream.use;
+        } on NoValueException {
+          // No changes
+          return prev;
+        }
+        for (var change in changes) {
+          if (change is ChangeRecordInsert<K, V>) {
+            keysToNotify?.add(change.key);
+            prev = prev.add(change.key, change.value);
+          } else if (change is ChangeRecordUpdate<K, V>) {
+            keysToNotify?.add(change.key);
+            prev = prev.add(change.key, change.newValue);
+          } else if (change is ChangeRecordDelete<K, V>) {
+            keysToNotify?.add(change.key);
+            prev = prev.remove(change.key);
+          } else if (change is ChangeRecordReplace<K, V>) {
+            keysToNotify = null;
+            prev = change.newCollection;
+          } else {
+            assert(false);
+          }
+        }
+
+        _curRes = _ValueOrException.value(prev);
+
+        if (!identical(changes, _lastChange)) {
+          // We cheat here a bit to avoid notifying listeners a second time
+          //  in case Computed runs us twice (eg. in debug mode)
+          _lastChange = changes;
+          if (keysToNotify == null) {
+            _notifyAllKeyStreams();
+          } else {
+            _notifyKeyStreams(keysToNotify);
+          }
+        }
+
         return prev;
+      } catch (e) {
+        _curRes = _ValueOrException.exc(e);
+        // We need to do this after excaping Computed's sync zone, otherwise it notices
+        //  that we are adding to a stream and complains.
+        // No need to check if we are in the idempotency call here, Computed does not do it for exceptions
+        Zone.current.parent!.run(_notifyAllKeyStreams);
+        rethrow;
       }
-      Set<K>? keysToNotify = <K>{}; // If null -> notify all listeners
-      for (var change in changes) {
-        if (change is ChangeRecordInsert<K, V>) {
-          keysToNotify?.add(change.key);
-          prev = prev.add(change.key, change.value);
-        } else if (change is ChangeRecordUpdate<K, V>) {
-          keysToNotify?.add(change.key);
-          prev = prev.add(change.key, change.newValue);
-        } else if (change is ChangeRecordDelete<K, V>) {
-          keysToNotify?.add(change.key);
-          prev = prev.remove(change.key);
-        } else if (change is ChangeRecordReplace<K, V>) {
-          keysToNotify = null;
-          prev = change.newCollection;
-        } else {
-          assert(false);
-        }
-      }
-
-      _curRes = prev;
-
-      if (!identical(changes, _lastChange)) {
-        // We cheat here a bit to avoid notifying listeners a second time
-        //  in case Computed runs us twice (eg. in debug mode)
-        _lastChange = changes;
-        if (keysToNotify == null) {
-          _notifyAllKeyStreams();
-        } else {
-          _notifyKeyStreams(keysToNotify);
-        }
-      }
-
-      return prev;
     }, initialPrev: <K, V>{}.lock);
   }
 
@@ -69,7 +94,7 @@ class ChangeStreamComputedMap<K, V> implements IComputedMap<K, V> {
   void fix(IMap<K, V> value) {
     // ignore: invalid_use_of_visible_for_testing_member
     _c.fix(value);
-    _curRes = value;
+    _curRes = _ValueOrException.value(value);
     _notifyAllKeyStreams();
   }
 
@@ -77,20 +102,23 @@ class ChangeStreamComputedMap<K, V> implements IComputedMap<K, V> {
   void fixThrow(Object e) {
     // ignore: invalid_use_of_visible_for_testing_member
     _c.fixThrow(e);
-    // TODO: We DO need the value or exception logic
-    //  As the change stream itself might throw an exception
-    //_curRes = value;
+    _curRes = _ValueOrException.exc(e);
     _notifyAllKeyStreams();
   }
 
   @visibleForTesting
   // ignore: invalid_use_of_visible_for_testing_member
   void mock(IMap<K, V> Function() mock) => _c.mock(() {
-        final mockRes = mock();
-        _curRes = mockRes;
+        try {
+          final mockRes = mock();
+          _curRes = _ValueOrException.value(mockRes);
+        } catch (e) {
+          _curRes = _ValueOrException.exc(e);
+        }
         // TODO: Nothing on which we can do the double-run check here, refactor it to a Token-based logic
         _notifyAllKeyStreams();
-        return mockRes;
+        return _curRes!
+            .value; // Will throw if there was an exception, which is fine
       });
 
   @visibleForTesting
@@ -99,19 +127,27 @@ class ChangeStreamComputedMap<K, V> implements IComputedMap<K, V> {
       .unmock(); // No need to do additional bookkeeping here as Computed will call the original computation anyway
 
   void _notifyAllKeyStreams() {
-    for (var entry in _curRes!.entries) {
-      for (var stream
-          in _keyValueStreams[entry.key]?.keys ?? <ValueStream<V?>>[]) {
-        stream.add(entry.value);
+    for (var entry in _keyValueStreams.entries) {
+      final value = _curRes!._isValue ? _curRes!.value[entry.key] : null;
+      for (var stream in entry.value.keys) {
+        if (_curRes!._isValue) {
+          stream.add(value);
+        } else {
+          stream.addError(_curRes!._exc!);
+        }
       }
     }
   }
 
   void _notifyKeyStreams(Iterable<K> keys) {
     for (var key in keys) {
-      final value = _curRes![key];
+      final value = _curRes!._isValue ? _curRes!.value[key] : null;
       for (var stream in _keyValueStreams[key]?.keys ?? <ValueStream<V?>>[]) {
-        stream.add(value);
+        if (_curRes!._isValue) {
+          stream.add(value);
+        } else {
+          stream.addError(_curRes!._exc!);
+        }
       }
     }
   }
@@ -146,9 +182,14 @@ class ChangeStreamComputedMap<K, V> implements IComputedMap<K, V> {
 
     // Seed the stream
     if (_curRes != null) {
-      stream.add(_curRes![key]);
+      if (_curRes!._isValue) {
+        stream.add(_curRes!.value[key]);
+      } else {
+        stream.addError(_curRes!._exc!);
+      }
     } else {
       // Note that this might be (quickly) overwritten if there is already a change stream event
+      // TODO: shouldn't. use react instead to prevent this.
       stream.add(null);
     }
 
