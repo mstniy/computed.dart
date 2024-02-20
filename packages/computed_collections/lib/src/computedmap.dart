@@ -23,7 +23,8 @@ class _ValueOrException<T> {
 }
 
 class ChangeStreamComputedMap<K, V> implements IComputedMap<K, V> {
-  final Computed<Set<ChangeRecord<K, V>>> _stream;
+  final initialValue = <K, V>{}.lock;
+  final Stream<Set<ChangeRecord<K, V>>> _stream;
   late final Computed<IMap<K, V>> _c;
   // The "keep-alive" subscription used by key streams, as we explicitly break the dependency DAG of Computed.
   ComputedSubscription<IMap<K, V>>? _cSub;
@@ -38,56 +39,60 @@ class ChangeStreamComputedMap<K, V> implements IComputedMap<K, V> {
       _curRes; // TODO: After adding support for disposing computations to Computed, set this to null as the disposer
   ChangeStreamComputedMap(this._stream) {
     _c = Computed.withPrev((prev) {
+      // We "schedule" the notifications inside the .react but actually carry them out outside it
+      //  Because the sync ValueStream-s eventually trigger code that .use-s things, and Computed
+      //  does not like when this happens inside .react
+      Set<K>? keysToNotify = <K>{}; // If null -> notify nothing
+      bool notifyAllKeys = false;
       try {
-        Set<K>? keysToNotify = <K>{}; // If null -> notify all listeners
-        Set<ChangeRecord<K, V>> changes;
-        try {
-          changes = _stream.use;
-        } on NoValueException {
-          // No changes
-          return prev;
-        }
-        for (var change in changes) {
-          if (change is ChangeRecordInsert<K, V>) {
-            keysToNotify?.add(change.key);
-            prev = prev.add(change.key, change.value);
-          } else if (change is ChangeRecordUpdate<K, V>) {
-            keysToNotify?.add(change.key);
-            prev = prev.add(change.key, change.newValue);
-          } else if (change is ChangeRecordDelete<K, V>) {
-            keysToNotify?.add(change.key);
-            prev = prev.remove(change.key);
-          } else if (change is ChangeRecordReplace<K, V>) {
+        _stream.react((changes) {
+          for (var change in changes) {
+            if (change is ChangeRecordInsert<K, V>) {
+              keysToNotify?.add(change.key);
+              prev = prev.add(change.key, change.value);
+            } else if (change is ChangeRecordUpdate<K, V>) {
+              keysToNotify?.add(change.key);
+              prev = prev.add(change.key, change.newValue);
+            } else if (change is ChangeRecordDelete<K, V>) {
+              keysToNotify?.add(change.key);
+              prev = prev.remove(change.key);
+            } else if (change is ChangeRecordReplace<K, V>) {
+              keysToNotify = null;
+              notifyAllKeys = true;
+              prev = change.newCollection;
+            } else {
+              assert(false);
+            }
+          }
+
+          _curRes = _ValueOrException.value(prev);
+
+          if (!identical(changes, _lastChange)) {
+            // We cheat here a bit to avoid notifying listeners a second time
+            //  in case Computed runs us twice (eg. in debug mode)
+            _lastChange = changes;
+          } else {
             keysToNotify = null;
-            prev = change.newCollection;
-          } else {
-            assert(false);
+            notifyAllKeys = false;
           }
-        }
-
-        _curRes = _ValueOrException.value(prev);
-
-        if (!identical(changes, _lastChange)) {
-          // We cheat here a bit to avoid notifying listeners a second time
-          //  in case Computed runs us twice (eg. in debug mode)
-          _lastChange = changes;
-          if (keysToNotify == null) {
-            _notifyAllKeyStreams();
-          } else {
-            _notifyKeyStreams(keysToNotify);
-          }
-        }
-
-        return prev;
-      } catch (e) {
-        _curRes = _ValueOrException.exc(e);
+        }, (e) {
+          _curRes = _ValueOrException.exc(e);
+          notifyAllKeys = true;
+          throw e;
+        });
+      } finally {
         // We need to do this after excaping Computed's sync zone, otherwise it notices
         //  that we are adding to a stream and complains.
         // No need to check if we are in the idempotency call here, Computed does not do it for exceptions
-        Zone.current.parent!.run(_notifyAllKeyStreams);
-        rethrow;
+        if (notifyAllKeys) {
+          Zone.current.parent!.run(_notifyAllKeyStreams);
+        } else if (keysToNotify != null) {
+          Zone.current.parent!.run(() => _notifyKeyStreams(keysToNotify!));
+        }
       }
-    }, initialPrev: <K, V>{}.lock);
+
+      return prev;
+    }, initialPrev: initialValue);
   }
 
   @visibleForTesting
@@ -123,9 +128,12 @@ class ChangeStreamComputedMap<K, V> implements IComputedMap<K, V> {
       });
 
   @visibleForTesting
-  void unmock() => _c
-      // ignore: invalid_use_of_visible_for_testing_member
-      .unmock(); // No need to do additional bookkeeping here as Computed will call the original computation anyway
+  void unmock() {
+    // ignore: invalid_use_of_visible_for_testing_member
+    _c.unmock(); // Note that this won't notify key streams
+    _curRes = _ValueOrException.value(initialValue);
+    _notifyAllKeyStreams();
+  }
 
   void _notifyAllKeyStreams() {
     for (var entry in _keyValueStreams.entries) {
@@ -161,25 +169,22 @@ class ChangeStreamComputedMap<K, V> implements IComputedMap<K, V> {
     // Otherwise, create a new stream-computation pair and subscribe to the user computation
     late final ValueStream<V?> stream;
     final computation = $(() => stream.use);
-    stream = ValueStream<V?>(
-        sync: true,
-        onListen: () {
-          final streams = _keyValueStreams.putIfAbsent(
-              key, () => <ValueStream<V?>, Computed<V?>>{});
-          streams[stream] = computation;
-          _cSub ??= _c.listen((e) {}, null);
-        },
-        onCancel: () {
-          final streams = _keyValueStreams[key]!;
-          streams.remove(stream);
-          if (streams.isEmpty) {
-            _keyValueStreams.remove(key);
-          }
-          if (_keyValueStreams.isEmpty) {
-            _cSub!.cancel();
-            _cSub = null;
-          }
-        });
+    stream = ValueStream<V?>(onListen: () {
+      final streams = _keyValueStreams.putIfAbsent(
+          key, () => <ValueStream<V?>, Computed<V?>>{});
+      streams[stream] = computation;
+      _cSub ??= _c.listen((e) {}, null);
+    }, onCancel: () {
+      final streams = _keyValueStreams[key]!;
+      streams.remove(stream);
+      if (streams.isEmpty) {
+        _keyValueStreams.remove(key);
+      }
+      if (_keyValueStreams.isEmpty) {
+        _cSub!.cancel();
+        _cSub = null;
+      }
+    });
 
     // Seed the stream
     if (_curRes != null) {

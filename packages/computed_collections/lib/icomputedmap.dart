@@ -12,7 +12,7 @@ import 'src/computedmap.dart';
 /// - Supports immutable snapshots (using fast_immutable_collections)
 abstract class IComputedMap<K, V> {
   factory IComputedMap.fromChangeStream(
-      Computed<Set<ChangeRecord<K, V>>> stream) {
+      Stream<Set<ChangeRecord<K, V>>> stream) {
     return ChangeStreamComputedMap(stream);
   }
   Computed<ChangeRecord<K, V>> get changes;

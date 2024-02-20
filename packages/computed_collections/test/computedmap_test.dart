@@ -1,4 +1,3 @@
-import 'package:computed/computed.dart';
 import 'package:computed/utils/streams.dart';
 import 'package:computed_collections/change_record.dart';
 import 'package:computed_collections/icomputedmap.dart';
@@ -9,7 +8,7 @@ void main() {
   group('fromChangeStream', () {
     test('snapshot works', () async {
       final s = ValueStream<Set<ChangeRecord<int, int>>>(sync: true);
-      final m = IComputedMap.fromChangeStream($(() => s.use));
+      final m = IComputedMap.fromChangeStream(s);
       IMap<int, int>? lastRes;
       final sub = m.snapshot.listen((event) {
         lastRes = event;
@@ -34,7 +33,7 @@ void main() {
 
     test('operator[] works', () async {
       final s = ValueStream<Set<ChangeRecord<int, int>>>(sync: true);
-      final m = IComputedMap.fromChangeStream($(() => s.use));
+      final m = IComputedMap.fromChangeStream(s);
 
       var callCnt1 = 0;
       int? lastRes1;
@@ -49,14 +48,18 @@ void main() {
       expect(lastRes1, null);
 
       s.add({ChangeRecordInsert(0, 1)});
+      await Future.value();
       expect(callCnt1, 2);
       expect(lastRes1, 1);
 
       s.add({ChangeRecordInsert(1, 2)});
+      await Future.value();
       expect(callCnt1, 2);
       s.add({ChangeRecordUpdate(1, 2, 3)});
+      await Future.value();
       expect(callCnt1, 2);
       s.add({ChangeRecordUpdate(0, 1, 4)});
+      await Future.value();
       expect(callCnt1, 3);
       expect(lastRes1, 4);
 
@@ -73,21 +76,25 @@ void main() {
       expect(lastRes2, 4);
 
       s.add({ChangeRecordDelete(0, 4)});
+      await Future.value();
       expect(callCnt1, 4);
       expect(lastRes1, null);
       expect(callCnt2, 2);
       expect(lastRes2, null);
       s.add({ChangeRecordDelete(1, 3)});
+      await Future.value();
       expect(callCnt1, 4);
       expect(callCnt2, 2);
       s.add({
         ChangeRecordReplace({4: 5}.lock)
       });
+      await Future.value();
       expect(callCnt1, 4);
       expect(callCnt2, 2);
       s.add({
         ChangeRecordReplace({0: 0, 1: 1}.lock)
       });
+      await Future.value();
       expect(callCnt1, 5);
       expect(lastRes1, 0);
       expect(callCnt2, 3);
@@ -106,6 +113,7 @@ void main() {
       expect(lastRes3, 1);
 
       s.add({ChangeRecordUpdate(1, 1, 2)});
+      await Future.value();
       expect(callCnt1, 5);
       expect(callCnt2, 3);
       expect(callCnt3, 2);
@@ -121,6 +129,7 @@ void main() {
       s.add({
         ChangeRecordReplace({0: 1, 1: 3}.lock)
       });
+      await Future.value();
       expect(callCnt1, 5); // The listener has been cancelled
       expect(callCnt2, 4);
       expect(lastRes2, 1);
@@ -133,6 +142,7 @@ void main() {
       s.add({
         ChangeRecordReplace({0: 2, 1: 4}.lock)
       });
+      await Future.value();
       expect(callCnt1, 5);
       expect(callCnt2, 4);
       expect(callCnt3, 3);
@@ -140,7 +150,7 @@ void main() {
 
     test('propagates exceptions', () async {
       final s = ValueStream<Set<ChangeRecord<int, int>>>(sync: true);
-      final m = IComputedMap.fromChangeStream($(() => s.use));
+      final m = IComputedMap.fromChangeStream(s);
       IMap<int, int>? lastRes1;
       Object? lastExc1;
       var callCnt1 = 0;
@@ -175,9 +185,11 @@ void main() {
       s.addError(42);
       expect(callCnt1, 2);
       expect(lastExc1, 42);
+      await Future.value();
       expect(callCnt2, 2);
       expect(lastExc2, 42);
       s.add({ChangeRecordInsert(0, 1)});
+      await Future.value();
       expect(callCnt1, 2);
       expect(callCnt2, 2);
 
@@ -209,7 +221,7 @@ void main() {
     group('mocks', () {
       test('can use fix/fixError', () async {
         final s = ValueStream<Set<ChangeRecord<int, int>>>(sync: true);
-        final m = IComputedMap.fromChangeStream($(() => s.use));
+        final m = IComputedMap.fromChangeStream(s);
         IMap<int, int>? lastRes1;
         Object? lastExc1;
         var callCnt1 = 0;
@@ -257,26 +269,29 @@ void main() {
         m.fix({0: 1}.lock);
 
         expect(callCnt1, 2);
-        expect(callCnt2, 2);
-        expect(callCnt3, 1);
         expect(lastRes1, {0: 1}.lock);
+        await Future.value();
+        expect(callCnt2, 2);
         expect(lastRes2, 1);
+        expect(callCnt3, 1);
 
         m.fixThrow(42);
 
         expect(callCnt1, 3);
+        expect(lastExc1, 42);
+        await Future.value();
         expect(callCnt2, 3);
         expect(callCnt3, 2);
-        expect(lastExc1, 42);
         expect(lastExc2, 42);
         expect(lastExc3, 42);
 
-        m.unmock(); // This causes the computation to .use the last value of the stream, which is error(42)
+        m.unmock();
 
         expect(callCnt1, 4);
+        expect(lastRes1, {}.lock);
+        await Future.value();
         expect(callCnt2, 4);
         expect(callCnt3, 3);
-        expect(lastRes1, {}.lock);
         expect(lastRes2, null);
         expect(lastRes3, null);
 
