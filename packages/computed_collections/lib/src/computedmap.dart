@@ -39,57 +39,46 @@ class ChangeStreamComputedMap<K, V> implements IComputedMap<K, V> {
       _curRes; // TODO: After adding support for disposing computations to Computed, set this to null as the disposer
   ChangeStreamComputedMap(this._stream) {
     _c = Computed.withPrev((prev) {
-      // We "schedule" the notifications inside the .react but actually carry them out outside it
-      //  Because the sync ValueStream-s eventually trigger code that .use-s things, and Computed
-      //  does not like when this happens inside .react
-      Set<K>? keysToNotify = <K>{}; // If null -> notify nothing
-      bool notifyAllKeys = false;
-      try {
-        _stream.react((changes) {
-          for (var change in changes) {
-            if (change is ChangeRecordInsert<K, V>) {
-              keysToNotify?.add(change.key);
-              prev = prev.add(change.key, change.value);
-            } else if (change is ChangeRecordUpdate<K, V>) {
-              keysToNotify?.add(change.key);
-              prev = prev.add(change.key, change.newValue);
-            } else if (change is ChangeRecordDelete<K, V>) {
-              keysToNotify?.add(change.key);
-              prev = prev.remove(change.key);
-            } else if (change is ChangeRecordReplace<K, V>) {
-              keysToNotify = null;
-              notifyAllKeys = true;
-              prev = change.newCollection;
-            } else {
-              assert(false);
-            }
-          }
-
-          _curRes = _ValueOrException.value(prev);
-
-          if (!identical(changes, _lastChange)) {
-            // We cheat here a bit to avoid notifying listeners a second time
-            //  in case Computed runs us twice (eg. in debug mode)
-            _lastChange = changes;
-          } else {
+      _stream.react((changes) {
+        Set<K>? keysToNotify = <K>{}; // If null -> notify all keys
+        for (var change in changes) {
+          if (change is ChangeRecordInsert<K, V>) {
+            keysToNotify?.add(change.key);
+            prev = prev.add(change.key, change.value);
+          } else if (change is ChangeRecordUpdate<K, V>) {
+            keysToNotify?.add(change.key);
+            prev = prev.add(change.key, change.newValue);
+          } else if (change is ChangeRecordDelete<K, V>) {
+            keysToNotify?.add(change.key);
+            prev = prev.remove(change.key);
+          } else if (change is ChangeRecordReplace<K, V>) {
             keysToNotify = null;
-            notifyAllKeys = false;
+            prev = change.newCollection;
+          } else {
+            assert(false);
           }
-        }, (e) {
-          _curRes = _ValueOrException.exc(e);
-          notifyAllKeys = true;
-          throw e;
-        });
-      } finally {
-        // We need to do this after excaping Computed's sync zone, otherwise it notices
-        //  that we are adding to a stream and complains.
-        // No need to check if we are in the idempotency call here, Computed does not do it for exceptions
-        if (notifyAllKeys) {
-          Zone.current.parent!.run(_notifyAllKeyStreams);
-        } else if (keysToNotify != null) {
-          Zone.current.parent!.run(() => _notifyKeyStreams(keysToNotify!));
         }
-      }
+
+        _curRes = _ValueOrException.value(prev);
+
+        if (!identical(changes, _lastChange)) {
+          // We cheat here a bit to avoid notifying listeners a second time
+          //  in case Computed runs us twice (eg. in debug mode)
+          _lastChange = changes;
+          if (keysToNotify == null) {
+            // Computed doesn't like it when a computation adds thins to a stream,
+            // so cheat here once again
+            Zone.current.parent!.run(_notifyAllKeyStreams);
+          } else {
+            Zone.current.parent!.run(() => _notifyKeyStreams(keysToNotify!));
+          }
+        }
+      }, (e) {
+        _curRes = _ValueOrException.exc(e);
+        // TODO: Check for idempotency calls here
+        Zone.current.parent!.run(_notifyAllKeyStreams);
+        throw e;
+      });
 
       return prev;
     }, initialPrev: initialValue);
@@ -194,8 +183,6 @@ class ChangeStreamComputedMap<K, V> implements IComputedMap<K, V> {
         stream.addError(_curRes!._exc!);
       }
     } else {
-      // Note that this might be (quickly) overwritten if there is already a change stream event
-      // TODO: shouldn't. use react instead to prevent this.
       stream.add(null);
     }
 
