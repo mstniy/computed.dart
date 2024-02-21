@@ -68,15 +68,16 @@ class ChangeStreamComputedMap<K, V> implements IComputedMap<K, V> {
           if (keysToNotify == null) {
             // Computed doesn't like it when a computation adds thins to a stream,
             // so cheat here once again
-            Zone.current.parent!.run(_notifyAllKeyStreams);
+            Zone.current.parent!.scheduleMicrotask(_notifyAllKeyStreams);
           } else {
-            Zone.current.parent!.run(() => _notifyKeyStreams(keysToNotify!));
+            Zone.current.parent!
+                .scheduleMicrotask(() => _notifyKeyStreams(keysToNotify!));
           }
         }
       }, (e) {
         _curRes = _ValueOrException.exc(e);
         // TODO: Check for idempotency calls here
-        Zone.current.parent!.run(_notifyAllKeyStreams);
+        Zone.current.parent!.scheduleMicrotask(_notifyAllKeyStreams);
         throw e;
       });
 
@@ -111,7 +112,7 @@ class ChangeStreamComputedMap<K, V> implements IComputedMap<K, V> {
           _curRes = _ValueOrException.exc(e);
         }
         // TODO: Nothing on which we can do the double-run check here, refactor it to a Token-based logic
-        _notifyAllKeyStreams();
+        Zone.current.parent!.scheduleMicrotask(_notifyAllKeyStreams);
         return _curRes!
             .value; // Will throw if there was an exception, which is fine
       });
@@ -158,22 +159,25 @@ class ChangeStreamComputedMap<K, V> implements IComputedMap<K, V> {
     // Otherwise, create a new stream-computation pair and subscribe to the user computation
     late final ValueStream<V?> stream;
     final computation = $(() => stream.use);
-    stream = ValueStream<V?>(onListen: () {
-      final streams = _keyValueStreams.putIfAbsent(
-          key, () => <ValueStream<V?>, Computed<V?>>{});
-      streams[stream] = computation;
-      _cSub ??= _c.listen((e) {}, null);
-    }, onCancel: () {
-      final streams = _keyValueStreams[key]!;
-      streams.remove(stream);
-      if (streams.isEmpty) {
-        _keyValueStreams.remove(key);
-      }
-      if (_keyValueStreams.isEmpty) {
-        _cSub!.cancel();
-        _cSub = null;
-      }
-    });
+    stream = ValueStream<V?>(
+        sync: true,
+        onListen: () {
+          final streams = _keyValueStreams.putIfAbsent(
+              key, () => <ValueStream<V?>, Computed<V?>>{});
+          streams[stream] = computation;
+          _cSub ??= _c.listen((e) {}, null);
+        },
+        onCancel: () {
+          final streams = _keyValueStreams[key]!;
+          streams.remove(stream);
+          if (streams.isEmpty) {
+            _keyValueStreams.remove(key);
+          }
+          if (_keyValueStreams.isEmpty) {
+            _cSub!.cancel();
+            _cSub = null;
+          }
+        });
 
     // Seed the stream
     if (_curRes != null) {
