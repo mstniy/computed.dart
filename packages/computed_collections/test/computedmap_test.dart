@@ -1,3 +1,4 @@
+import 'package:computed/computed.dart';
 import 'package:computed/utils/streams.dart';
 import 'package:computed_collections/change_record.dart';
 import 'package:computed_collections/icomputedmap.dart';
@@ -298,6 +299,65 @@ void main() {
         sub1.cancel();
         sub2.cancel();
         sub3.cancel();
+      });
+
+      test('can use mock', () async {
+        final s = ValueStream<Set<ChangeRecord<int, int>>>(sync: true);
+        final s2 = ValueStream<IMap<int, int>>(sync: true);
+        final m = IComputedMap.fromChangeStream(s);
+        IMap<int, int>? lastRes1;
+        Object? lastExc1;
+        var callCnt1 = 0;
+        final sub1 = m.snapshot.listen((event) {
+          callCnt1++;
+          lastRes1 = event;
+          lastExc1 = null;
+        }, (e) {
+          callCnt1++;
+          lastRes1 = null;
+          lastExc1 = e;
+        });
+        int? lastRes2;
+        Object? lastExc2;
+        var callCnt2 = 0;
+        final sub2 = m[0].listen((event) {
+          callCnt2++;
+          lastRes2 = event;
+          lastExc2 = null;
+        }, (e) {
+          callCnt2++;
+          lastRes2 = null;
+          lastExc2 = e;
+        });
+
+        await Future.value();
+        expect(callCnt1, 1);
+        expect(callCnt2, 1);
+        expect(lastRes1, {}.lock);
+        expect(lastRes2, null);
+
+        s2.add({0: 1}.lock);
+
+        m.mock(() => s2.use);
+        expect(callCnt1, 1);
+        await Future.value();
+        expect(callCnt1, 2);
+        expect(lastRes1, {0: 1}.lock);
+        expect(callCnt2, 1);
+        await Future.value();
+        expect(callCnt2, 2);
+        expect(lastRes2, 1);
+
+        m.mock(() => throw 42);
+        expect(callCnt1, 3);
+        expect(lastExc1, 42);
+        expect(callCnt2, 2);
+        await Future.value();
+        expect(callCnt2, 3);
+        expect(lastExc2, 42);
+
+        sub1.cancel();
+        sub2.cancel();
       });
     });
   });

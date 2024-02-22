@@ -108,6 +108,8 @@ class ChangeStreamComputedMap<K, V> implements IComputedMap<K, V> {
         try {
           final mockRes = mock();
           _curRes = _ValueOrException.value(mockRes);
+        } on NoValueException {
+          rethrow; // Propagate
         } catch (e) {
           _curRes = _ValueOrException.exc(e);
         }
@@ -139,14 +141,11 @@ class ChangeStreamComputedMap<K, V> implements IComputedMap<K, V> {
   }
 
   void _notifyKeyStreams(Iterable<K> keys) {
+    assert(_curRes!._isValue);
     for (var key in keys) {
-      final value = _curRes!._isValue ? _curRes!.value[key] : null;
+      final value = _curRes!._value![key];
       for (var stream in _keyValueStreams[key]?.keys ?? <ValueStream<V?>>[]) {
-        if (_curRes!._isValue) {
-          stream.add(value);
-        } else {
-          stream.addError(_curRes!._exc!);
-        }
+        stream.add(value);
       }
     }
   }
