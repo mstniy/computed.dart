@@ -219,6 +219,25 @@ void main() {
       sub3.cancel();
     });
 
+    test('propagates the change stream', () async {
+      final s = ValueStream<Set<ChangeRecord<int, int>>>(sync: true);
+      final m = IComputedMap.fromChangeStream(s);
+      Set<ChangeRecord<int, int>>? lastRes;
+      var callCnt = 0;
+      final sub = m.changes.listen((event) {
+        callCnt++;
+        lastRes = event;
+      }, (e) => fail(e.toString()));
+
+      await Future.value();
+      expect(callCnt, 0);
+      s.add({ChangeRecordInsert(0, 1)});
+      expect(callCnt, 1);
+      expect(lastRes, unorderedEquals({ChangeRecordInsert(0, 1)}));
+
+      sub.cancel();
+    });
+
     group('mocks', () {
       test('can use fix/fixError', () async {
         final s = ValueStream<Set<ChangeRecord<int, int>>>(sync: true);

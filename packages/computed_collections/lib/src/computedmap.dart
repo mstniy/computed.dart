@@ -25,6 +25,7 @@ class _ValueOrException<T> {
 class ChangeStreamComputedMap<K, V> implements IComputedMap<K, V> {
   final initialValue = <K, V>{}.lock;
   final Stream<Set<ChangeRecord<K, V>>> _stream;
+  late final Computed<Set<ChangeRecord<K, V>>> _changes;
   late final Computed<IMap<K, V>> _c;
   // The "keep-alive" subscription used by key streams, as we explicitly break the dependency DAG of Computed.
   ComputedSubscription<IMap<K, V>>? _cSub;
@@ -38,6 +39,7 @@ class ChangeStreamComputedMap<K, V> implements IComputedMap<K, V> {
   _ValueOrException<IMap<K, V>>?
       _curRes; // TODO: After adding support for disposing computations to Computed, set this to null as the disposer
   ChangeStreamComputedMap(this._stream) {
+    _changes = $(() => _stream.use);
     _c = Computed.withPrev((prev) {
       _stream.react((changes) {
         Set<K>? keysToNotify = <K>{}; // If null -> notify all keys
@@ -211,8 +213,7 @@ class ChangeStreamComputedMap<K, V> implements IComputedMap<K, V> {
   }
 
   @override
-  // TODO: implement changes
-  Computed<ChangeRecord<K, V>> get changes => throw UnimplementedError();
+  Computed<Set<ChangeRecord<K, V>>> get changes => _changes;
 
   @override
   Computed<ChangeRecord<K, V>> changesFor(K key) {

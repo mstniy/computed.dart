@@ -15,7 +15,7 @@ abstract class IComputedMap<K, V> {
       Stream<Set<ChangeRecord<K, V>>> stream) {
     return ChangeStreamComputedMap(stream);
   }
-  Computed<ChangeRecord<K, V>> get changes;
+  Computed<Set<ChangeRecord<K, V>>> get changes;
   Computed<ChangeRecord<K, V>> changesFor(K key);
 
   @visibleForTesting
