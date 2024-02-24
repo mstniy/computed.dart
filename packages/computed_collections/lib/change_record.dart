@@ -19,6 +19,9 @@ class ChangeRecordInsert<K, V> extends ChangeRecord<K, V> {
   // mile of checking in the reverse direction.
   bool operator ==(Object other) =>
       other is ChangeRecordInsert && other.key == key && other.value == value;
+
+  @override
+  int get hashCode => Object.hash(key, value);
 }
 
 @immutable
@@ -32,6 +35,9 @@ class ChangeRecordDelete<K, V> extends ChangeRecord<K, V> {
       other is ChangeRecordDelete &&
       other.key == key &&
       other.oldValue == oldValue;
+
+  @override
+  int get hashCode => Object.hash(key, oldValue);
 }
 
 @immutable
@@ -46,6 +52,9 @@ class ChangeRecordUpdate<K, V> extends ChangeRecord<K, V> {
       other.key == key &&
       other.oldValue == oldValue &&
       other.newValue == newValue;
+
+  @override
+  int get hashCode => Object.hash(key, oldValue, newValue);
 }
 
 @immutable
@@ -56,4 +65,7 @@ class ChangeRecordReplace<K, V> extends ChangeRecord<K, V> {
 
   bool operator ==(Object other) =>
       other is ChangeRecordReplace && other.newCollection == newCollection;
+
+  @override
+  int get hashCode => newCollection.hashCode;
 }

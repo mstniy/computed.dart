@@ -15,7 +15,7 @@ abstract class IComputedMap<K, V> {
       Stream<Set<ChangeRecord<K, V>>> stream) {
     return ChangeStreamComputedMap(stream);
   }
-  Computed<Set<ChangeRecord<K, V>>> get changes;
+  Computed<ISet<ChangeRecord<K, V>>> get changes;
   Computed<ChangeRecord<K, V>> changesFor(K key);
 
   @visibleForTesting
@@ -43,6 +43,8 @@ abstract class IComputedMap<K, V> {
   Computed<int> get length;
   //IComputedList<V> get values;
 
+  IComputedMap<K, V> add(
+      K key, V value); // Note that the computed variant is trivial
   IComputedMap<K, V> addAllComputed(IComputedMap<K, V> other);
   IComputedMap<K, V> addAll(IMap<K, V> other);
   //IComputedIMap<K, V> addEntires(IComputedIList<MapEntry<K, V>> newEntries);
@@ -71,6 +73,4 @@ abstract class IComputedMap<K, V> {
   IComputedMap<K, V> updateAllComputed(
       Computed<V> Function(K key, V Value) update);
   IComputedMap<K, V> updateAll(V Function(K key, V Value) update);
-  IComputedMap<K, V> replace(
-      K key, V value); // Note that the computed variant is trivial
 }
