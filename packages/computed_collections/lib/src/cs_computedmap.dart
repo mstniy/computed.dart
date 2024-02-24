@@ -199,24 +199,6 @@ class ChangeStreamComputedMap<K, V>
   }
 
   @override
-  IComputedMap<K, V> addAll(IMap<K, V> other) {
-    // TODO: implement addAll
-    throw UnimplementedError();
-  }
-
-  @override
-  IComputedMap<K, V> addAllComputed(IComputedMap<K, V> other) {
-    // TODO: implement addAllComputed
-    throw UnimplementedError();
-  }
-
-  @override
-  IComputedMap<RK, RV> cast<RK, RV>() {
-    // TODO: implement cast
-    throw UnimplementedError();
-  }
-
-  @override
   Computed<ISet<ChangeRecord<K, V>>> get changes => _changes;
 
   @override
@@ -226,101 +208,20 @@ class ChangeStreamComputedMap<K, V>
   }
 
   @override
-  Computed<bool> containsKey(K key) {
-    // TODO: implement containsKey
-    throw UnimplementedError();
-  }
+  Computed<bool> containsKey(K key) => $(() => _c.use.containsKey(key));
 
   @override
-  Computed<bool> containsValue(V value) {
-    // TODO: implement containsValue
-    throw UnimplementedError();
-  }
+  Computed<bool> containsValue(V value) => $(() => _c.use.containsValue(value));
 
   @override
-  // TODO: implement isEmpty
-  Computed<bool> get isEmpty => throw UnimplementedError();
+  Computed<bool> get isEmpty => $(() => _c.use.isEmpty);
 
   @override
-  // TODO: implement isNotEmpty
-  Computed<bool> get isNotEmpty => throw UnimplementedError();
+  Computed<bool> get isNotEmpty => $(() => _c.use.isNotEmpty);
 
   @override
-  // TODO: implement length
-  Computed<int> get length => throw UnimplementedError();
-
-  @override
-  IComputedMap<K2, V2> map<K2, V2>(
-      MapEntry<K2, V2> Function(K key, V Value) convert) {
-    // TODO: implement map
-    throw UnimplementedError();
-  }
-
-  @override
-  IComputedMap<K2, V2> mapComputed<K2, V2>(
-      Computed<MapEntry<K2, V2>> Function(K key, V Value) convert) {
-    // TODO: implement mapComputed
-    throw UnimplementedError();
-  }
-
-  @override
-  IComputedMap<K, V2> mapValues<V2>(V2 Function(K key, V Value) convert) {
-    // TODO: implement mapValues
-    throw UnimplementedError();
-  }
-
-  @override
-  IComputedMap<K, V2> mapValuesComputed<V2>(
-      Computed<V2> Function(K key, V Value) convert) {
-    // TODO: implement mapValuesComputed
-    throw UnimplementedError();
-  }
-
-  @override
-  IComputedMap<K, V> putIfAbsent(K key, V Function() ifAbsent) {
-    // TODO: implement putIfAbsent
-    throw UnimplementedError();
-  }
-
-  @override
-  IComputedMap<K, V> remove(K key) {
-    // TODO: implement remove
-    throw UnimplementedError();
-  }
-
-  @override
-  IComputedMap<K, V> removeWhere(bool Function(K key, V value) test) {
-    // TODO: implement removeWhere
-    throw UnimplementedError();
-  }
-
-  @override
-  IComputedMap<K, V> removeWhereComputed(
-      Computed<bool> Function(K key, V value) test) {
-    // TODO: implement removeWhereComputed
-    throw UnimplementedError();
-  }
+  Computed<int> get length => $(() => _c.use.length);
 
   @override
   Computed<IMap<K, V>> get snapshot => _c;
-
-  @override
-  IComputedMap<K, V> update(K key, V Function(V value) update,
-      {V Function()? ifAbsent}) {
-    // TODO: implement update
-    throw UnimplementedError();
-  }
-
-  @override
-  IComputedMap<K, V> updateAll(V Function(K key, V Value) update) {
-    // TODO: implement updateAll
-    throw UnimplementedError();
-  }
-
-  @override
-  IComputedMap<K, V> updateAllComputed(
-      Computed<V> Function(K key, V Value) update) {
-    // TODO: implement updateAllComputed
-    throw UnimplementedError();
-  }
 }
