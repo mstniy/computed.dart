@@ -4,7 +4,7 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import 'package:meta/meta.dart';
 
-import 'src/computedmap.dart';
+import 'src/cs_computedmap.dart';
 
 /// An in-memory, partially- or fully-observable key-value store.
 /// Similar to the ObservableMap from the `observable` package, but with the following upsides:
