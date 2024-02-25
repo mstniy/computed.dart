@@ -1,5 +1,6 @@
 import 'package:computed/computed.dart';
 import 'package:computed_collections/src/map_values.dart';
+import 'package:computed_collections/src/map_values_computed.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import '../icomputedmap.dart';
@@ -40,10 +41,8 @@ class ComputedMapMixin<K, V> {
       MapValuesComputedMap(this as IComputedMap<K, V>, convert);
 
   IComputedMap<K, V2> mapValuesComputed<V2>(
-      Computed<V2> Function(K key, V value) convert) {
-    // TODO: implement mapValuesComputed
-    throw UnimplementedError();
-  }
+          Computed<V2> Function(K key, V value) convert) =>
+      MapValuesComputedComputedMap(this as IComputedMap<K, V>, convert);
 
   IComputedMap<K, V> putIfAbsent(K key, V Function() ifAbsent) {
     // TODO: implement putIfAbsent
