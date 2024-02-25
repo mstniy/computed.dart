@@ -73,15 +73,23 @@ class MapValuesComputedComputedMap<K, V, VParent>
     });
     // TODO: asStream introduces a lag of one microtask here
     //  Can we change it to make the api more uniform?
-    // TODO: Implement an initial value computer. Needs to catch NVEs, just like the first
-    _snapshot = ChangeStreamComputedMap(
-        _changes.asStream,
-        // TODO: placeholder for the initial computation
-        () => <int, int>{1: 1}.lock as IMap<K,
-            V> /*,
-            () => _parent.snapshot.use
-                .map(((key, value) => MapEntry(key, _convert(key, value))))*/
-        ).snapshot;
+    _snapshot = ChangeStreamComputedMap(_changes.asStream, () {
+      final entries = _parent.snapshot.use
+          .map(((key, value) => MapEntry(key, _convert(key, value))));
+      var gotNVE = false;
+      final unwrapped = IMap.fromEntries(entries.entries.map((e) {
+        try {
+          return [MapEntry(e.key, e.value.use)];
+        } on NoValueException {
+          gotNVE = true;
+          return <MapEntry<K, V>>[];
+          // Keep going, we want Computed to be aware of all the dependencies
+        }
+      }).expand((e) => e));
+
+      if (gotNVE) throw NoValueException();
+      return unwrapped;
+    }).snapshot;
   }
 
   @override
@@ -104,12 +112,24 @@ class MapValuesComputedComputedMap<K, V, VParent>
 
   @override
   // TODO: cache the result, like ChangeStreamComputedMap
-  Computed<V?> operator [](K key) => $(() {
-        if (_parent.containsKey(key).use) {
-          return _convert(key, _parent[key].use as VParent).use;
-        }
-        return null;
-      });
+  Computed<V?> operator [](K key) {
+    // TODO: we have to use async here because we return a computation,
+    //  but the downside is that we are also running the user computation async
+    //  we only really want to disable idempotency checks, not really allow async
+    final computationComputation = Computed.async(() {
+      if (_parent.containsKey(key).use) {
+        return _convert(key, _parent[key].use as VParent);
+      }
+      return null;
+    });
+    final resultComputation = $(() {
+      final c = computationComputation.use;
+      if (c != null) return c.use;
+      return null;
+    });
+
+    return resultComputation;
+  }
 
   @override
   Computed<ChangeRecord<K, V>> changesFor(K key) {

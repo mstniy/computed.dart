@@ -73,12 +73,13 @@ void main() {
   });
   test('operator[] works', () async {
     final s = ValueStream<ISet<ChangeRecord<int, int>>>(sync: true);
+    final s2 = ValueStream<int>.seeded(5, sync: true);
     final m1 = IComputedMap.fromChangeStream(s);
     var cCnt = 0;
-    final m2 = m1.mapValues((k, v) {
-      cCnt++;
-      return v + 1;
-    });
+    final m2 = m1.mapValuesComputed((k, v) => $(() {
+          cCnt++;
+          return v + s2.use;
+        }));
 
     var callCnt1 = 0;
     int? lastRes1;
@@ -94,9 +95,16 @@ void main() {
 
     s.add({ChangeRecordInsert(0, 1)}.lock);
     await Future.value();
-    expect(cCnt, 2);
+    await Future.value();
+    // Two runs in which it throws NVE, two runs after subscribing to [s2]
+    expect(cCnt, 4);
     expect(callCnt1, 2);
-    expect(lastRes1, 2);
+    expect(lastRes1, 6);
+
+    s2.add(0);
+    expect(cCnt, 6);
+    expect(callCnt1, 3);
+    expect(lastRes1, 1);
 
     sub1.cancel();
   });
