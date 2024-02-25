@@ -5,15 +5,15 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import 'computedmap_mixins.dart';
 
-class AddComputedMap<K, V> extends ChildComputedMap<K, V>
+class AddComputedMap<K, V>
     with ComputedMapMixin<K, V>
     implements IComputedMap<K, V> {
   K _key;
   V _value;
+  final IComputedMap<K, V> _parent;
   late final Computed<ISet<ChangeRecord<K, V>>> _changes;
   late final Computed<IMap<K, V>> _snapshot;
-  AddComputedMap(IComputedMap<K, V> _parent, this._key, this._value)
-      : super(_parent) {
+  AddComputedMap(this._parent, this._key, this._value) {
     _snapshot = $(() => _parent.snapshot.use.add(this._key, this._value));
     _changes = Computed(() {
       final changes = _parent.changes.use
@@ -46,13 +46,13 @@ class AddComputedMap<K, V> extends ChildComputedMap<K, V>
 
   Computed<V?> operator [](K key) {
     if (key == _key) return $(() => _value);
-    return parent[key];
+    return _parent[key];
   }
 
   @override
   IComputedMap<K, V> add(K key, V value) {
     if (key == _key) {
-      return AddComputedMap(parent, key, value);
+      return AddComputedMap(_parent, key, value);
     } else {
       return AddComputedMap(this, key, value);
     }
@@ -65,19 +65,19 @@ class AddComputedMap<K, V> extends ChildComputedMap<K, V>
   Computed<ChangeRecord<K, V>> changesFor(K key) {
     // The value of _key never changes
     if (key == _key) return $(() => throw NoValueException);
-    return parent.changesFor(key);
+    return _parent.changesFor(key);
   }
 
   @override
   Computed<bool> containsKey(K key) {
     if (key == _key) return $(() => true);
-    return parent.containsKey(key);
+    return _parent.containsKey(key);
   }
 
   @override
   Computed<bool> containsValue(V value) {
     if (value == _value) return $(() => true);
-    return parent.containsValue(value);
+    return _parent.containsValue(value);
   }
 
   @override
@@ -88,8 +88,28 @@ class AddComputedMap<K, V> extends ChildComputedMap<K, V>
 
   @override
   Computed<int> get length =>
-      $(() => parent.length.use + (parent.containsKey(_key).use ? 0 : 1));
+      $(() => _parent.length.use + (_parent.containsKey(_key).use ? 0 : 1));
 
   @override
   Computed<IMap<K, V>> get snapshot => _snapshot;
+
+  @override
+  void fix(IMap<K, V> value) {
+    // TODO: implement fix
+  }
+
+  @override
+  void fixThrow(Object e) {
+    // TODO: implement fixThrow
+  }
+
+  @override
+  void mock(IMap<K, V> Function() mock) {
+    // TODO: implement mock
+  }
+
+  @override
+  void unmock() {
+    // TODO: implement unmock
+  }
 }

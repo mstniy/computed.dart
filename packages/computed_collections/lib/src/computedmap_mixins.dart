@@ -1,7 +1,6 @@
 import 'package:computed/computed.dart';
 import 'package:computed_collections/src/map_values.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
-import 'package:meta/meta.dart';
 
 import '../icomputedmap.dart';
 import 'add_computedmap.dart';
@@ -26,22 +25,22 @@ class ComputedMapMixin<K, V> {
   }
 
   IComputedMap<K2, V2> map<K2, V2>(
-      MapEntry<K2, V2> Function(K key, V Value) convert) {
+      MapEntry<K2, V2> Function(K key, V value) convert) {
     // TODO: implement map
     throw UnimplementedError();
   }
 
   IComputedMap<K2, V2> mapComputed<K2, V2>(
-      Computed<MapEntry<K2, V2>> Function(K key, V Value) convert) {
+      Computed<MapEntry<K2, V2>> Function(K key, V value) convert) {
     // TODO: implement mapComputed
     throw UnimplementedError();
   }
 
-  IComputedMap<K, V2> mapValues<V2>(V2 Function(K key, V Value) convert) =>
+  IComputedMap<K, V2> mapValues<V2>(V2 Function(K key, V value) convert) =>
       MapValuesComputedMap(this as IComputedMap<K, V>, convert);
 
   IComputedMap<K, V2> mapValuesComputed<V2>(
-      Computed<V2> Function(K key, V Value) convert) {
+      Computed<V2> Function(K key, V value) convert) {
     // TODO: implement mapValuesComputed
     throw UnimplementedError();
   }
@@ -73,36 +72,14 @@ class ComputedMapMixin<K, V> {
     throw UnimplementedError();
   }
 
-  IComputedMap<K, V> updateAll(V Function(K key, V Value) update) {
+  IComputedMap<K, V> updateAll(V Function(K key, V value) update) {
     // TODO: implement updateAll
     throw UnimplementedError();
   }
 
   IComputedMap<K, V> updateAllComputed(
-      Computed<V> Function(K key, V Value) update) {
+      Computed<V> Function(K key, V value) update) {
     // TODO: implement updateAllComputed
     throw UnimplementedError();
   }
-}
-
-class ChildComputedMap<K, V> {
-  final IComputedMap<K, V> parent;
-  ChildComputedMap(this.parent);
-
-  @visibleForTesting
-  // TODO: This is completely wrong semantically. We can't "delegate" mocks this way
-  // ignore: invalid_use_of_visible_for_testing_member
-  void fix(IMap<K, V> value) => parent.fix(value);
-
-  @visibleForTesting
-  // ignore: invalid_use_of_visible_for_testing_member
-  void fixThrow(Object e) => parent.fixThrow(e);
-
-  @visibleForTesting
-  // ignore: invalid_use_of_visible_for_testing_member
-  void mock(IMap<K, V> Function() mock) => parent.mock(mock);
-
-  @visibleForTesting
-  // ignore: invalid_use_of_visible_for_testing_member
-  void unmock() => parent.unmock();
 }

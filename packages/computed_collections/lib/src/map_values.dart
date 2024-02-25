@@ -63,10 +63,13 @@ class MapValuesComputedMap<K, V, VParent>
   Computed<IMap<K, V>> get snapshot => _snapshot;
 
   @override
-  Computed<V?> operator [](K key) {
-    // TODO: implement []
-    throw UnimplementedError();
-  }
+  // TODO: cache the result, like ChangeStreamComputedMap
+  Computed<V?> operator [](K key) => $(() {
+        if (_parent.containsKey(key).use) {
+          return _convert(key, _parent[key].use as VParent);
+        }
+        return null;
+      });
 
   @override
   Computed<ChangeRecord<K, V>> changesFor(K key) {

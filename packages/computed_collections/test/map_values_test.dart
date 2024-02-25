@@ -58,6 +58,78 @@ void main() {
     sub1.cancel();
     sub2.cancel();
   });
+  test('operator[] works', () async {
+    final s = ValueStream<ISet<ChangeRecord<int, int>>>(sync: true);
+    final m1 = IComputedMap.fromChangeStream(s);
+    var cCnt = 0;
+    final m2 = m1.mapValues((k, v) {
+      cCnt++;
+      return v + 1;
+    });
 
-  // Nothing to test further, as mapValues just returns a ChangeStreamComputedMap
+    var callCnt1 = 0;
+    int? lastRes1;
+    final sub1 = m2[0].listen((event) {
+      callCnt1++;
+      lastRes1 = event;
+    }, (e) => fail(e.toString()));
+
+    await Future.value();
+    expect(cCnt, 0);
+    expect(callCnt1, 1);
+    expect(lastRes1, null);
+
+    s.add({ChangeRecordInsert(0, 1)}.lock);
+    await Future.value();
+    expect(cCnt, 2);
+    expect(callCnt1, 2);
+    expect(lastRes1, 2);
+
+    sub1.cancel();
+  });
+
+  test('propagates the change stream', () async {
+    final s = ValueStream<ISet<ChangeRecord<int, int>>>(sync: true);
+    final m1 = IComputedMap.fromChangeStream(s);
+    final m2 = m1.mapValues((key, value) => value + 1);
+    ISet<ChangeRecord<int, int>>? lastRes;
+    var callCnt = 0;
+    final sub = m2.changes.listen((event) {
+      callCnt++;
+      lastRes = event;
+    }, (e) => fail(e.toString()));
+
+    await Future.value();
+    expect(callCnt, 0);
+    s.add({ChangeRecordInsert(0, 1)}.lock);
+    expect(callCnt, 1);
+    expect(lastRes, {ChangeRecordInsert(0, 2)}.lock);
+
+    s.add({ChangeRecordInsert(1, 2)}.lock);
+    expect(callCnt, 2);
+    expect(lastRes, {ChangeRecordInsert(1, 3)}.lock);
+
+    s.add({ChangeRecordUpdate(0, 1, 2)}.lock);
+    expect(callCnt, 3);
+    expect(lastRes, {ChangeRecordUpdate(0, null, 3)}.lock);
+
+    s.add({ChangeRecordDelete(0, 2)}.lock);
+    expect(callCnt, 4);
+    expect(lastRes, {ChangeRecordDelete(0, null)}.lock);
+
+    s.add({ChangeRecordDelete(1, 3)}.lock);
+    expect(callCnt, 5);
+    expect(lastRes, {ChangeRecordDelete(1, null)}.lock);
+    s.add({
+      ChangeRecordReplace({0: 5, 1: 6, 2: 7}.lock)
+    }.lock);
+    expect(callCnt, 6);
+    expect(
+        lastRes,
+        {
+          ChangeRecordReplace({0: 6, 1: 7, 2: 8}.lock)
+        }.lock);
+
+    sub.cancel();
+  });
 }

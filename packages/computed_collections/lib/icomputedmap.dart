@@ -53,12 +53,12 @@ abstract class IComputedMap<K, V> {
   Computed<bool> containsValue(
       V value); // Not that the computed variant is trivial
   IComputedMap<K2, V2> mapComputed<K2, V2>(
-      Computed<MapEntry<K2, V2>> Function(K key, V Value) convert);
+      Computed<MapEntry<K2, V2>> Function(K key, V value) convert);
   IComputedMap<K2, V2> map<K2, V2>(
-      MapEntry<K2, V2> Function(K key, V Value) convert);
+      MapEntry<K2, V2> Function(K key, V value) convert);
   IComputedMap<K, V2> mapValuesComputed<V2>(
-      Computed<V2> Function(K key, V Value) convert);
-  IComputedMap<K, V2> mapValues<V2>(V2 Function(K key, V Value) convert);
+      Computed<V2> Function(K key, V value) convert);
+  IComputedMap<K, V2> mapValues<V2>(V2 Function(K key, V value) convert);
   IComputedMap<K, V> putIfAbsent(
       K key, V Function() ifAbsent); // Not that the computed variant is trivial
   IComputedMap<K, V> remove(K key); // Not that the computed variant is trivial
@@ -71,6 +71,6 @@ abstract class IComputedMap<K, V> {
       V Function(V value) update,
       {V Function()? ifAbsent});
   IComputedMap<K, V> updateAllComputed(
-      Computed<V> Function(K key, V Value) update);
-  IComputedMap<K, V> updateAll(V Function(K key, V Value) update);
+      Computed<V> Function(K key, V value) update);
+  IComputedMap<K, V> updateAll(V Function(K key, V value) update);
 }
