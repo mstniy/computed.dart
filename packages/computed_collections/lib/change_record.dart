@@ -27,7 +27,7 @@ class ChangeRecordInsert<K, V> extends ChangeRecord<K, V> {
 @immutable
 class ChangeRecordDelete<K, V> extends ChangeRecord<K, V> {
   final K key;
-  final V oldValue;
+  final V? oldValue;
 
   ChangeRecordDelete(this.key, this.oldValue);
 
@@ -43,7 +43,8 @@ class ChangeRecordDelete<K, V> extends ChangeRecord<K, V> {
 @immutable
 class ChangeRecordUpdate<K, V> extends ChangeRecord<K, V> {
   final K key;
-  final V oldValue, newValue;
+  final V? oldValue;
+  final V newValue;
 
   ChangeRecordUpdate(this.key, this.oldValue, this.newValue);
 

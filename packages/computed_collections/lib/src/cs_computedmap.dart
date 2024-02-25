@@ -27,8 +27,8 @@ class _ValueOrException<T> {
 class ChangeStreamComputedMap<K, V>
     with ComputedMapMixin<K, V>
     implements IComputedMap<K, V> {
-  final initialValue = <K, V>{}.lock;
-  final Stream<Set<ChangeRecord<K, V>>> _stream;
+  final IMap<K, V> Function()? _initialValueComputer;
+  final Stream<ISet<ChangeRecord<K, V>>> _stream;
   late final Computed<ISet<ChangeRecord<K, V>>> _changes;
   late final Computed<IMap<K, V>> _c;
   // The "keep-alive" subscription used by key streams, as we explicitly break the dependency DAG of Computed.
@@ -39,12 +39,26 @@ class ChangeStreamComputedMap<K, V>
   final _keyChangeStreams = <K, Set<ValueStream<ChangeRecord<K, V>>>>{};
   final _keyChangeStreamComputations = <K, Set<Computed<ChangeRecord<K, V>>>>{};
   final _keyValueStreams = <K, Map<ValueStream<V?>, Computed<V?>>>{};
-  Set<ChangeRecord<K, V>>? _lastChange;
+  ISet<ChangeRecord<K, V>>? _lastChange;
   _ValueOrException<IMap<K, V>>?
       _curRes; // TODO: After adding support for disposing computations to Computed, set this to null as the disposer
-  ChangeStreamComputedMap(this._stream) {
-    _changes = $(() => _stream.use.lock);
+  ChangeStreamComputedMap(this._stream, [this._initialValueComputer]) {
+    _changes = $(() => _stream.use);
+    final firstReactToken = IMap<K,
+        V>(); // TODO: This is obviously ugly. Make Computed.withPrev support null instead
     _c = Computed.withPrev((prev) {
+      void Function()? notifierToSchedule;
+      if (identical(prev, firstReactToken)) {
+        if (_initialValueComputer != null) {
+          prev = _initialValueComputer!();
+        } else {
+          prev = <K, V>{}.lock;
+        }
+
+        _curRes = _ValueOrException.value(prev);
+        // TODO: Check for idempotency calls here
+        notifierToSchedule = _notifyAllKeyStreams;
+      }
       _stream.react((changes) {
         Set<K>? keysToNotify = <K>{}; // If null -> notify all keys
         for (var change in changes) {
@@ -74,10 +88,9 @@ class ChangeStreamComputedMap<K, V>
           if (keysToNotify == null) {
             // Computed doesn't like it when a computation adds thins to a stream,
             // so cheat here once again
-            Zone.current.parent!.scheduleMicrotask(_notifyAllKeyStreams);
+            notifierToSchedule = _notifyAllKeyStreams;
           } else {
-            Zone.current.parent!
-                .scheduleMicrotask(() => _notifyKeyStreams(keysToNotify!));
+            notifierToSchedule ??= () => _notifyKeyStreams(keysToNotify!);
           }
         }
       }, (e) {
@@ -87,8 +100,12 @@ class ChangeStreamComputedMap<K, V>
         throw e;
       });
 
+      if (notifierToSchedule != null) {
+        Zone.current.parent!.scheduleMicrotask(notifierToSchedule!);
+      }
+
       return prev;
-    }, initialPrev: initialValue);
+    }, initialPrev: firstReactToken);
   }
 
   @visibleForTesting
@@ -129,7 +146,6 @@ class ChangeStreamComputedMap<K, V>
   void unmock() {
     // ignore: invalid_use_of_visible_for_testing_member
     _c.unmock(); // Note that this won't notify key streams
-    _curRes = _ValueOrException.value(initialValue);
     _notifyAllKeyStreams();
   }
 

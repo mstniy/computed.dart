@@ -6,33 +6,66 @@ import 'package:test/test.dart';
 
 void main() {
   test('snapshot works', () async {
-    final s = ValueStream<Set<ChangeRecord<int, int>>>(sync: true);
+    final s = ValueStream<ISet<ChangeRecord<int, int>>>(sync: true);
     final m1 = IComputedMap.fromChangeStream(s);
-    final m2 = m1.add(0, 1);
+    // Test both .add on a fromChangeStream map as well as on an added map
+    for (var getM2 in [() => m1.add(0, 1), () => m1.add(0, 2).add(0, 1)]) {
+      final m2 = getM2();
+      IMap<int, int>? lastRes;
+      final sub = m2.snapshot.listen((event) {
+        lastRes = event;
+      }, (e) => fail(e.toString()));
+      await Future.value();
+      expect(lastRes, {0: 1}.lock);
+      s.add({ChangeRecordInsert(0, 1)}.lock);
+      expect(lastRes, {0: 1}.lock);
+      s.add({ChangeRecordUpdate(0, 1, 2)}.lock);
+      expect(lastRes, {0: 1}.lock);
+      s.add({ChangeRecordInsert(1, 2)}.lock);
+      expect(lastRes, {0: 1, 1: 2}.lock);
+      s.add({ChangeRecordDelete(0, 2)}.lock);
+      expect(lastRes, {0: 1, 1: 2}.lock);
+      s.add({
+        ChangeRecordReplace({4: 5}.lock)
+      }.lock);
+      expect(lastRes, {0: 1, 4: 5}.lock);
+
+      sub.cancel();
+
+      // Clear m1 in preparation of the next iteration
+      s.add({ChangeRecordReplace(<int, int>{}.lock)}.lock);
+    }
+  });
+
+  test('add on different key works', () async {
+    final s = ValueStream<ISet<ChangeRecord<int, int>>>(sync: true);
+    final m1 = IComputedMap.fromChangeStream(s);
+    final m2 = m1.add(0, 1).add(2, 3);
+
     IMap<int, int>? lastRes;
     final sub = m2.snapshot.listen((event) {
       lastRes = event;
     }, (e) => fail(e.toString()));
     await Future.value();
-    expect(lastRes, {0: 1}.lock);
-    s.add({ChangeRecordInsert(0, 1)});
-    expect(lastRes, {0: 1}.lock);
-    s.add({ChangeRecordUpdate(0, 1, 2)});
-    expect(lastRes, {0: 1}.lock);
-    s.add({ChangeRecordInsert(1, 2)});
-    expect(lastRes, {0: 1, 1: 2}.lock);
-    s.add({ChangeRecordDelete(0, 2)});
-    expect(lastRes, {0: 1, 1: 2}.lock);
+    expect(lastRes, {0: 1, 2: 3}.lock);
+    s.add({ChangeRecordInsert(0, 1)}.lock);
+    expect(lastRes, {0: 1, 2: 3}.lock);
+    s.add({ChangeRecordUpdate(0, 1, 2)}.lock);
+    expect(lastRes, {0: 1, 2: 3}.lock);
+    s.add({ChangeRecordInsert(4, 5)}.lock);
+    expect(lastRes, {0: 1, 2: 3, 4: 5}.lock);
+    s.add({ChangeRecordDelete(0, 2)}.lock);
+    expect(lastRes, {0: 1, 2: 3, 4: 5}.lock);
     s.add({
-      ChangeRecordReplace({4: 5}.lock)
-    });
-    expect(lastRes, {0: 1, 4: 5}.lock);
+      ChangeRecordReplace({6: 7}.lock)
+    }.lock);
+    expect(lastRes, {0: 1, 2: 3, 6: 7}.lock);
 
     sub.cancel();
   });
 
   test('operator[] works', () async {
-    final s = ValueStream<Set<ChangeRecord<int, int>>>(sync: true);
+    final s = ValueStream<ISet<ChangeRecord<int, int>>>(sync: true);
     final m1 = IComputedMap.fromChangeStream(s);
     final m2 = m1.add(0, 1);
 
@@ -48,22 +81,22 @@ void main() {
     expect(callCnt1, 1);
     expect(lastRes1, 1);
 
-    s.add({ChangeRecordInsert(0, 1)});
+    s.add({ChangeRecordInsert(0, 1)}.lock);
     await Future.value();
     expect(callCnt1, 1);
 
-    s.add({ChangeRecordInsert(1, 2)});
+    s.add({ChangeRecordInsert(1, 2)}.lock);
     await Future.value();
     expect(callCnt1, 1);
-    s.add({ChangeRecordUpdate(1, 2, 3)});
+    s.add({ChangeRecordUpdate(1, 2, 3)}.lock);
     await Future.value();
     expect(callCnt1, 1);
-    s.add({ChangeRecordUpdate(0, 1, 4)});
+    s.add({ChangeRecordUpdate(0, 1, 4)}.lock);
     await Future.value();
     expect(callCnt1, 1);
     s.add({
       ChangeRecordReplace({5: 6}.lock)
-    });
+    }.lock);
     await Future.value();
     expect(callCnt1, 1);
 
@@ -79,23 +112,23 @@ void main() {
     expect(callCnt2, 1);
     expect(lastRes2, null);
 
-    s.add({ChangeRecordDelete(5, 6)});
+    s.add({ChangeRecordDelete(5, 6)}.lock);
     await Future.value();
     expect(callCnt1, 1);
     expect(callCnt2, 1);
-    s.add({ChangeRecordInsert(1, 2)});
+    s.add({ChangeRecordInsert(1, 2)}.lock);
     await Future.value();
     expect(callCnt1, 1);
     expect(callCnt2, 2);
     expect(lastRes2, 2);
-    s.add({ChangeRecordUpdate(1, 2, 3)});
+    s.add({ChangeRecordUpdate(1, 2, 3)}.lock);
     await Future.value();
     expect(callCnt1, 1);
     expect(callCnt2, 3);
     expect(lastRes2, 3);
     s.add({
       ChangeRecordReplace({1: 4}.lock)
-    });
+    }.lock);
     await Future.value();
     expect(callCnt1, 1);
     expect(callCnt2, 4);
@@ -106,14 +139,14 @@ void main() {
 
     s.add({
       ChangeRecordReplace({0: 3, 1: 5}.lock)
-    });
+    }.lock);
     await Future.value();
     expect(callCnt1, 1); // The listeners have been cancelled
     expect(callCnt2, 4);
   });
 
   test('propagates the change stream', () async {
-    final s = ValueStream<Set<ChangeRecord<int, int>>>(sync: true);
+    final s = ValueStream<ISet<ChangeRecord<int, int>>>(sync: true);
     final m1 = IComputedMap.fromChangeStream(s);
     final m2 = m1.add(0, 1);
     ISet<ChangeRecord<int, int>>? lastRes;
@@ -125,24 +158,24 @@ void main() {
 
     await Future.value();
     expect(callCnt, 0);
-    s.add({ChangeRecordInsert(0, 1)});
+    s.add({ChangeRecordInsert(0, 1)}.lock);
     expect(callCnt, 0);
-    s.add({ChangeRecordInsert(1, 2)});
+    s.add({ChangeRecordInsert(1, 2)}.lock);
     expect(callCnt, 1);
     expect(lastRes, {ChangeRecordInsert(1, 2)}.lock);
-    s.add({ChangeRecordUpdate(0, 1, 2)});
+    s.add({ChangeRecordUpdate(0, 1, 2)}.lock);
     expect(callCnt, 1);
-    s.add({ChangeRecordUpdate(1, 2, 3)});
+    s.add({ChangeRecordUpdate(1, 2, 3)}.lock);
     expect(callCnt, 2);
     expect(lastRes, {ChangeRecordUpdate(1, 2, 3)}.lock);
-    s.add({ChangeRecordDelete(0, 2)});
+    s.add({ChangeRecordDelete(0, 2)}.lock);
     expect(callCnt, 2);
-    s.add({ChangeRecordDelete(1, 3)});
+    s.add({ChangeRecordDelete(1, 3)}.lock);
     expect(callCnt, 3);
     expect(lastRes, {ChangeRecordDelete(1, 3)}.lock);
     s.add({
       ChangeRecordReplace({0: 5, 1: 6, 2: 7}.lock)
-    });
+    }.lock);
     expect(callCnt, 4);
     expect(
         lastRes,
