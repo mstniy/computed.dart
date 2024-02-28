@@ -111,8 +111,9 @@ void main() {
 
   test('propagates the change stream', () async {
     final s = ValueStream<ISet<ChangeRecord<int, int>>>(sync: true);
+    final s2 = ValueStream<int>.seeded(5, sync: true);
     final m1 = IComputedMap.fromChangeStream(s);
-    final m2 = m1.mapValues((key, value) => value + 1);
+    final m2 = m1.mapValuesComputed((key, value) => $(() => value + s2.use));
     ISet<ChangeRecord<int, int>>? lastRes;
     var callCnt = 0;
     final sub = m2.changes.listen((event) {
@@ -123,34 +124,35 @@ void main() {
     await Future.value();
     expect(callCnt, 0);
     s.add({ChangeRecordInsert(0, 1)}.lock);
+    await Future.value();
     expect(callCnt, 1);
-    expect(lastRes, {ChangeRecordInsert(0, 2)}.lock);
+    expect(lastRes, {ChangeRecordInsert(0, 6)}.lock);
 
     s.add({ChangeRecordInsert(1, 2)}.lock);
     expect(callCnt, 2);
-    expect(lastRes, {ChangeRecordInsert(1, 3)}.lock);
+    expect(lastRes, {ChangeRecordInsert(1, 7)}.lock);
 
     s.add({ChangeRecordUpdate(0, 1, 2)}.lock);
     expect(callCnt, 3);
-    expect(lastRes, {ChangeRecordUpdate(0, null, 3)}.lock);
+    expect(lastRes, {ChangeRecordUpdate<int, int>(0, null, 7)}.lock);
 
     s.add({ChangeRecordDelete(0, 2)}.lock);
     expect(callCnt, 4);
-    expect(lastRes, {ChangeRecordDelete(0, null)}.lock);
+    expect(lastRes, {ChangeRecordDelete<int, int>(0, null)}.lock);
 
-    s.add({ChangeRecordDelete(1, 3)}.lock);
-    expect(callCnt, 5);
-    expect(lastRes, {ChangeRecordDelete(1, null)}.lock);
     s.add({
       ChangeRecordReplace({0: 5, 1: 6, 2: 7}.lock)
     }.lock);
-    expect(callCnt, 6);
+    await Future
+        .value(); // We need this because the last delete causes the change stream computation to unsubscribe from s2
+    expect(callCnt, 5);
     expect(
         lastRes,
         {
-          ChangeRecordReplace({0: 6, 1: 7, 2: 8}.lock)
+          ChangeRecordReplace({0: 10, 1: 11, 2: 12}.lock)
         }.lock);
 
     sub.cancel();
+    // TODO: Also test that changing the value of s2 is well-behaved
   });
 }

@@ -37,6 +37,18 @@ class MapValuesComputedComputedMap<K, V, VParent>
       return computedChanges;
     });
     _changes = $(() {
+      // TODO: This node needs to somehow merge all the nodes in the previous one
+      //  how to do this scalably? currently the only way is to .use each node one by one,
+      //  very inefficient from a collectional sense, but this is due to the limitations of computed.
+      //  Idea: Drop down to the imperative level (by turning all the computations returned by the previous node into sync streams)
+      //  and manually call .listen/.cancel on them (to avoid the inefficiency of having to iterate the whole list at each change)
+
+      // TODO: Idea: create a stream controller here. onListen, attach a listener to the previous node.
+      //  state: a map of key-computedsubscription pairs
+      //  in the listener, if this is an insert/update, attach a listener to the returned computation that adds the values to this stream, and add the subscription to the state
+      //                   if this is a delete, cancel the subscription and remove it from the state
+      //  onCancel: cancel all subscriptions, both in the state and the subscription to the previous node
+
       // TODO: We need .react here, but we can't .react on computations
       //  This might break things when we eg. get unmocked
       var gotNVE = false;
