@@ -1,4 +1,5 @@
 import 'package:computed/computed.dart';
+import 'package:computed/utils/streams.dart';
 import 'package:computed_collections/change_record.dart';
 import 'package:computed_collections/icomputedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
@@ -6,12 +7,21 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'computedmap_mixins.dart';
 import 'cs_computedmap.dart';
 
+class _SubscriptionAndProduced<T> {
+  ComputedSubscription<T> _sub;
+  bool _produced = false;
+
+  _SubscriptionAndProduced(this._sub);
+}
+
 class MapValuesComputedComputedMap<K, V, VParent>
     with ComputedMapMixin<K, V>
     implements IComputedMap<K, V> {
   final IComputedMap<K, VParent> _parent;
   final Computed<V> Function(K key, VParent value) _convert;
-  late final Computed<ISet<ChangeRecord<K, V>>> _changes;
+  late final ValueStream<ISet<ChangeRecord<K, V>>> _changes;
+  late final Computed<ISet<ChangeRecord<K, V>>> _changesComputed;
+  final _changesState = <K, _SubscriptionAndProduced<V>>{};
   late final Computed<IMap<K, V>> _snapshot;
 
   MapValuesComputedComputedMap(this._parent, this._convert) {
@@ -36,56 +46,69 @@ class MapValuesComputedComputedMap<K, V, VParent>
       if (computedChanges.isEmpty) throw NoValueException();
       return computedChanges;
     });
-    _changes = $(() {
-      // TODO: This node needs to somehow merge all the nodes in the previous one
-      //  how to do this scalably? currently the only way is to .use each node one by one,
-      //  very inefficient from a collectional sense, but this is due to the limitations of computed.
-      //  Idea: Drop down to the imperative level (by turning all the computations returned by the previous node into sync streams)
-      //  and manually call .listen/.cancel on them (to avoid the inefficiency of having to iterate the whole list at each change)
 
-      // TODO: Idea: create a stream controller here. onListen, attach a listener to the previous node.
-      //  state: a map of key-computedsubscription pairs
-      //  in the listener, if this is an insert/update, attach a listener to the returned computation that adds the values to this stream, and add the subscription to the state
-      //                   if this is a delete, cancel the subscription and remove it from the state
-      //  onCancel: cancel all subscriptions, both in the state and the subscription to the previous node
+    void _computationListener(_SubscriptionAndProduced<V> sap, K key, V value) {
+      _changes.add({
+        sap._produced
+            ? ChangeRecordUpdate<K, V>(key, null, value)
+            : ChangeRecordInsert<K, V>(key, value)
+      }.lock);
+      sap._produced = true;
+    }
 
-      // TODO: We need .react here, but we can't .react on computations
-      //  This might break things when we eg. get unmocked
-      var gotNVE = false;
-      final unwrapped = _computedChanges.use
-          .map((record) {
-            try {
-              if (record is ChangeRecordInsert<K, Computed<V>>) {
-                return [ChangeRecordInsert(record.key, record.value.use)];
-              } else if (record is ChangeRecordUpdate<K, Computed<V>>) {
-                return [
-                  ChangeRecordUpdate<K, V>(
-                      record.key, null, record.newValue.use)
-                ];
-              } else if (record is ChangeRecordDelete<K, Computed<V>>) {
-                return [ChangeRecordDelete<K, V>(record.key, null)];
-              } else if (record is ChangeRecordReplace<K, Computed<V>>) {
-                return [
-                  ChangeRecordReplace(record.newCollection
-                      .map(((key, value) => MapEntry(key, value.use))))
-                ];
-              } else {
-                throw TypeError();
-              }
-            } on NoValueException {
-              gotNVE = true;
-              return <ChangeRecord<K, V>>[];
-              // Keep going, we want Computed to be aware of all the dependencies
-            }
-          })
-          .expand((e) => e)
-          .toISet();
-      if (gotNVE) throw NoValueException();
-      return unwrapped;
+    void _computedChangesListener(
+        ISet<ChangeRecord<K, Computed<V>>> computedChanges) {
+      for (var change in computedChanges) {
+        if (change is ChangeRecordInsert<K, Computed<V>>) {
+          assert(_changesState[change.key] == null);
+          late final _SubscriptionAndProduced<V> sap;
+          final sub = change.value.listen(
+              (e) => _computationListener(sap, change.key, e),
+              _changes.addError);
+          sap = _SubscriptionAndProduced(sub);
+          _changesState[change.key] = sap;
+        } else if (change is ChangeRecordUpdate<K, Computed<V>>) {
+          final sap = _changesState[change.key]!;
+          sap._sub.cancel();
+          sap._sub = change.newValue.listen(
+              (e) => _computationListener(sap, change.key, e),
+              _changes.addError);
+        } else if (change is ChangeRecordDelete<K, Computed<V>>) {
+          final sap = _changesState[change.key]!;
+          sap._sub.cancel();
+          _changesState.remove(change.key);
+          if (sap._produced) {
+            _changes.add({ChangeRecordDelete<K, V>(change.key, null)}.lock);
+          }
+        } else if (change is ChangeRecordReplace<K, Computed<V>>) {
+          _changesState.values.forEach((sap) => sap._sub.cancel());
+          _changesState.clear();
+          _changes.add(
+              <ChangeRecord<K, V>>{ChangeRecordReplace(<K, V>{}.lock)}.lock);
+          change.newCollection.forEach((key, value) {
+            late final _SubscriptionAndProduced<V> sap;
+            final sub = value.listen(
+                (e) => _computationListener(sap, key, e), _changes.addError);
+            sap = _SubscriptionAndProduced(sub);
+            _changesState[key] = sap;
+          });
+        }
+      }
+    }
+
+    ComputedSubscription<ISet<ChangeRecord<K, Computed<V>>>>?
+        _computedChangesSubscription;
+    _changes = ValueStream(onListen: () {
+      assert(_computedChangesSubscription == null);
+      _computedChangesSubscription =
+          _computedChanges.listen(_computedChangesListener, _changes.addError);
+    }, onCancel: () {
+      _changesState.values.forEach((sap) => sap._sub.cancel());
+      _changesState.clear();
+      _computedChangesSubscription!.cancel();
     });
-    // TODO: asStream introduces a lag of one microtask here
-    //  Can we change it to make the api more uniform?
-    _snapshot = ChangeStreamComputedMap(_changes.asStream, () {
+    _changesComputed = $(() => _changes.use);
+    _snapshot = ChangeStreamComputedMap(_changes, () {
       final entries = _parent.snapshot.use
           .map(((key, value) => MapEntry(key, _convert(key, value))));
       var gotNVE = false;
@@ -105,7 +128,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
   }
 
   @override
-  Computed<ISet<ChangeRecord<K, V>>> get changes => _changes;
+  Computed<ISet<ChangeRecord<K, V>>> get changes => _changesComputed;
 
   @override
   Computed<bool> containsKey(K key) => _parent.containsKey(key);

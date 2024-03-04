@@ -27,11 +27,13 @@ void main() {
 
     s.add({ChangeRecordUpdate(0, 1, 2)}.lock);
     await Future.value();
+    await Future.value();
     expect(lastRes, {0: 3}.lock);
     s2.add(2);
     await Future.value();
     expect(lastRes, {0: 4}.lock);
     s.add({ChangeRecordInsert(1, 1)}.lock);
+    await Future.value();
     await Future.value();
     expect(lastRes, {0: 4, 1: 3}.lock);
     s.add({ChangeRecordDelete(0, 2)}.lock);
@@ -42,6 +44,8 @@ void main() {
       ChangeRecordReplace({4: 5}.lock)
     }.lock);
     await Future.value();
+    await Future.value();
+    expect(lastRes, {}.lock);
     await Future.value();
     expect(lastRes, {4: 8}.lock);
 
@@ -88,6 +92,8 @@ void main() {
       lastRes1 = event;
     }, (e) => fail(e.toString()));
 
+    final sub2 = m2[0].listen(null, null);
+
     await Future.value();
     expect(cCnt, 0);
     expect(callCnt1, 1);
@@ -97,16 +103,26 @@ void main() {
     await Future.value();
     await Future.value();
     // Two runs in which it throws NVE, two runs after subscribing to [s2]
-    expect(cCnt, 4);
+    // Times two for the two listeners
+    expect(cCnt, 8);
     expect(callCnt1, 2);
     expect(lastRes1, 6);
 
     s2.add(0);
-    expect(cCnt, 6);
+    expect(cCnt, 12);
     expect(callCnt1, 3);
     expect(lastRes1, 1);
 
     sub1.cancel();
+
+    s2.add(1);
+    expect(cCnt, 14);
+    expect(callCnt1, 3);
+
+    sub2.cancel();
+    s2.add(2);
+    expect(cCnt, 14);
+    expect(callCnt1, 3);
   });
 
   test('propagates the change stream', () async {
@@ -125,34 +141,46 @@ void main() {
     expect(callCnt, 0);
     s.add({ChangeRecordInsert(0, 1)}.lock);
     await Future.value();
+    await Future.value();
     expect(callCnt, 1);
     expect(lastRes, {ChangeRecordInsert(0, 6)}.lock);
 
     s.add({ChangeRecordInsert(1, 2)}.lock);
+    await Future.value();
+    await Future.value();
     expect(callCnt, 2);
     expect(lastRes, {ChangeRecordInsert(1, 7)}.lock);
 
     s.add({ChangeRecordUpdate(0, 1, 2)}.lock);
+    await Future.value();
+    await Future.value();
     expect(callCnt, 3);
     expect(lastRes, {ChangeRecordUpdate<int, int>(0, null, 7)}.lock);
 
     s.add({ChangeRecordDelete(0, 2)}.lock);
+    await Future.value();
     expect(callCnt, 4);
     expect(lastRes, {ChangeRecordDelete<int, int>(0, null)}.lock);
 
     s.add({
       ChangeRecordReplace({0: 5, 1: 6, 2: 7}.lock)
     }.lock);
-    await Future
-        .value(); // We need this because the last delete causes the change stream computation to unsubscribe from s2
+    await Future.value();
     expect(callCnt, 5);
-    expect(
-        lastRes,
-        {
-          ChangeRecordReplace({0: 10, 1: 11, 2: 12}.lock)
-        }.lock);
+    expect(lastRes, {ChangeRecordReplace({}.lock)}.lock);
+    await Future.value();
+    expect(callCnt, 6);
+    expect(lastRes, {ChangeRecordInsert(0, 10)}.lock);
+    await Future.value();
+    expect(callCnt, 7);
+    expect(lastRes, {ChangeRecordInsert(1, 11)}.lock);
+    await Future.value();
+    expect(callCnt, 8);
+    expect(lastRes, {ChangeRecordInsert(2, 12)}.lock);
+
+    await Future.value(); // No more calls
+    expect(callCnt, 8);
 
     sub.cancel();
-    // TODO: Also test that changing the value of s2 is well-behaved
   });
 }
