@@ -230,20 +230,20 @@ void main() {
       c2.fix(42);
       expect(cCnt, 6);
       c2.unmock();
-      expect(cCnt, 6);
+      expect(cCnt, 8);
       expectation1 = 43;
       c2.fix(43);
-      expect(cCnt, 8);
+      expect(cCnt, 10);
       c2.fix(43);
-      expect(cCnt, 8);
+      expect(cCnt, 10);
       expectation1 = 42;
       c2.unmock();
-      expect(cCnt, 10);
+      expect(cCnt, 12);
       source.mockEmit(1);
-      expect(cCnt, 10);
+      expect(cCnt, 12);
       expectation2 = 2;
       source.mockEmit(2);
-      expect(cCnt, 12);
+      expect(cCnt, 14);
 
       sub.cancel();
     });
