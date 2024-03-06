@@ -74,16 +74,27 @@ void main() {
       lastRes1 = event;
     }, (e) => fail(e.toString()));
 
+    var callCnt2 = 0;
+    int? lastRes2;
+    final sub2 = m2[0].listen((event) {
+      callCnt2++;
+      lastRes2 = event;
+    }, (e) => fail(e.toString()));
+
     await Future.value();
     expect(cCnt, 0);
     expect(callCnt1, 1);
     expect(lastRes1, null);
+    expect(callCnt2, 1);
+    expect(lastRes2, null);
 
     s.add({ChangeRecordInsert(0, 1)}.lock);
     await Future.value();
     expect(cCnt, 2);
     expect(callCnt1, 2);
     expect(lastRes1, 2);
+    expect(callCnt2, 2);
+    expect(lastRes2, 2);
 
     sub1.cancel();
   });

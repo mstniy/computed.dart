@@ -103,25 +103,25 @@ void main() {
     await Future.value();
     await Future.value();
     // Two runs in which it throws NVE, two runs after subscribing to [s2]
-    // Times two for the two listeners
-    expect(cCnt, 8);
+    expect(cCnt,
+        4); // TODO: this is currently failing as MVC does not use ComputationCache on the result of operator[]
     expect(callCnt1, 2);
     expect(lastRes1, 6);
 
     s2.add(0);
-    expect(cCnt, 12);
+    expect(cCnt, 6);
     expect(callCnt1, 3);
     expect(lastRes1, 1);
 
     sub1.cancel();
 
     s2.add(1);
-    expect(cCnt, 14);
+    expect(cCnt, 8);
     expect(callCnt1, 3);
 
     sub2.cancel();
     s2.add(2);
-    expect(cCnt, 14);
+    expect(cCnt, 8);
     expect(callCnt1, 3);
   });
 

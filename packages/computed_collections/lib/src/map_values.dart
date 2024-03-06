@@ -1,4 +1,5 @@
 import 'package:computed/computed.dart';
+import 'package:computed/utils/computation_cache.dart';
 import 'package:computed_collections/change_record.dart';
 import 'package:computed_collections/icomputedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
@@ -13,6 +14,7 @@ class MapValuesComputedMap<K, V, VParent>
   final V Function(K key, VParent value) _convert;
   late final Computed<ISet<ChangeRecord<K, V>>> _changes;
   late final Computed<IMap<K, V>> _snapshot;
+  final _keyComputationCache = ComputationCache<K, V?>();
 
   MapValuesComputedMap(this._parent, this._convert) {
     _changes = Computed(() {
@@ -63,8 +65,7 @@ class MapValuesComputedMap<K, V, VParent>
   Computed<IMap<K, V>> get snapshot => _snapshot;
 
   @override
-  // TODO: cache the result, like ChangeStreamComputedMap
-  Computed<V?> operator [](K key) => $(() {
+  Computed<V?> operator [](K key) => _keyComputationCache.wrap(key, () {
         if (_parent.containsKey(key).use) {
           return _convert(key, _parent[key].use as VParent);
         }

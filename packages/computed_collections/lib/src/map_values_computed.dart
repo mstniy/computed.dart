@@ -1,4 +1,5 @@
 import 'package:computed/computed.dart';
+import 'package:computed/utils/computation_cache.dart';
 import 'package:computed/utils/streams.dart';
 import 'package:computed_collections/change_record.dart';
 import 'package:computed_collections/icomputedmap.dart';
@@ -23,6 +24,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
   late final Computed<ISet<ChangeRecord<K, V>>> _changesComputed;
   final _changesState = <K, _SubscriptionAndProduced<V>>{};
   late final Computed<IMap<K, V>> _snapshot;
+  final _keyComputationCache = ComputationCache<K, V?>();
 
   MapValuesComputedComputedMap(this._parent, this._convert) {
     // We use async here because Computed does not have semantics operator==
@@ -146,7 +148,6 @@ class MapValuesComputedComputedMap<K, V, VParent>
   Computed<IMap<K, V>> get snapshot => _snapshot;
 
   @override
-  // TODO: cache the result, like ChangeStreamComputedMap
   Computed<V?> operator [](K key) {
     // TODO: we have to use async here because we return a computation,
     //  but the downside is that we are also running the user computation async
@@ -157,7 +158,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
       }
       return null;
     });
-    final resultComputation = $(() {
+    final resultComputation = _keyComputationCache.wrap(key, () {
       final c = computationComputation.use;
       if (c != null) return c.use;
       return null;
