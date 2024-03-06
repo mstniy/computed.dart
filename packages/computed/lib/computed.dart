@@ -19,21 +19,37 @@ class Computed<T> {
   /// other computations using its value will be re-run every time this computation
   /// is re-run, even if it's value stays the same, except for the extra computations
   /// being done in debug mode to check for non-idempotency.
-  Computed(T Function() f, {bool memoized = true})
-      : _impl = ComputedImpl(f, memoized, false);
+  ///
+  /// If [onDispose] and/or [onDisposeError] is set, they will be called when the computation loses
+  /// all listeners after notifying its listeners. [onDispose] is called if the last computation
+  /// returned a value, [onDisposeError] is called if the last computation throw an exception
+  /// other than [NoValueException].
+  Computed(T Function() f,
+      {bool memoized = true,
+      void Function(T value)? onDispose,
+      void Function(Object error)? onDisposeError})
+      : _impl = ComputedImpl(f, memoized, false, onDispose, onDisposeError);
 
   /// Creates an "async" computation, which is allowed to run asynchronous operations
   /// and will only be re-run if absolutely necessary. This also disables the idempotency
   /// check in debug mode.
-  Computed.async(T Function() f, {bool memoized = true})
-      : _impl = ComputedImpl(f, memoized, true);
+  Computed.async(T Function() f,
+      {bool memoized = true,
+      void Function(T value)? onDispose,
+      void Function(Object error)? onDisposeError})
+      : _impl = ComputedImpl(f, memoized, true, onDispose, onDisposeError);
 
   /// As [Computed], but calls the given function with its last value.
   ///
   /// If the computation has no value yet, [prev] is set to [initialPrev].
   Computed.withPrev(T Function(T prev) f,
-      {required T initialPrev, bool memoized = true, bool async = false})
-      : _impl = ComputedImpl.withPrev(f, initialPrev, memoized, async);
+      {required T initialPrev,
+      bool memoized = true,
+      bool async = false,
+      void Function(T value)? onDispose,
+      void Function(Object error)? onDisposeError})
+      : _impl = ComputedImpl.withPrev(
+            f, initialPrev, memoized, async, onDispose, onDisposeError);
 
   /// Defines an "effect", which is a computation meant to have side effects.
   static ComputedSubscription<void> effect(void Function() f) =>

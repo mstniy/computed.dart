@@ -6,7 +6,7 @@ import 'package:test/test.dart';
 class _DelayedComputedImpl<T> extends ComputedImpl<T> {
   final void Function() _onDependencyUpdated;
   _DelayedComputedImpl(this._onDependencyUpdated, T Function() build)
-      : super(build, false, false);
+      : super(build, false, false, null, null);
 
   @override
   void onDependencyUpdated() {

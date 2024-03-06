@@ -104,7 +104,7 @@ class GlobalCtx {
               throw NoValueException();
             }
             return rvoe._voe!.value;
-          }, true, false),
+          }, true, false, null, null),
           currentValue != null
               ? _ValueOrException.value(currentValue())
               : null);
@@ -207,13 +207,23 @@ class ComputedImpl<T> {
   T Function() _f;
   final T Function() _origF;
 
-  ComputedImpl(this._f, this._memoized, this._async) : _origF = _f;
+  final void Function(T value)? _onDispose;
+  final void Function(Object error)? _onDisposeError;
+
+  ComputedImpl(this._f, this._memoized, this._async, this._onDispose,
+      this._onDisposeError)
+      : _origF = _f;
 
   static ComputedImpl<T> withPrev<T>(
-      T Function(T prev) f, T initialPrev, bool memoized, bool async) {
+      T Function(T prev) f,
+      T initialPrev,
+      bool memoized,
+      bool async,
+      void Function(T value)? onDispose,
+      void Function(Object error)? onDisposeError) {
     late ComputedImpl<T> c;
-    c = ComputedImpl<T>(
-        () => f(c._prevResult?.value ?? initialPrev), memoized, async);
+    c = ComputedImpl<T>(() => f(c._prevResult?.value ?? initialPrev), memoized,
+        async, onDispose, onDisposeError);
     c._initialPrev = initialPrev;
 
     return c;
@@ -593,9 +603,25 @@ class ComputedImpl<T> {
       _dss = null;
     }
 
+    final lastResultBackup = _lastResult;
+
     _lastResult = null; // So that we re-run the next time we are subscribed to
     _lastUpdate = null;
     _lastResultfulUpstreamComputations = null;
+
+    if (lastResultBackup != null) {
+      // Call onDispose/Error
+      if (lastResultBackup._isValue) {
+        if (_onDispose != null) {
+          _onDispose!(lastResultBackup._value as T);
+        }
+      } else {
+        // The last value is an exception
+        if (_onDisposeError != null) {
+          _onDisposeError!(lastResultBackup._exc!);
+        }
+      }
+    }
   }
 
   void _removeDownstreamComputation(ComputedImpl c) {

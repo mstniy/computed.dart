@@ -2583,4 +2583,89 @@ void main() {
       sub.cancel();
     });
   });
+
+  group('onDispose', () {
+    test('is called upon losing the last downstream computation', () async {
+      var cCnt = 0;
+      int? lastArg;
+      final c1 = Computed<int>(() => 42, onDispose: (value) {
+        cCnt++;
+        lastArg = value;
+      }, onDisposeError: ((error) => fail('must not call onDisposeError')));
+      final c2 = $(() => c1.use);
+
+      final sub =
+          c2.listen((val) => expect(val, 42), (e) => fail(e.toString()));
+      await Future.value();
+      expect(cCnt, 0);
+      sub.cancel();
+      expect(cCnt, 1);
+      expect(lastArg, 42);
+    });
+    test('is called upon losing the last listener', () async {
+      var cCnt = 0;
+      int? lastArg;
+      final c = Computed<int>(() => 42, onDispose: (value) {
+        cCnt++;
+        lastArg = value;
+      }, onDisposeError: ((error) => fail('must not call onDisposeError')));
+
+      final sub = c.listen((val) => expect(val, 42), (e) => fail(e.toString()));
+      await Future.value();
+      expect(cCnt, 0);
+      sub.cancel();
+      expect(cCnt, 1);
+      expect(lastArg, 42);
+    });
+    test('is not called for computations without a value', () async {
+      final c = Computed<int>(() => throw NoValueException(),
+          onDispose: (value) => fail('must not call onDispose'),
+          onDisposeError: ((error) => fail('must not call onDisposeError')));
+
+      final sub = c.listen((val) => fail('must not notify the listener'),
+          (e) => fail(e.toString()));
+      await Future.value();
+      sub.cancel();
+      await Future.value();
+    });
+  });
+  group('onDisposeError', () {
+    test('is called upon losing the last downstream computation', () async {
+      var cCnt = 0;
+      int? lastArg;
+      final c1 = Computed<int>(() => throw 42,
+          onDispose: ((value) => fail('must not call onDispose')),
+          onDisposeError: (value) {
+        cCnt++;
+        lastArg = value as int;
+      });
+      final c2 = $(() => c1.use);
+
+      final sub = c2.listen((val) => fail('must not notify the value listener'),
+          (e) => expect(e, 42));
+      await Future.value();
+      expect(cCnt, 0);
+      sub.cancel();
+      expect(cCnt, 1);
+      expect(lastArg, 42);
+    });
+    test('is called upon losing the last listener', () async {
+      var cCnt = 0;
+      int? lastArg;
+      final c = Computed<int>(() => throw 42,
+          onDispose: ((value) => fail('must not call onDispose')),
+          onDisposeError: (value) {
+        cCnt++;
+        lastArg = value as int;
+      });
+
+      final sub = c.listen((val) => fail('must not notify the value listener'),
+          (e) => expect(e, 42));
+      await Future.value();
+      expect(cCnt, 0);
+      sub.cancel();
+      expect(cCnt, 1);
+      expect(lastArg, 42);
+    });
+  });
 }
