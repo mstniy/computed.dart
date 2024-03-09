@@ -65,13 +65,6 @@ class AddComputedMap<K, V>
   Computed<ChangeEvent<K, V>> get changes => _changes;
 
   @override
-  Computed<ChangeRecord<V>> changesFor(K key) {
-    // The value of _key never changes
-    if (key == _key) return $(() => throw NoValueException);
-    return _parent.changesFor(key);
-  }
-
-  @override
   Computed<bool> containsKey(K key) {
     if (key == _key) return $(() => true);
     return _parent.containsKey(key);

@@ -78,12 +78,6 @@ class MapValuesComputedMap<K, V, VParent>
       });
 
   @override
-  Computed<ChangeRecord<V>> changesFor(K key) {
-    // TODO: implement changesFor
-    throw UnimplementedError();
-  }
-
-  @override
   Computed<bool> containsValue(V value) {
     // TODO: implement containsValue
     throw UnimplementedError();

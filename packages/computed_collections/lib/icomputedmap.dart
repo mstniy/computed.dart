@@ -15,7 +15,6 @@ abstract class IComputedMap<K, V> {
     return ChangeStreamComputedMap(stream);
   }
   Computed<ChangeEvent<K, V>> get changes;
-  Computed<ChangeRecord<V>> changesFor(K key);
 
   @visibleForTesting
   void fix(IMap<K, V> value);

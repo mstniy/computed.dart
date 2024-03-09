@@ -222,12 +222,6 @@ class ChangeStreamComputedMap<K, V>
   Computed<ChangeEvent<K, V>> get changes => _changes;
 
   @override
-  Computed<ChangeRecord<V>> changesFor(K key) {
-    // TODO: implement changesFor
-    throw UnimplementedError();
-  }
-
-  @override
   Computed<bool> containsKey(K key) => $(() => _c.use.containsKey(key));
 
   @override
