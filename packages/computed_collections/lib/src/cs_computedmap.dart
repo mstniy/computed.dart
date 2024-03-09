@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:computed/computed.dart';
-import 'package:computed_collections/change_record.dart';
+import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/icomputedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
@@ -28,18 +28,18 @@ class ChangeStreamComputedMap<K, V>
     with ComputedMapMixin<K, V>
     implements IComputedMap<K, V> {
   final IMap<K, V> Function()? _initialValueComputer;
-  final Stream<ISet<ChangeRecord<K, V>>> _stream;
-  late final Computed<ISet<ChangeRecord<K, V>>> _changes;
+  final Stream<ChangeEvent<K, V>> _stream;
+  late final Computed<ChangeEvent<K, V>> _changes;
   late final Computed<IMap<K, V>> _c;
   // The "keep-alive" subscription used by key streams, as we explicitly break the dependency DAG of Computed.
   ComputedSubscription<IMap<K, V>>? _cSub;
   // These are set because we create them lazily, and forget about them when they lose all subscribers
   // But they may gain subscribers later in the future, and at that point there might already be
   // (an)other stream(s)/computation(s).
-  final _keyChangeStreams = <K, Set<ValueStream<ChangeRecord<K, V>>>>{};
-  final _keyChangeStreamComputations = <K, Set<Computed<ChangeRecord<K, V>>>>{};
+  final _keyChangeStreams = <K, Set<ValueStream<ChangeEvent<K, V>>>>{};
+  final _keyChangeStreamComputations = <K, Set<Computed<ChangeEvent<K, V>>>>{};
   final _keyValueStreams = <K, Map<ValueStream<V?>, Computed<V?>>>{};
-  ISet<ChangeRecord<K, V>>? _lastChange;
+  ChangeEvent<K, V>? _lastChange;
   _ValueOrException<IMap<K, V>>?
       _curRes; // TODO: After adding support for disposing computations to Computed, set this to null as the disposer
   ChangeStreamComputedMap(this._stream, [this._initialValueComputer]) {
@@ -59,32 +59,36 @@ class ChangeStreamComputedMap<K, V>
         // TODO: Check for idempotency calls here
         notifierToSchedule = _notifyAllKeyStreams;
       }
-      _stream.react((changes) {
+      _stream.react((change) {
         Set<K>? keysToNotify = <K>{}; // If null -> notify all keys
-        for (var change in changes) {
-          if (change is ChangeRecordInsert<K, V>) {
-            keysToNotify?.add(change.key);
-            prev = prev.add(change.key, change.value);
-          } else if (change is ChangeRecordUpdate<K, V>) {
-            keysToNotify?.add(change.key);
-            prev = prev.add(change.key, change.newValue);
-          } else if (change is ChangeRecordDelete<K, V>) {
-            keysToNotify?.add(change.key);
-            prev = prev.remove(change.key);
-          } else if (change is ChangeRecordReplace<K, V>) {
-            keysToNotify = null;
-            prev = change.newCollection;
-          } else {
-            assert(false);
+        if (change is ChangeEventReplace<K, V>) {
+          keysToNotify = null;
+          prev = change.newCollection;
+        } else if (change is KeyChanges<K, V>) {
+          for (var e in change.changes.entries) {
+            final key = e.key;
+            final record = e.value;
+            if (record is ChangeRecordInsert<V>) {
+              keysToNotify.add(key);
+              prev = prev.add(key, record.value);
+            } else if (record is ChangeRecordUpdate<V>) {
+              keysToNotify.add(key);
+              prev = prev.add(key, record.newValue);
+            } else if (record is ChangeRecordDelete<V>) {
+              keysToNotify.add(key);
+              prev = prev.remove(key);
+            } else {
+              assert(false);
+            }
           }
         }
 
         _curRes = _ValueOrException.value(prev);
 
-        if (!identical(changes, _lastChange)) {
+        if (!identical(change, _lastChange)) {
           // We cheat here a bit to avoid notifying listeners a second time
           //  in case Computed runs us twice (eg. in debug mode)
-          _lastChange = changes;
+          _lastChange = change;
           if (keysToNotify == null) {
             // Computed doesn't like it when a computation adds thins to a stream,
             // so cheat here once again
@@ -215,10 +219,10 @@ class ChangeStreamComputedMap<K, V>
   }
 
   @override
-  Computed<ISet<ChangeRecord<K, V>>> get changes => _changes;
+  Computed<ChangeEvent<K, V>> get changes => _changes;
 
   @override
-  Computed<ChangeRecord<K, V>> changesFor(K key) {
+  Computed<ChangeRecord<V>> changesFor(K key) {
     // TODO: implement changesFor
     throw UnimplementedError();
   }

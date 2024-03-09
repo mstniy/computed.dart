@@ -1,5 +1,5 @@
 import 'package:computed/computed.dart';
-import 'package:computed_collections/change_record.dart';
+import 'package:computed_collections/change_event.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import 'package:meta/meta.dart';
@@ -11,12 +11,11 @@ import 'src/cs_computedmap.dart';
 /// - Individual keys can be observed
 /// - Supports immutable snapshots (using fast_immutable_collections)
 abstract class IComputedMap<K, V> {
-  factory IComputedMap.fromChangeStream(
-      Stream<ISet<ChangeRecord<K, V>>> stream) {
+  factory IComputedMap.fromChangeStream(Stream<ChangeEvent<K, V>> stream) {
     return ChangeStreamComputedMap(stream);
   }
-  Computed<ISet<ChangeRecord<K, V>>> get changes;
-  Computed<ChangeRecord<K, V>> changesFor(K key);
+  Computed<ChangeEvent<K, V>> get changes;
+  Computed<ChangeRecord<V>> changesFor(K key);
 
   @visibleForTesting
   void fix(IMap<K, V> value);

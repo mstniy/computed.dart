@@ -1,13 +1,13 @@
 import 'package:computed/computed.dart';
 import 'package:computed/utils/streams.dart';
-import 'package:computed_collections/change_record.dart';
+import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/icomputedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:test/test.dart';
 
 void main() {
   test('snapshot works', () async {
-    final s = ValueStream<ISet<ChangeRecord<int, int>>>(sync: true);
+    final s = ValueStream<ChangeEvent<int, int>>(sync: true);
     final m = IComputedMap.fromChangeStream(s);
     IMap<int, int>? lastRes;
     final sub = m.snapshot.listen((event) {
@@ -15,24 +15,22 @@ void main() {
     }, (e) => fail(e.toString()));
     await Future.value();
     expect(lastRes, {}.lock);
-    s.add({ChangeRecordInsert(0, 1)}.lock);
+    s.add(KeyChanges({0: ChangeRecordInsert(1)}.lock));
     expect(lastRes, {0: 1}.lock);
-    s.add({ChangeRecordInsert(1, 2)}.lock);
+    s.add(KeyChanges({1: ChangeRecordInsert(2)}.lock));
     expect(lastRes, {0: 1, 1: 2}.lock);
-    s.add({ChangeRecordUpdate(1, 2, 3)}.lock);
+    s.add(KeyChanges({1: ChangeRecordUpdate(3)}.lock));
     expect(lastRes, {0: 1, 1: 3}.lock);
-    s.add({ChangeRecordDelete(0, 1)}.lock);
+    s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
     expect(lastRes, {1: 3}.lock);
-    s.add({
-      ChangeRecordReplace({4: 5}.lock)
-    }.lock);
+    s.add(ChangeEventReplace({4: 5}.lock));
     expect(lastRes, {4: 5}.lock);
 
     sub.cancel();
   });
 
   test('operator[] works', () async {
-    final s = ValueStream<ISet<ChangeRecord<int, int>>>(sync: true);
+    final s = ValueStream<ChangeEvent<int, int>>(sync: true);
     final m = IComputedMap.fromChangeStream(s);
 
     var callCnt1 = 0;
@@ -47,18 +45,18 @@ void main() {
     expect(callCnt1, 1);
     expect(lastRes1, null);
 
-    s.add({ChangeRecordInsert(0, 1)}.lock);
+    s.add(KeyChanges({0: ChangeRecordInsert(01)}.lock));
     await Future.value();
     expect(callCnt1, 2);
     expect(lastRes1, 1);
 
-    s.add({ChangeRecordInsert(1, 2)}.lock);
+    s.add(KeyChanges({1: ChangeRecordInsert(2)}.lock));
     await Future.value();
     expect(callCnt1, 2);
-    s.add({ChangeRecordUpdate(1, 2, 3)}.lock);
+    s.add(KeyChanges({1: ChangeRecordUpdate(3)}.lock));
     await Future.value();
     expect(callCnt1, 2);
-    s.add({ChangeRecordUpdate(0, 1, 4)}.lock);
+    s.add(KeyChanges({0: ChangeRecordUpdate(4)}.lock));
     await Future.value();
     expect(callCnt1, 3);
     expect(lastRes1, 4);
@@ -75,25 +73,21 @@ void main() {
     expect(callCnt2, 1);
     expect(lastRes2, 4);
 
-    s.add({ChangeRecordDelete(0, 4)}.lock);
+    s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
     await Future.value();
     expect(callCnt1, 4);
     expect(lastRes1, null);
     expect(callCnt2, 2);
     expect(lastRes2, null);
-    s.add({ChangeRecordDelete(1, 3)}.lock);
+    s.add(KeyChanges({1: ChangeRecordDelete<int>()}.lock));
     await Future.value();
     expect(callCnt1, 4);
     expect(callCnt2, 2);
-    s.add({
-      ChangeRecordReplace({4: 5}.lock)
-    }.lock);
+    s.add(ChangeEventReplace({4: 5}.lock));
     await Future.value();
     expect(callCnt1, 4);
     expect(callCnt2, 2);
-    s.add({
-      ChangeRecordReplace({0: 0, 1: 1}.lock)
-    }.lock);
+    s.add(ChangeEventReplace({0: 0, 1: 1}.lock));
     await Future.value();
     expect(callCnt1, 5);
     expect(lastRes1, 0);
@@ -112,7 +106,7 @@ void main() {
     expect(callCnt3, 1);
     expect(lastRes3, 1);
 
-    s.add({ChangeRecordUpdate(1, 1, 2)}.lock);
+    s.add(KeyChanges({1: ChangeRecordUpdate(2)}.lock));
     await Future.value();
     expect(callCnt1, 5);
     expect(callCnt2, 3);
@@ -126,9 +120,7 @@ void main() {
 
     sub1.cancel();
 
-    s.add({
-      ChangeRecordReplace({0: 1, 1: 3}.lock)
-    }.lock);
+    s.add(ChangeEventReplace({0: 1, 1: 3}.lock));
     await Future.value();
     expect(callCnt1, 5); // The listener has been cancelled
     expect(callCnt2, 4);
@@ -139,9 +131,7 @@ void main() {
     sub3.cancel();
     sub2.cancel();
 
-    s.add({
-      ChangeRecordReplace({0: 2, 1: 4}.lock)
-    }.lock);
+    s.add(ChangeEventReplace({0: 2, 1: 4}.lock));
     await Future.value();
     expect(callCnt1, 5);
     expect(callCnt2, 4);
@@ -149,7 +139,7 @@ void main() {
   });
 
   test('propagates exceptions', () async {
-    final s = ValueStream<ISet<ChangeRecord<int, int>>>(sync: true);
+    final s = ValueStream<ChangeEvent<int, int>>(sync: true);
     final m = IComputedMap.fromChangeStream(s);
     IMap<int, int>? lastRes1;
     Object? lastExc1;
@@ -188,7 +178,7 @@ void main() {
     await Future.value();
     expect(callCnt2, 2);
     expect(lastExc2, 42);
-    s.add({ChangeRecordInsert(0, 1)}.lock);
+    s.add(KeyChanges({0: ChangeRecordInsert(1)}.lock));
     await Future.value();
     expect(callCnt1, 2);
     expect(callCnt2, 2);
@@ -219,9 +209,9 @@ void main() {
   });
 
   test('propagates the change stream', () async {
-    final s = ValueStream<ISet<ChangeRecord<int, int>>>(sync: true);
+    final s = ValueStream<ChangeEvent<int, int>>(sync: true);
     final m = IComputedMap.fromChangeStream(s);
-    ISet<ChangeRecord<int, int>>? lastRes;
+    ChangeEvent<int, int>? lastRes;
     var callCnt = 0;
     final sub = m.changes.listen((event) {
       callCnt++;
@@ -230,16 +220,16 @@ void main() {
 
     await Future.value();
     expect(callCnt, 0);
-    s.add({ChangeRecordInsert(0, 1)}.lock);
+    s.add(KeyChanges({0: ChangeRecordInsert(1)}.lock));
     expect(callCnt, 1);
-    expect(lastRes, {ChangeRecordInsert(0, 1)}.lock);
+    expect(lastRes, KeyChanges({0: ChangeRecordInsert(1)}.lock));
 
     sub.cancel();
   });
 
   group('mocks', () {
     test('can use fix/fixError', () async {
-      final s = ValueStream<ISet<ChangeRecord<int, int>>>(sync: true);
+      final s = ValueStream<ChangeEvent<int, int>>(sync: true);
       final m = IComputedMap.fromChangeStream(s);
       IMap<int, int>? lastRes1;
       Object? lastExc1;
@@ -320,7 +310,7 @@ void main() {
     });
 
     test('can use mock', () async {
-      final s = ValueStream<ISet<ChangeRecord<int, int>>>(sync: true);
+      final s = ValueStream<ChangeEvent<int, int>>(sync: true);
       final s2 = ValueStream<IMap<int, int>>(sync: true);
       final m = IComputedMap.fromChangeStream(s);
       IMap<int, int>? lastRes1;

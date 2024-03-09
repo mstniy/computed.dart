@@ -1,13 +1,13 @@
 import 'package:computed/computed.dart';
 import 'package:computed/utils/streams.dart';
-import 'package:computed_collections/change_record.dart';
+import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/icomputedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:test/test.dart';
 
 void main() {
   test('incremental update works', () async {
-    final s = ValueStream<ISet<ChangeRecord<int, int>>>(sync: true);
+    final s = ValueStream<ChangeEvent<int, int>>(sync: true);
     final s2 = ValueStream<int>.seeded(0, sync: true);
     final m1 = IComputedMap.fromChangeStream(s);
     final m2 = m1.mapValuesComputed((k, v) => $(() => v + s2.use));
@@ -17,7 +17,7 @@ void main() {
     }, (e) => fail(e.toString()));
     await Future.value();
     expect(lastRes, {}.lock);
-    s.add({ChangeRecordInsert(0, 1)}.lock);
+    s.add(KeyChanges({0: ChangeRecordInsert(1)}.lock));
     await Future.value();
     await Future.value();
     expect(lastRes, {0: 1}.lock);
@@ -25,24 +25,22 @@ void main() {
     await Future.value();
     expect(lastRes, {0: 2}.lock);
 
-    s.add({ChangeRecordUpdate(0, 1, 2)}.lock);
+    s.add(KeyChanges({0: ChangeRecordUpdate(2)}.lock));
     await Future.value();
     await Future.value();
     expect(lastRes, {0: 3}.lock);
     s2.add(2);
     await Future.value();
     expect(lastRes, {0: 4}.lock);
-    s.add({ChangeRecordInsert(1, 1)}.lock);
+    s.add(KeyChanges({1: ChangeRecordInsert(1)}.lock));
     await Future.value();
     await Future.value();
     expect(lastRes, {0: 4, 1: 3}.lock);
-    s.add({ChangeRecordDelete(0, 2)}.lock);
+    s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
     await Future.value();
     expect(lastRes, {1: 3}.lock);
     s2.add(3);
-    s.add({
-      ChangeRecordReplace({4: 5}.lock)
-    }.lock);
+    s.add(ChangeEventReplace({4: 5}.lock));
     await Future.value();
     await Future.value();
     expect(lastRes, {}.lock);
@@ -53,11 +51,9 @@ void main() {
   });
 
   test('initial computation works', () async {
-    final s = ValueStream<ISet<ChangeRecord<int, int>>>(sync: true);
+    final s = ValueStream<ChangeEvent<int, int>>(sync: true);
     final s2 = ValueStream<int>.seeded(5, sync: true);
-    s.add({
-      ChangeRecordReplace({0: 1, 2: 3}.lock)
-    }.lock);
+    s.add(ChangeEventReplace({0: 1, 2: 3}.lock));
     final m1 = IComputedMap.fromChangeStream(s);
     final sub1 = m1.snapshot.listen(null, null); // Force m1 to be computed
     await Future.value();
@@ -76,7 +72,7 @@ void main() {
     sub2.cancel();
   });
   test('operator[] works', () async {
-    final s = ValueStream<ISet<ChangeRecord<int, int>>>(sync: true);
+    final s = ValueStream<ChangeEvent<int, int>>(sync: true);
     final s2 = ValueStream<int>.seeded(5, sync: true);
     final m1 = IComputedMap.fromChangeStream(s);
     var cCnt = 0;
@@ -99,12 +95,11 @@ void main() {
     expect(callCnt1, 1);
     expect(lastRes1, null);
 
-    s.add({ChangeRecordInsert(0, 1)}.lock);
+    s.add(KeyChanges({0: ChangeRecordInsert(1)}.lock));
     await Future.value();
     await Future.value();
     // Two runs in which it throws NVE, two runs after subscribing to [s2]
-    expect(cCnt,
-        4); // TODO: this is currently failing as MVC does not use ComputationCache on the result of operator[]
+    expect(cCnt, 4);
     expect(callCnt1, 2);
     expect(lastRes1, 6);
 
@@ -126,11 +121,11 @@ void main() {
   });
 
   test('propagates the change stream', () async {
-    final s = ValueStream<ISet<ChangeRecord<int, int>>>(sync: true);
+    final s = ValueStream<ChangeEvent<int, int>>(sync: true);
     final s2 = ValueStream<int>.seeded(5, sync: true);
     final m1 = IComputedMap.fromChangeStream(s);
     final m2 = m1.mapValuesComputed((key, value) => $(() => value + s2.use));
-    ISet<ChangeRecord<int, int>>? lastRes;
+    ChangeEvent<int, int>? lastRes;
     var callCnt = 0;
     final sub = m2.changes.listen((event) {
       callCnt++;
@@ -139,44 +134,42 @@ void main() {
 
     await Future.value();
     expect(callCnt, 0);
-    s.add({ChangeRecordInsert(0, 1)}.lock);
+    s.add(KeyChanges({0: ChangeRecordInsert(1)}.lock));
     await Future.value();
     await Future.value();
     expect(callCnt, 1);
-    expect(lastRes, {ChangeRecordInsert(0, 6)}.lock);
+    expect(lastRes, KeyChanges({0: ChangeRecordInsert(6)}.lock));
 
-    s.add({ChangeRecordInsert(1, 2)}.lock);
+    s.add(KeyChanges({1: ChangeRecordInsert(2)}.lock));
     await Future.value();
     await Future.value();
     expect(callCnt, 2);
-    expect(lastRes, {ChangeRecordInsert(1, 7)}.lock);
+    expect(lastRes, KeyChanges({1: ChangeRecordInsert(7)}.lock));
 
-    s.add({ChangeRecordUpdate(0, 1, 2)}.lock);
+    s.add(KeyChanges({0: ChangeRecordUpdate(2)}.lock));
     await Future.value();
     await Future.value();
     expect(callCnt, 3);
-    expect(lastRes, {ChangeRecordUpdate<int, int>(0, null, 7)}.lock);
+    expect(lastRes, KeyChanges({0: ChangeRecordUpdate<int>(7)}.lock));
 
-    s.add({ChangeRecordDelete(0, 2)}.lock);
+    s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
     await Future.value();
     expect(callCnt, 4);
-    expect(lastRes, {ChangeRecordDelete<int, int>(0, null)}.lock);
+    expect(lastRes, KeyChanges({0: ChangeRecordDelete<int>()}.lock));
 
-    s.add({
-      ChangeRecordReplace({0: 5, 1: 6, 2: 7}.lock)
-    }.lock);
+    s.add(ChangeEventReplace({0: 5, 1: 6, 2: 7}.lock));
     await Future.value();
     expect(callCnt, 5);
-    expect(lastRes, {ChangeRecordReplace({}.lock)}.lock);
+    expect(lastRes, ChangeEventReplace(<int, int>{}.lock));
     await Future.value();
     expect(callCnt, 6);
-    expect(lastRes, {ChangeRecordInsert(0, 10)}.lock);
+    expect(lastRes, KeyChanges({0: ChangeRecordInsert(10)}.lock));
     await Future.value();
     expect(callCnt, 7);
-    expect(lastRes, {ChangeRecordInsert(1, 11)}.lock);
+    expect(lastRes, KeyChanges({1: ChangeRecordInsert(11)}.lock));
     await Future.value();
     expect(callCnt, 8);
-    expect(lastRes, {ChangeRecordInsert(2, 12)}.lock);
+    expect(lastRes, KeyChanges({2: ChangeRecordInsert(12)}.lock));
 
     await Future.value(); // No more calls
     expect(callCnt, 8);

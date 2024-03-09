@@ -138,7 +138,6 @@ void main() {
       expect(lCnts, [8, 6, 2, 2, 2]);
       expect(lastValues, [10, 8, 10, 4, 4]);
 
-      // TODO: Also test the onDisposeError branch by cancelling all listeners to all computations on a key while the last value is an exception
       sub3.cancel();
       sub4.cancel();
       s2.addError(42);

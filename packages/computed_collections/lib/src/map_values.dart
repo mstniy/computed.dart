@@ -1,6 +1,6 @@
 import 'package:computed/computed.dart';
 import 'package:computed/utils/computation_cache.dart';
-import 'package:computed_collections/change_record.dart';
+import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/icomputedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
@@ -12,30 +12,35 @@ class MapValuesComputedMap<K, V, VParent>
     implements IComputedMap<K, V> {
   final IComputedMap<K, VParent> _parent;
   final V Function(K key, VParent value) _convert;
-  late final Computed<ISet<ChangeRecord<K, V>>> _changes;
+  late final Computed<ChangeEvent<K, V>> _changes;
   late final Computed<IMap<K, V>> _snapshot;
   final _keyComputationCache = ComputationCache<K, V?>();
 
   MapValuesComputedMap(this._parent, this._convert) {
     _changes = Computed(() {
-      final changes = _parent.changes.use.map((upstreamChange) {
-        if (upstreamChange is ChangeRecordInsert<K, VParent>) {
-          return ChangeRecordInsert(upstreamChange.key,
-              _convert(upstreamChange.key, upstreamChange.value));
-        } else if (upstreamChange is ChangeRecordUpdate<K, VParent>) {
-          return ChangeRecordUpdate<K, V>(upstreamChange.key, null,
-              _convert(upstreamChange.key, upstreamChange.newValue));
-        } else if (upstreamChange is ChangeRecordDelete<K, VParent>) {
-          return ChangeRecordDelete<K, V>(upstreamChange.key, null);
-        } else if (upstreamChange is ChangeRecordReplace<K, VParent>) {
-          return ChangeRecordReplace(upstreamChange.newCollection
-              .map(((key, value) => MapEntry(key, _convert(key, value)))));
-        } else {
-          throw TypeError();
-        }
-      }).toISet();
-      if (changes.isEmpty) throw NoValueException();
-      return changes;
+      final change = _parent.changes.use;
+      if (change is ChangeEventReplace<K, VParent>) {
+        return ChangeEventReplace(change.newCollection
+            .map(((key, value) => MapEntry(key, _convert(key, value)))));
+      } else if (change is KeyChanges<K, VParent>) {
+        return KeyChanges(IMap.fromEntries(change.changes.entries.map((e) {
+          final key = e.key;
+          final upstreamChange = e.value;
+          if (upstreamChange is ChangeRecordInsert<VParent>) {
+            return MapEntry(
+                key, ChangeRecordInsert(_convert(key, upstreamChange.value)));
+          } else if (upstreamChange is ChangeRecordUpdate<VParent>) {
+            return MapEntry(key,
+                ChangeRecordUpdate<V>(_convert(key, upstreamChange.newValue)));
+          } else if (upstreamChange is ChangeRecordDelete<VParent>) {
+            return MapEntry(key, ChangeRecordDelete<V>());
+          } else {
+            throw TypeError();
+          }
+        })));
+      } else {
+        throw TypeError();
+      }
     });
     // TODO: asStream introduces a lag of one microtask here
     //  Can we change it to make the api more uniform?
@@ -47,7 +52,7 @@ class MapValuesComputedMap<K, V, VParent>
   }
 
   @override
-  Computed<ISet<ChangeRecord<K, V>>> get changes => _changes;
+  Computed<ChangeEvent<K, V>> get changes => _changes;
 
   @override
   Computed<bool> containsKey(K key) => _parent.containsKey(key);
@@ -73,7 +78,7 @@ class MapValuesComputedMap<K, V, VParent>
       });
 
   @override
-  Computed<ChangeRecord<K, V>> changesFor(K key) {
+  Computed<ChangeRecord<V>> changesFor(K key) {
     // TODO: implement changesFor
     throw UnimplementedError();
   }

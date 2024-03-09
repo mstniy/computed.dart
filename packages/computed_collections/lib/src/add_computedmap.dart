@@ -1,5 +1,5 @@
 import 'package:computed/computed.dart';
-import 'package:computed_collections/change_record.dart';
+import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/icomputedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
@@ -11,36 +11,39 @@ class AddComputedMap<K, V>
   K _key;
   V _value;
   final IComputedMap<K, V> _parent;
-  late final Computed<ISet<ChangeRecord<K, V>>> _changes;
+  late final Computed<ChangeEvent<K, V>> _changes;
   late final Computed<IMap<K, V>> _snapshot;
   AddComputedMap(this._parent, this._key, this._value) {
     _snapshot = $(() => _parent.snapshot.use.add(this._key, this._value));
     _changes = Computed(() {
-      final changes = _parent.changes.use
-          .map((upstreamChange) {
-            if (upstreamChange is ChangeRecordInsert<K, V>) {
-              if (upstreamChange.key == _key) return <ChangeRecord<K, V>>[];
-              return [upstreamChange];
-            } else if (upstreamChange is ChangeRecordUpdate<K, V>) {
-              if (upstreamChange.key == _key) return <ChangeRecord<K, V>>[];
-              return [upstreamChange];
-            } else if (upstreamChange is ChangeRecordDelete<K, V>) {
-              if (upstreamChange.key == _key) return <ChangeRecord<K, V>>[];
-              return [upstreamChange];
-            } else if (upstreamChange is ChangeRecordReplace<K, V>) {
-              return [
-                ChangeRecordReplace(
-                    upstreamChange.newCollection.add(_key, _value))
-              ];
-            } else {
-              assert(false);
-              return <ChangeRecord<K, V>>[];
-            }
-          })
-          .expand((e) => e)
-          .toISet();
-      if (changes.isEmpty) throw NoValueException();
-      return changes;
+      final changeEvent = _parent.changes.use;
+      if (changeEvent is ChangeEventReplace<K, V>) {
+        return ChangeEventReplace(changeEvent.newCollection.add(_key, _value));
+      } else if (changeEvent is KeyChanges<K, V>) {
+        final changes = changeEvent.changes.entries.map((upstreamChange) {
+          if (upstreamChange.value is ChangeRecordInsert<V>) {
+            if (upstreamChange.key == _key)
+              return <MapEntry<K, ChangeRecord<V>>>[];
+            return [upstreamChange];
+          } else if (upstreamChange.value is ChangeRecordUpdate<V>) {
+            if (upstreamChange.key == _key)
+              return <MapEntry<K, ChangeRecord<V>>>[];
+            return [upstreamChange];
+          } else if (upstreamChange.value is ChangeRecordDelete<V>) {
+            if (upstreamChange.key == _key)
+              return <MapEntry<K, ChangeRecord<V>>>[];
+            return [upstreamChange];
+          } else {
+            assert(false);
+            return <MapEntry<K, ChangeRecord<V>>>[];
+          }
+        }).expand((e) => e);
+        if (changes.isEmpty) throw NoValueException();
+        return KeyChanges(IMap.fromEntries(changes));
+      } else {
+        assert(false);
+        return KeyChanges(<K, ChangeRecord<V>>{}.lock);
+      }
     });
   }
 
@@ -59,10 +62,10 @@ class AddComputedMap<K, V>
   }
 
   @override
-  Computed<ISet<ChangeRecord<K, V>>> get changes => _changes;
+  Computed<ChangeEvent<K, V>> get changes => _changes;
 
   @override
-  Computed<ChangeRecord<K, V>> changesFor(K key) {
+  Computed<ChangeRecord<V>> changesFor(K key) {
     // The value of _key never changes
     if (key == _key) return $(() => throw NoValueException);
     return _parent.changesFor(key);
