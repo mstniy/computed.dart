@@ -162,7 +162,7 @@ void main() {
     expect(callCnt, 2);
     s.add(KeyChanges({1: ChangeRecordDelete<int>()}.lock));
     expect(callCnt, 3);
-    expect(lastRes, KeyChanges({1: ChangeRecordDelete<int>()}.lock));
+    expect(lastRes, KeyChanges({1: ChangeRecordDelete()}.lock));
     s.add(ChangeEventReplace({0: 5, 1: 6, 2: 7}.lock));
     expect(callCnt, 4);
     expect(lastRes, ChangeEventReplace({0: 1, 1: 6, 2: 7}.lock));

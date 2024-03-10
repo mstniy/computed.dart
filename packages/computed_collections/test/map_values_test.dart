@@ -123,11 +123,11 @@ void main() {
 
     s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
     expect(callCnt, 4);
-    expect(lastRes, KeyChanges({0: ChangeRecordDelete<int>()}.lock));
+    expect(lastRes, KeyChanges({0: ChangeRecordDelete()}.lock));
 
     s.add(KeyChanges({1: ChangeRecordDelete<int>()}.lock));
     expect(callCnt, 5);
-    expect(lastRes, KeyChanges({1: ChangeRecordDelete<int>()}.lock));
+    expect(lastRes, KeyChanges({1: ChangeRecordDelete()}.lock));
     s.add(ChangeEventReplace({0: 5, 1: 6, 2: 7}.lock));
     expect(callCnt, 6);
     expect(lastRes, ChangeEventReplace({0: 6, 1: 7, 2: 8}.lock));

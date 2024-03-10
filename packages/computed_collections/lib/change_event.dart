@@ -18,8 +18,7 @@ class KeyChanges<K, V> extends ChangeEvent<K, V> {
   KeyChanges(this.changes);
 
   bool operator ==(Object other) =>
-      other.runtimeType == (KeyChanges<K, V>) &&
-      (other as KeyChanges<K, V>).changes == changes;
+      other is KeyChanges && other.changes == changes;
 
   @override
   int get hashCode => changes.hashCode;
@@ -32,8 +31,7 @@ class ChangeRecordInsert<V> extends ChangeRecord<V> {
   ChangeRecordInsert(this.value);
 
   bool operator ==(Object other) =>
-      other.runtimeType == (ChangeRecordInsert<V>) &&
-      (other as ChangeRecordInsert<V>).value == value;
+      other is ChangeRecordInsert && other.value == value;
 
   @override
   int get hashCode => value.hashCode;
@@ -43,7 +41,7 @@ class ChangeRecordInsert<V> extends ChangeRecord<V> {
 class ChangeRecordDelete<V> extends ChangeRecord<V> {
   ChangeRecordDelete();
 
-  bool operator ==(Object other) => other.runtimeType == ChangeRecordDelete<V>;
+  bool operator ==(Object other) => other is ChangeRecordDelete;
 
   @override
   int get hashCode => 0;
@@ -55,10 +53,8 @@ class ChangeRecordUpdate<V> extends ChangeRecord<V> {
 
   ChangeRecordUpdate(this.newValue);
 
-  // TODO: Undo these changes on checking runtimeType. Then we can also remove a lot of explicit generic arguments from the tests
   bool operator ==(Object other) =>
-      other.runtimeType == (ChangeRecordUpdate<V>) &&
-      (other as ChangeRecordUpdate<V>).newValue == newValue;
+      other is ChangeRecordUpdate && other.newValue == newValue;
 
   @override
   int get hashCode => newValue.hashCode;
@@ -71,8 +67,7 @@ class ChangeEventReplace<K, V> extends ChangeEvent<K, V> {
   ChangeEventReplace(this.newCollection);
 
   bool operator ==(Object other) =>
-      other.runtimeType == (ChangeEventReplace<K, V>) &&
-      (other as ChangeEventReplace<K, V>).newCollection == newCollection;
+      other is ChangeEventReplace && other.newCollection == newCollection;
 
   @override
   int get hashCode => newCollection.hashCode;
