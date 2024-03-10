@@ -78,56 +78,59 @@ void main() {
     sub2.cancel();
   });
   test('operator[] works', () async {
-    final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final s2 = ValueStream<int>.seeded(5, sync: true);
-    final m1 = IComputedMap.fromChangeStream(s);
-    var cCnt = 0;
-    final m2 = m1.mapValuesComputed(
-        (k, v) => $(() {
-              cCnt++;
-              return v + s2.use;
-            }),
-        null);
+    for (var noValueSentinel in [null, 42]) {
+      final s = ValueStream<ChangeEvent<int, int>>(sync: true);
+      final s2 = ValueStream<int>.seeded(5, sync: true);
+      final m1 = IComputedMap.fromChangeStream(s);
+      var cCnt = 0;
+      final m2 = m1.mapValuesComputed<int?>(
+          (k, v) => $(() {
+                cCnt++;
+                return v + s2.use;
+              }),
+          noValueSentinel);
 
-    var callCnt1 = 0;
-    int? lastRes1;
-    final sub1 = m2[0].listen((event) {
-      callCnt1++;
-      lastRes1 = event;
-    }, (e) => fail(e.toString()));
+      var callCnt1 = 0;
+      int? lastRes1;
+      final sub1 = m2[0].listen((event) {
+        callCnt1++;
+        lastRes1 = event;
+      }, (e) => fail(e.toString()));
 
-    final sub2 = m2[0].listen(null, null);
+      final sub2 = m2[0].listen(null, null);
 
-    await Future.value();
-    expect(cCnt, 0);
-    expect(callCnt1, 1);
-    expect(lastRes1, null);
+      await Future.value();
+      expect(cCnt, 0);
+      expect(callCnt1, 1);
+      expect(lastRes1, null);
 
-    s.add(KeyChanges({0: ChangeRecordInsert(1)}.lock));
-    await Future.value();
-    expect(cCnt, 2);
-    expect(callCnt1, 1);
-    await Future.value();
-    // Two runs in which it throws NVE, two runs after subscribing to [s2]
-    expect(cCnt, 4);
-    expect(callCnt1, 2);
-    expect(lastRes1, 6);
+      s.add(KeyChanges({0: ChangeRecordInsert(1)}.lock));
+      await Future.value();
+      expect(cCnt, 2);
+      expect(callCnt1, noValueSentinel == null ? 1 : 2);
+      expect(lastRes1, noValueSentinel);
+      await Future.value();
+      // Two runs in which it throws NVE, two runs after subscribing to [s2]
+      expect(cCnt, 4);
+      expect(callCnt1, noValueSentinel == null ? 2 : 3);
+      expect(lastRes1, 6);
 
-    s2.add(0);
-    expect(cCnt, 6);
-    expect(callCnt1, 3);
-    expect(lastRes1, 1);
+      s2.add(0);
+      expect(cCnt, 6);
+      expect(callCnt1, noValueSentinel == null ? 3 : 4);
+      expect(lastRes1, 1);
 
-    sub1.cancel();
+      sub1.cancel();
 
-    s2.add(1);
-    expect(cCnt, 8);
-    expect(callCnt1, 3);
+      s2.add(1);
+      expect(cCnt, 8);
+      expect(callCnt1, noValueSentinel == null ? 3 : 4);
 
-    sub2.cancel();
-    s2.add(2);
-    expect(cCnt, 8);
-    expect(callCnt1, 3);
+      sub2.cancel();
+      s2.add(2);
+      expect(cCnt, 8);
+      expect(callCnt1, noValueSentinel == null ? 3 : 4);
+    }
   });
 
   // TODO: Test a non-null sentinel value
