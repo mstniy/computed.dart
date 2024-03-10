@@ -153,11 +153,8 @@ class MapValuesComputedComputedMap<K, V, VParent>
       }
       return null;
     });
-    final resultComputation = _keyComputationCache.wrap(key, () {
-      final c = computationComputation.use;
-      if (c != null) return c.useOr(_noValueSentinel);
-      return null;
-    });
+    final resultComputation = _keyComputationCache.wrap(
+        key, () => computationComputation.use?.useOr(_noValueSentinel));
 
     return resultComputation;
   }
