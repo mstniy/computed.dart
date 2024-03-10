@@ -41,7 +41,7 @@ class ChangeStreamComputedMap<K, V>
     final firstReactToken = IMap<K,
         V>(); // TODO: This is obviously ugly. Make Computed.withPrev support null instead
     _c = Computed.withPrev((prev) {
-      void Function()? notifierToSchedule;
+      void Function()? notifier;
       if (identical(prev, firstReactToken)) {
         if (_initialValueComputer != null) {
           prev = _initialValueComputer!();
@@ -50,7 +50,7 @@ class ChangeStreamComputedMap<K, V>
         }
 
         _curRes = _ValueOrException.value(prev);
-        notifierToSchedule = _notifyAllKeyStreams;
+        notifier = _notifyAllKeyStreams;
       }
       _stream.react((change) {
         Set<K>? keysToNotify = <K>{}; // If null -> notify all keys
@@ -81,9 +81,9 @@ class ChangeStreamComputedMap<K, V>
         if (keysToNotify == null) {
           // Computed doesn't like it when a computation adds things to a stream,
           // so cheat here once again
-          notifierToSchedule = _notifyAllKeyStreams;
+          notifier = _notifyAllKeyStreams;
         } else {
-          notifierToSchedule ??= () => _notifyKeyStreams(keysToNotify!);
+          notifier ??= () => _notifyKeyStreams(keysToNotify!);
         }
       }, (e) {
         _curRes = _ValueOrException.exc(e);
@@ -91,8 +91,8 @@ class ChangeStreamComputedMap<K, V>
         throw e;
       });
 
-      if (notifierToSchedule != null) {
-        Zone.current.parent!.scheduleMicrotask(notifierToSchedule!);
+      if (notifier != null) {
+        notifier!();
       }
 
       return prev;
