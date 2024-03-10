@@ -2137,11 +2137,13 @@ void main() {
       expectation = 1;
       controller.add(-1); // Note that (-1)^2 == 1^2
       expect(subCnt, 2);
-      // Note that expectation == 1, as the -1 case did not lead to a change in the result
+      expectation = -1;
       controller.add(1);
       expect(subCnt, 2);
+      expectation = 1;
       controller.add(-1); // Note that (-1)^2 == 1^2
       expect(subCnt, 2);
+      expectation = -1;
       controller.add(0);
       expect(subCnt, 3);
 
@@ -2413,8 +2415,7 @@ void main() {
       // Note that expectation2 is still null
       controller1.add(3);
       expect(subCnt, 3); // Throws NoValueException on source2
-      // Note that expectation1 did not change: the previous run did not produce a result
-      // And expectation2 is still null
+      expectation1 = 3;
       controller2.add(4);
       expect(subCnt, 4);
       expectation1 = 3;

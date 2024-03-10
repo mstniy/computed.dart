@@ -147,8 +147,6 @@ class ComputedImpl<T> {
   _ValueOrException<T>? _lastResult;
   _ValueOrException<T>? _prevResult;
   T? _initialPrev;
-  Map<ComputedImpl, _MemoizedValueOrException>?
-      _lastResultfulUpstreamComputations;
   var _lastUpstreamComputations = <ComputedImpl, _MemoizedValueOrException>{};
 
   bool get _computing => _curUpstreamComputations != null;
@@ -196,7 +194,7 @@ class ComputedImpl<T> {
       return (_prevResult?.value ?? _initialPrev)!;
     } else {
       if (caller._lastResult == null) throw NoValueException();
-      final mvoe = caller._lastResultfulUpstreamComputations![this];
+      final mvoe = caller._lastUpstreamComputations[this];
       if (mvoe?._voe == null) {
         throw NoValueException();
       }
@@ -519,7 +517,6 @@ class ComputedImpl<T> {
           if (!down._computing) down._dirty = true;
         }
         if (shouldNotify) {
-          _lastResultfulUpstreamComputations = _lastUpstreamComputations;
           for (var down in _memoizedDownstreamComputations) {
             if (!down._computing) down._dirty = true;
           }
@@ -592,7 +589,6 @@ class ComputedImpl<T> {
 
     _lastResult = null; // So that we re-run the next time we are subscribed to
     _lastUpdate = null;
-    _lastResultfulUpstreamComputations = null;
 
     if (lastResultBackup != null) {
       // Call onDispose/Error
