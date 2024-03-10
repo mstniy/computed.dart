@@ -456,8 +456,6 @@ class ComputedImpl<T> {
     var gotNVE = false;
     bool shouldNotify = false;
     try {
-      final oldPrevResult = _prevResult;
-      final oldUpstreamComputations = _lastUpstreamComputations;
       _prevResult = _lastResult;
       _curUpstreamComputations = {};
       GlobalCtx._currentComputation = this;
@@ -493,18 +491,16 @@ class ComputedImpl<T> {
       shouldNotify = !gotNVE &&
           (!_memoized ||
               (_prevResult?.shouldNotifyMemoized(_lastResult) ?? true));
-      if (gotNVE || shouldNotify) {
-        // Commit the changes to the DAG
-        for (var e in _curUpstreamComputations!.entries) {
-          final up = e.key;
-          up._addDownstreamComputation(this, e.value._memoized);
-        }
-        final oldDiffNew = _lastUpstreamComputations.keys
-            .toSet()
-            .difference(_curUpstreamComputations!.keys.toSet());
-        for (var up in oldDiffNew) {
-          up._removeDownstreamComputation(this);
-        }
+      // Commit the changes to the DAG
+      for (var e in _curUpstreamComputations!.entries) {
+        final up = e.key;
+        up._addDownstreamComputation(this, e.value._memoized);
+      }
+      final oldDiffNew = _lastUpstreamComputations.keys
+          .toSet()
+          .difference(_curUpstreamComputations!.keys.toSet());
+      for (var up in oldDiffNew) {
+        up._removeDownstreamComputation(this);
       }
 
       // Even if f() throws NoValueException
@@ -527,12 +523,6 @@ class ComputedImpl<T> {
           for (var down in _memoizedDownstreamComputations) {
             if (!down._computing) down._dirty = true;
           }
-        } else {
-          // If the result of the computation is the same as the last time,
-          // undo its effects on the node state to preserve prev values.
-          _lastResult = _prevResult;
-          _prevResult = oldPrevResult;
-          _lastUpstreamComputations = oldUpstreamComputations;
         }
       }
     } finally {
