@@ -33,11 +33,6 @@ class ChangeStreamComputedMap<K, V>
   late final Computed<IMap<K, V>> _c;
   // The "keep-alive" subscription used by key streams, as we explicitly break the dependency DAG of Computed.
   ComputedSubscription<IMap<K, V>>? _cSub;
-  // These are set because we create them lazily, and forget about them when they lose all subscribers
-  // But they may gain subscribers later in the future, and at that point there might already be
-  // (an)other stream(s)/computation(s).
-  final _keyChangeStreams = <K, Set<ValueStream<ChangeEvent<K, V>>>>{};
-  final _keyChangeStreamComputations = <K, Set<Computed<ChangeEvent<K, V>>>>{};
   final _keyValueStreams = <K, Map<ValueStream<V?>, Computed<V?>>>{};
   ChangeEvent<K, V>? _lastChange;
   _ValueOrException<IMap<K, V>>?
