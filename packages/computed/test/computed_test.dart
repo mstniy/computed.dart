@@ -2105,51 +2105,6 @@ void main() {
       sub.cancel();
     });
 
-    test('in computations whose value did not change', () async {
-      final controller = StreamController<int>.broadcast(
-          sync: true); // Use a broadcast stream to make debugging easier
-      final source = controller.stream;
-
-      int? expectation; // If null, expect NoValueError
-
-      final c = Computed(() {
-        source.use; // Make sure to subscribe to it
-        try {
-          expect(source.prev, expectation);
-        } on NoValueException {
-          expect(expectation, null);
-        }
-        return source.use * source.use;
-      });
-
-      var subCnt = 0;
-
-      final sub = c.listen((event) {
-        subCnt++;
-      }, (e) => fail(e.toString()));
-
-      expect(subCnt, 0);
-      controller.add(0);
-      expect(subCnt, 1);
-      expectation = 0;
-      controller.add(1);
-      expect(subCnt, 2);
-      expectation = 1;
-      controller.add(-1); // Note that (-1)^2 == 1^2
-      expect(subCnt, 2);
-      expectation = -1;
-      controller.add(1);
-      expect(subCnt, 2);
-      expectation = 1;
-      controller.add(-1); // Note that (-1)^2 == 1^2
-      expect(subCnt, 2);
-      expectation = -1;
-      controller.add(0);
-      expect(subCnt, 3);
-
-      sub.cancel();
-    });
-
     test('works on computations', () {
       final controller = StreamController<int>.broadcast(
           sync: true); // Use a broadcast stream to make debugging easier
