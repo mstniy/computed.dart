@@ -55,6 +55,7 @@ class ChangeRecordUpdate<V> extends ChangeRecord<V> {
 
   ChangeRecordUpdate(this.newValue);
 
+  // TODO: Undo these changes on checking runtimeType. Then we can also remove a lot of explicit generic arguments from the tests
   bool operator ==(Object other) =>
       other.runtimeType == (ChangeRecordUpdate<V>) &&
       (other as ChangeRecordUpdate<V>).newValue == newValue;
