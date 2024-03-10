@@ -34,7 +34,6 @@ class ChangeStreamComputedMap<K, V>
   // The "keep-alive" subscription used by key streams, as we explicitly break the dependency DAG of Computed.
   ComputedSubscription<IMap<K, V>>? _cSub;
   final _keyValueStreams = <K, Map<ValueStream<V?>, Computed<V?>>>{};
-  ChangeEvent<K, V>? _lastChange;
   _ValueOrException<IMap<K, V>>?
       _curRes; // TODO: After adding support for disposing computations to Computed, set this to null as the disposer
   ChangeStreamComputedMap(this._stream, [this._initialValueComputer]) {
@@ -51,7 +50,6 @@ class ChangeStreamComputedMap<K, V>
         }
 
         _curRes = _ValueOrException.value(prev);
-        // TODO: Check for idempotency calls here
         notifierToSchedule = _notifyAllKeyStreams;
       }
       _stream.react((change) {
@@ -80,21 +78,15 @@ class ChangeStreamComputedMap<K, V>
 
         _curRes = _ValueOrException.value(prev);
 
-        if (!identical(change, _lastChange)) {
-          // We cheat here a bit to avoid notifying listeners a second time
-          //  in case Computed runs us twice (eg. in debug mode)
-          _lastChange = change;
-          if (keysToNotify == null) {
-            // Computed doesn't like it when a computation adds thins to a stream,
-            // so cheat here once again
-            notifierToSchedule = _notifyAllKeyStreams;
-          } else {
-            notifierToSchedule ??= () => _notifyKeyStreams(keysToNotify!);
-          }
+        if (keysToNotify == null) {
+          // Computed doesn't like it when a computation adds things to a stream,
+          // so cheat here once again
+          notifierToSchedule = _notifyAllKeyStreams;
+        } else {
+          notifierToSchedule ??= () => _notifyKeyStreams(keysToNotify!);
         }
       }, (e) {
         _curRes = _ValueOrException.exc(e);
-        // TODO: Check for idempotency calls here
         Zone.current.parent!.scheduleMicrotask(_notifyAllKeyStreams);
         throw e;
       });
@@ -104,7 +96,7 @@ class ChangeStreamComputedMap<K, V>
       }
 
       return prev;
-    }, initialPrev: firstReactToken);
+    }, async: true, initialPrev: firstReactToken);
   }
 
   @visibleForTesting
@@ -135,7 +127,6 @@ class ChangeStreamComputedMap<K, V>
         } catch (e) {
           _curRes = _ValueOrException.exc(e);
         }
-        // TODO: Nothing on which we can do the double-run check here, refactor it to a Token-based logic
         Zone.current.parent!.scheduleMicrotask(_notifyAllKeyStreams);
         return _curRes!
             .value; // Will throw if there was an exception, which is fine

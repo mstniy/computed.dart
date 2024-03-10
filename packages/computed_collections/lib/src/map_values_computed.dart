@@ -144,15 +144,12 @@ class MapValuesComputedComputedMap<K, V, VParent>
 
   @override
   Computed<V?> operator [](K key) {
-    // TODO: we have to use async here because we return a computation,
-    //  but the downside is that we are also running the user computation async
-    //  we only really want to disable idempotency checks, not really allow async
-    final computationComputation = Computed.async(() {
+    final computationComputation = Computed(() {
       if (_parent.containsKey(key).use) {
         return _convert(key, _parent[key].use as VParent);
       }
       return null;
-    });
+    }, assertIdempotent: false);
     final resultComputation = _keyComputationCache.wrap(
         key, () => computationComputation.use?.useOr(_noValueSentinel));
 
