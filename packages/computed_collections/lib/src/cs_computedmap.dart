@@ -127,7 +127,7 @@ class ChangeStreamComputedMap<K, V>
         } catch (e) {
           _curRes = _ValueOrException.exc(e);
         }
-        Zone.current.parent!.scheduleMicrotask(_notifyAllKeyStreams);
+        _notifyAllKeyStreams();
         return _curRes!
             .value; // Will throw if there was an exception, which is fine
       });

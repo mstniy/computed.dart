@@ -46,18 +46,14 @@ void main() {
     expect(lastRes1, null);
 
     s.add(KeyChanges({0: ChangeRecordInsert(01)}.lock));
-    await Future.value();
     expect(callCnt1, 2);
     expect(lastRes1, 1);
 
     s.add(KeyChanges({1: ChangeRecordInsert(2)}.lock));
-    await Future.value();
     expect(callCnt1, 2);
     s.add(KeyChanges({1: ChangeRecordUpdate(3)}.lock));
-    await Future.value();
     expect(callCnt1, 2);
     s.add(KeyChanges({0: ChangeRecordUpdate(4)}.lock));
-    await Future.value();
     expect(callCnt1, 3);
     expect(lastRes1, 4);
 
@@ -74,21 +70,17 @@ void main() {
     expect(lastRes2, 4);
 
     s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
-    await Future.value();
     expect(callCnt1, 4);
     expect(lastRes1, null);
     expect(callCnt2, 2);
     expect(lastRes2, null);
     s.add(KeyChanges({1: ChangeRecordDelete<int>()}.lock));
-    await Future.value();
     expect(callCnt1, 4);
     expect(callCnt2, 2);
     s.add(ChangeEventReplace({4: 5}.lock));
-    await Future.value();
     expect(callCnt1, 4);
     expect(callCnt2, 2);
     s.add(ChangeEventReplace({0: 0, 1: 1}.lock));
-    await Future.value();
     expect(callCnt1, 5);
     expect(lastRes1, 0);
     expect(callCnt2, 3);
@@ -107,7 +99,6 @@ void main() {
     expect(lastRes3, 1);
 
     s.add(KeyChanges({1: ChangeRecordUpdate(2)}.lock));
-    await Future.value();
     expect(callCnt1, 5);
     expect(callCnt2, 3);
     expect(callCnt3, 2);
@@ -121,7 +112,6 @@ void main() {
     sub1.cancel();
 
     s.add(ChangeEventReplace({0: 1, 1: 3}.lock));
-    await Future.value();
     expect(callCnt1, 5); // The listener has been cancelled
     expect(callCnt2, 4);
     expect(lastRes2, 1);
@@ -132,7 +122,6 @@ void main() {
     sub2.cancel();
 
     s.add(ChangeEventReplace({0: 2, 1: 4}.lock));
-    await Future.value();
     expect(callCnt1, 5);
     expect(callCnt2, 4);
     expect(callCnt3, 3);
@@ -175,11 +164,10 @@ void main() {
     s.addError(42);
     expect(callCnt1, 2);
     expect(lastExc1, 42);
-    await Future.value();
+    await Future.value(); // TODO: why do we need that?
     expect(callCnt2, 2);
     expect(lastExc2, 42);
     s.add(KeyChanges({0: ChangeRecordInsert(1)}.lock));
-    await Future.value();
     expect(callCnt1, 2);
     expect(callCnt2, 2);
 
@@ -278,29 +266,26 @@ void main() {
       m.fix({0: 1}.lock);
 
       expect(callCnt1, 2);
-      expect(lastRes1, {0: 1}.lock);
-      await Future.value();
       expect(callCnt2, 2);
+      expect(lastRes1, {0: 1}.lock);
       expect(lastRes2, 1);
       expect(callCnt3, 1);
 
       m.fixThrow(42);
 
       expect(callCnt1, 3);
-      expect(lastExc1, 42);
-      await Future.value();
       expect(callCnt2, 3);
       expect(callCnt3, 2);
+      expect(lastExc1, 42);
       expect(lastExc2, 42);
       expect(lastExc3, 42);
 
       m.unmock();
 
       expect(callCnt1, 4);
-      expect(lastRes1, {}.lock);
-      await Future.value();
       expect(callCnt2, 4);
       expect(callCnt3, 3);
+      expect(lastRes1, {}.lock);
       expect(lastRes2, null);
       expect(lastRes3, null);
 
@@ -348,20 +333,17 @@ void main() {
 
       m.mock(() => s2.use);
       expect(callCnt1, 1);
-      await Future.value();
-      expect(callCnt1, 2);
-      expect(lastRes1, {0: 1}.lock);
       expect(callCnt2, 1);
-      await Future.value();
+      await Future.value(); // Wait for Computed to subscribe to `s2`
+      expect(callCnt1, 2);
       expect(callCnt2, 2);
+      expect(lastRes1, {0: 1}.lock);
       expect(lastRes2, 1);
 
       m.mock(() => throw 42);
       expect(callCnt1, 3);
-      expect(lastExc1, 42);
-      expect(callCnt2, 2);
-      await Future.value();
       expect(callCnt2, 3);
+      expect(lastExc1, 42);
       expect(lastExc2, 42);
 
       sub1.cancel();
