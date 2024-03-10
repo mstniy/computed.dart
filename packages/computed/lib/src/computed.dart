@@ -104,7 +104,7 @@ class GlobalCtx {
               throw NoValueException();
             }
             return rvoe._voe!.value;
-          }, true, false, null, null),
+          }, true, false, false, null, null),
           currentValue != null
               ? _ValueOrException.value(currentValue())
               : null);
@@ -140,7 +140,7 @@ class ComputedImpl<T> {
   // Always true for routers, which might have both memoized (.use)
   // and non-memoized (.react) listeners.
   final bool _memoized;
-  final bool _async;
+  final bool _assertIdempotent, _async;
   _Token? _lastUpdate;
 
   bool get _novalue => _lastResult == null;
@@ -208,20 +208,21 @@ class ComputedImpl<T> {
     }
   }
 
-  ComputedImpl(this._f, this._memoized, this._async, this._onDispose,
-      this._onDisposeError)
+  ComputedImpl(this._f, this._memoized, this._assertIdempotent, this._async,
+      this._onDispose, this._onDisposeError)
       : _origF = _f;
 
   static ComputedImpl<T> withPrev<T>(
       T Function(T prev) f,
       T initialPrev,
       bool memoized,
+      bool assertIdempotent,
       bool async,
       void Function(T value)? onDispose,
       void Function(Object error)? onDisposeError) {
     late ComputedImpl<T> c;
     c = ComputedImpl<T>(() => f(c._prevResult?.value ?? initialPrev), memoized,
-        async, onDispose, onDisposeError);
+        assertIdempotent && !async, async, onDispose, onDisposeError);
     c._initialPrev = initialPrev;
 
     return c;
@@ -458,7 +459,7 @@ class ComputedImpl<T> {
       _curUpstreamComputations = {};
       GlobalCtx._currentComputation = this;
       var newResult = _evalFGuarded();
-      if (!_async &&
+      if (_assertIdempotent &&
           (newResult._isValue || newResult._exc is NoValueException)) {
         // Run f() once again and see if it behaves identically
         bool ensureIdempotent() {

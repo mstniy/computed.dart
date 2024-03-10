@@ -2512,6 +2512,18 @@ void main() {
     });
   });
 
+  test('can disable the idempotency check', () {
+    var cCnt = 0;
+    final c1 = Computed(() => cCnt++, assertIdempotent: false);
+    c1.listen(null, null).cancel();
+    expect(cCnt, 1);
+
+    final c2 = Computed.withPrev((prev) => cCnt++,
+        initialPrev: 0, assertIdempotent: false);
+    c2.listen(null, null).cancel();
+    expect(cCnt, 2);
+  });
+
   group('async mode', () {
     test('disables the sync zone and idempotency checks', () async {
       var cCnt = 0;
@@ -2537,6 +2549,18 @@ void main() {
       expect(await lastRes, 42);
 
       sub.cancel();
+
+      // Also test for `withPrev`
+      final c2 =
+          Computed.withPrev((prev) => cCnt++, initialPrev: 0, async: true);
+      c2.listen(null, null).cancel();
+      expect(cCnt, 2);
+
+      // `assertIdempotent` is ignored
+      final c3 = Computed.withPrev((prev) => cCnt++,
+          initialPrev: 0, async: true, assertIdempotent: true);
+      c3.listen(null, null).cancel();
+      expect(cCnt, 3);
     });
   });
 
