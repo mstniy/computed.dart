@@ -159,6 +159,12 @@ class ComputedImpl<T> {
 
   final _listeners = <_ComputedSubscriptionImpl<T>>{};
 
+  T Function() _f;
+  final T Function() _origF;
+
+  final void Function(T value)? _onDispose;
+  final void Function(Object error)? _onDisposeError;
+
   var _dirty = false;
 
   T get use {
@@ -201,12 +207,6 @@ class ComputedImpl<T> {
       return mvoe!._voe!.value;
     }
   }
-
-  T Function() _f;
-  final T Function() _origF;
-
-  final void Function(T value)? _onDispose;
-  final void Function(Object error)? _onDisposeError;
 
   ComputedImpl(this._f, this._memoized, this._async, this._onDispose,
       this._onDisposeError)
