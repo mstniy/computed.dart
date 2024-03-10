@@ -375,11 +375,6 @@ class ComputedImpl<T> {
       noUnsatDep.remove(cur);
       if (done.contains(cur)) continue;
       try {
-        if (cur._memoizedDownstreamComputations.isEmpty &&
-            cur._nonMemoizedDownstreamComputations.isEmpty &&
-            cur._listeners.isEmpty) {
-          continue;
-        }
         if (cur._lastUpdate != GlobalCtx._currentUpdate) {
           try {
             if (cur == this) {
