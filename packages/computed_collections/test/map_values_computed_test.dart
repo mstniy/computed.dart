@@ -7,47 +7,53 @@ import 'package:test/test.dart';
 
 void main() {
   test('incremental update works', () async {
-    final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final s2 = ValueStream<int>.seeded(0, sync: true);
-    final m1 = IComputedMap.fromChangeStream(s);
-    final m2 = m1.mapValuesComputed((k, v) => $(() => v + s2.use), null);
-    IMap<int, int?>? lastRes;
-    final sub = m2.snapshot.listen((event) {
-      lastRes = event;
-    }, (e) => fail(e.toString()));
-    await Future.value();
-    expect(lastRes, {}.lock);
-    s.add(KeyChanges({0: ChangeRecordInsert(1)}.lock));
-    await Future.value();
-    await Future.value();
-    expect(lastRes, {0: 1}.lock);
-    s2.add(1);
-    await Future.value();
-    expect(lastRes, {0: 2}.lock);
+    for (var noValueSentinel in [null, 42]) {
+      final s = ValueStream<ChangeEvent<int, int>>(sync: true);
+      final s2 = ValueStream<int>.seeded(0, sync: true);
+      final m1 = IComputedMap.fromChangeStream(s);
+      final m2 =
+          m1.mapValuesComputed((k, v) => $(() => v + s2.use), noValueSentinel);
+      IMap<int, int?>? lastRes;
+      final sub = m2.snapshot.listen((event) {
+        lastRes = event;
+      }, (e) => fail(e.toString()));
+      await Future.value();
+      expect(lastRes, {}.lock);
+      s.add(KeyChanges({0: ChangeRecordInsert(1)}.lock));
+      await Future.value();
+      expect(lastRes, {0: noValueSentinel}.lock);
+      await Future.value();
+      expect(lastRes, {0: 1}.lock);
+      s2.add(1);
+      await Future.value();
+      expect(lastRes, {0: 2}.lock);
 
-    s.add(KeyChanges({0: ChangeRecordUpdate(2)}.lock));
-    await Future.value();
-    await Future.value();
-    expect(lastRes, {0: 3}.lock);
-    s2.add(2);
-    await Future.value();
-    expect(lastRes, {0: 4}.lock);
-    s.add(KeyChanges({1: ChangeRecordInsert(1)}.lock));
-    await Future.value();
-    await Future.value();
-    expect(lastRes, {0: 4, 1: 3}.lock);
-    s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
-    await Future.value();
-    expect(lastRes, {1: 3}.lock);
-    s2.add(3);
-    s.add(ChangeEventReplace({4: 5}.lock));
-    await Future.value();
-    await Future.value();
-    expect(lastRes, <int, int?>{4: null}.lock);
-    await Future.value();
-    expect(lastRes, {4: 8}.lock);
+      s.add(KeyChanges({0: ChangeRecordUpdate(2)}.lock));
+      await Future.value();
+      expect(lastRes, {0: noValueSentinel}.lock);
+      await Future.value();
+      expect(lastRes, {0: 3}.lock);
+      s2.add(2);
+      await Future.value();
+      expect(lastRes, {0: 4}.lock);
+      s.add(KeyChanges({1: ChangeRecordInsert(1)}.lock));
+      await Future.value();
+      expect(lastRes, {0: 4, 1: noValueSentinel}.lock);
+      await Future.value();
+      expect(lastRes, {0: 4, 1: 3}.lock);
+      s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
+      await Future.value();
+      expect(lastRes, {1: 3}.lock);
+      s2.add(3);
+      s.add(ChangeEventReplace({4: 5}.lock));
+      await Future.value();
+      await Future.value();
+      expect(lastRes, {4: noValueSentinel}.lock);
+      await Future.value();
+      expect(lastRes, {4: 8}.lock);
 
-    sub.cancel();
+      sub.cancel();
+    }
   });
 
   test('initial computation works', () async {

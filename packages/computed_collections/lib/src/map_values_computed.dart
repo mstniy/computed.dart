@@ -155,7 +155,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
     });
     final resultComputation = _keyComputationCache.wrap(key, () {
       final c = computationComputation.use;
-      if (c != null) return c.use;
+      if (c != null) return c.useOr(_noValueSentinel);
       return null;
     });
 
