@@ -133,69 +133,89 @@ void main() {
     }
   });
 
-  // TODO: Test a non-null sentinel value
-
   test('propagates the change stream', () async {
-    final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final s2 = ValueStream<int>.seeded(5, sync: true);
-    final m1 = IComputedMap.fromChangeStream(s);
-    final m2 =
-        m1.mapValuesComputed((key, value) => $(() => value + s2.use), null);
-    ChangeEvent<int, int?>? lastRes;
-    var callCnt = 0;
-    final sub = m2.changes.listen((event) {
-      callCnt++;
-      lastRes = event;
-    }, (e) => fail(e.toString()));
+    for (var noValueSentinel in [null, 42]) {
+      final s = ValueStream<ChangeEvent<int, int>>(sync: true);
+      final s2 = ValueStream<int>.seeded(5, sync: true);
+      final m1 = IComputedMap.fromChangeStream(s);
+      final m2 = m1.mapValuesComputed(
+          (key, value) => $(() => value + s2.use), noValueSentinel);
+      ChangeEvent<int, int?>? lastRes;
+      var callCnt = 0;
+      final sub = m2.changes.listen((event) {
+        callCnt++;
+        lastRes = event;
+      }, (e) => fail(e.toString()));
 
-    await Future.value();
-    expect(callCnt, 0);
-    s.add(KeyChanges({0: ChangeRecordInsert(1)}.lock));
-    await Future.value();
-    expect(callCnt, 1);
-    expect(lastRes, KeyChanges({0: ChangeRecordInsert(null)}.lock));
-    await Future.value();
-    expect(callCnt, 2);
-    expect(lastRes, KeyChanges({0: ChangeRecordUpdate(6)}.lock));
+      await Future.value();
+      expect(callCnt, 0);
+      s.add(KeyChanges({0: ChangeRecordInsert(1)}.lock));
+      await Future.value();
+      expect(callCnt, 1);
+      expect(
+          lastRes, KeyChanges({0: ChangeRecordInsert(noValueSentinel)}.lock));
+      await Future.value();
+      expect(callCnt, 2);
+      expect(lastRes, KeyChanges({0: ChangeRecordUpdate(6)}.lock));
 
-    s.add(KeyChanges({1: ChangeRecordInsert(2)}.lock));
-    await Future.value();
-    expect(callCnt, 3);
-    expect(lastRes, KeyChanges({1: ChangeRecordInsert(null)}.lock));
-    await Future.value();
-    expect(callCnt, 4);
-    expect(lastRes, KeyChanges({1: ChangeRecordUpdate(7)}.lock));
+      s.add(KeyChanges({1: ChangeRecordInsert(2)}.lock));
+      await Future.value();
+      expect(callCnt, 3);
+      expect(
+          lastRes, KeyChanges({1: ChangeRecordInsert(noValueSentinel)}.lock));
+      await Future.value();
+      expect(callCnt, 4);
+      expect(lastRes, KeyChanges({1: ChangeRecordUpdate(7)}.lock));
 
-    s.add(KeyChanges({0: ChangeRecordUpdate(2)}.lock));
-    await Future.value();
-    expect(callCnt, 5);
-    expect(lastRes, KeyChanges({0: ChangeRecordUpdate(null)}.lock));
-    await Future.value();
-    expect(callCnt, 6);
-    expect(lastRes, KeyChanges({0: ChangeRecordUpdate(7)}.lock));
+      s.add(KeyChanges({0: ChangeRecordUpdate(2)}.lock));
+      await Future.value();
+      expect(callCnt, 5);
+      expect(
+          lastRes, KeyChanges({0: ChangeRecordUpdate(noValueSentinel)}.lock));
+      await Future.value();
+      expect(callCnt, 6);
+      expect(lastRes, KeyChanges({0: ChangeRecordUpdate(7)}.lock));
 
-    s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
-    await Future.value();
-    expect(callCnt, 7);
-    expect(lastRes, KeyChanges({0: ChangeRecordDelete()}.lock));
+      s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
+      await Future.value();
+      expect(callCnt, 7);
+      expect(lastRes, KeyChanges({0: ChangeRecordDelete()}.lock));
 
-    s.add(ChangeEventReplace({0: 5, 1: 6, 2: 7}.lock));
-    await Future.value();
-    expect(callCnt, 8);
-    expect(lastRes, ChangeEventReplace({0: null, 1: null, 2: null}.lock));
-    await Future.value();
-    expect(callCnt, 9);
-    expect(lastRes, KeyChanges({0: ChangeRecordUpdate(10)}.lock));
-    await Future.value();
-    expect(callCnt, 10);
-    expect(lastRes, KeyChanges({1: ChangeRecordUpdate(11)}.lock));
-    await Future.value();
-    expect(callCnt, 11);
-    expect(lastRes, KeyChanges({2: ChangeRecordUpdate(12)}.lock));
+      s.add(ChangeEventReplace({0: 5, 1: 6, 2: 7}.lock));
+      await Future.value();
+      expect(callCnt, 8);
+      expect(
+          lastRes,
+          ChangeEventReplace({
+            0: noValueSentinel,
+            1: noValueSentinel,
+            2: noValueSentinel
+          }.lock));
+      await Future.value();
+      expect(callCnt, 9);
+      expect(lastRes, KeyChanges({0: ChangeRecordUpdate(10)}.lock));
+      await Future.value();
+      expect(callCnt, 10);
+      expect(lastRes, KeyChanges({1: ChangeRecordUpdate(11)}.lock));
+      await Future.value();
+      expect(callCnt, 11);
+      expect(lastRes, KeyChanges({2: ChangeRecordUpdate(12)}.lock));
 
-    await Future.value(); // No more calls
-    expect(callCnt, 11);
+      s2.add(6);
+      await Future.value();
+      expect(callCnt, 12);
+      expect(lastRes, KeyChanges({0: ChangeRecordUpdate(11)}.lock));
+      await Future.value();
+      expect(callCnt, 13);
+      expect(lastRes, KeyChanges({1: ChangeRecordUpdate(12)}.lock));
+      await Future.value();
+      expect(callCnt, 14);
+      expect(lastRes, KeyChanges({2: ChangeRecordUpdate(13)}.lock));
 
-    sub.cancel();
+      await Future.value(); // No more calls
+      expect(callCnt, 14);
+
+      sub.cancel();
+    }
   });
 }
