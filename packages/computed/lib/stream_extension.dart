@@ -47,7 +47,7 @@ extension StreamComputedExtension<T> on Stream<T> {
   void react(void Function(T) onData, [void Function(Object)? onError]) =>
       StreamComputedExtensionImpl<T>(this).react(onData, onError);
 
-  /// Returns the value of this stream during the last run of the current computation which triggered the current computation's downstream, if one exists.
+  /// Returns the value of this stream during the last run of the current computation.
   ///
   /// Can only be used inside computations.
   /// Throws [NoValueException] if the current computation did not [use] this stream

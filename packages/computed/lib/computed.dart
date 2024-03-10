@@ -111,13 +111,13 @@ class Computed<T> {
     }
   }
 
-  /// Returns the result of this computation during the last run of the current computation which notified the current computation's downstream, if one exists.
-  /// If called on the current computation, returns its last result which was different to the previous one.
+  /// Returns the result of this computation during the last run of the current computation.
+  /// If called on the current computation, returns its last result.
   ///
   /// This will never trigger a re-computation.
   /// Can only be used inside computations.
   /// Throws [NoValueException] if the current computation did not [use] this computation
-  /// during its previous run.
+  /// during its previous run and this computations is not the current computation.
   /// Note that [prev] does not subscribe to this computation. To do that, see [use].
   T get prev => _impl.prev;
 
