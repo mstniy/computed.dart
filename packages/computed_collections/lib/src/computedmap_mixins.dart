@@ -32,8 +32,7 @@ class ComputedMapMixin<K, V> {
   }
 
   IComputedMap<K2, V2> mapComputed<K2, V2>(
-      Computed<MapEntry<K2, V2>> Function(K key, V value) convert,
-      V2 noValueSentinel) {
+      Computed<MapEntry<K2, V2>> Function(K key, V value) convert) {
     // TODO: implement mapComputed
     throw UnimplementedError();
   }
@@ -42,9 +41,8 @@ class ComputedMapMixin<K, V> {
       MapValuesComputedMap(this as IComputedMap<K, V>, convert);
 
   IComputedMap<K, V2> mapValuesComputed<V2>(
-          Computed<V2> Function(K key, V value) convert, V2 noValueSentinel) =>
-      MapValuesComputedComputedMap(
-          this as IComputedMap<K, V>, convert, noValueSentinel);
+          Computed<V2> Function(K key, V value) convert) =>
+      MapValuesComputedComputedMap(this as IComputedMap<K, V>, convert);
 
   IComputedMap<K, V> putIfAbsent(K key, V Function() ifAbsent) {
     // TODO: implement putIfAbsent
@@ -79,7 +77,7 @@ class ComputedMapMixin<K, V> {
   }
 
   IComputedMap<K, V> updateAllComputed(
-      Computed<V> Function(K key, V value) update, V noValueSentinel) {
+      Computed<V> Function(K key, V value) update) {
     // TODO: implement updateAllComputed
     throw UnimplementedError();
   }

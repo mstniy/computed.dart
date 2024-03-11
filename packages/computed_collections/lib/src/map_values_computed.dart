@@ -8,6 +8,13 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'computedmap_mixins.dart';
 import 'cs_computedmap.dart';
 
+class _SubscriptionAndProduced<T> {
+  late ComputedSubscription<T> _sub;
+  bool _produced = false;
+
+  _SubscriptionAndProduced();
+}
+
 class MapValuesComputedComputedMap<K, V, VParent>
     with ComputedMapMixin<K, V>
     implements IComputedMap<K, V> {
@@ -15,13 +22,11 @@ class MapValuesComputedComputedMap<K, V, VParent>
   final Computed<V> Function(K key, VParent value) _convert;
   late final ValueStream<ChangeEvent<K, V>> _changes;
   late final Computed<ChangeEvent<K, V>> _changesComputed;
-  final _changesState = <K, ComputedSubscription<V>>{};
+  final _changesState = <K, _SubscriptionAndProduced<V>>{};
   late final Computed<IMap<K, V>> _snapshot;
   final _keyComputationCache = ComputationCache<K, V?>();
-  final V _noValueSentinel;
 
-  MapValuesComputedComputedMap(
-      this._parent, this._convert, this._noValueSentinel) {
+  MapValuesComputedComputedMap(this._parent, this._convert) {
     // We use async here because Computed does not have semantics operator==
     final _computedChanges = Computed.async(() {
       final change = _parent.changes.use;
@@ -51,21 +56,26 @@ class MapValuesComputedComputedMap<K, V, VParent>
       }
     });
 
-    void _computationListener(K key, V value) {
-      _changes.add(KeyChanges({key: ChangeRecordUpdate<V>(value)}.lock));
+    void _computationListener(_SubscriptionAndProduced<V> sap, K key, V value) {
+      _changes.add(KeyChanges({
+        key: sap._produced
+            ? ChangeRecordUpdate<V>(value)
+            : ChangeRecordInsert<V>(value)
+      }.lock));
+      sap._produced = true;
     }
 
     void _computedChangesListener(ChangeEvent<K, Computed<V>> computedChanges) {
       if (computedChanges is ChangeEventReplace<K, Computed<V>>) {
-        _changesState.values.forEach((sub) => sub.cancel());
+        _changesState.values.forEach((sap) => sap._sub.cancel());
         _changesState
             .clear(); // TODO: Delay the cancellation to remove the microtask lag
-        _changes.add(ChangeEventReplace(computedChanges.newCollection
-            .map((key, value) => MapEntry(key, _noValueSentinel))));
+        _changes.add(ChangeEventReplace(<K, V>{}.lock));
         computedChanges.newCollection.forEach((key, value) {
-          final sub = value.listen(
-              (e) => _computationListener(key, e), _changes.addError);
-          _changesState[key] = sub;
+          final sap = _SubscriptionAndProduced<V>();
+          sap._sub = value.listen(
+              (e) => _computationListener(sap, key, e), _changes.addError);
+          _changesState[key] = sap;
         });
       } else if (computedChanges is KeyChanges<K, Computed<V>>) {
         for (var e in computedChanges.changes.entries) {
@@ -73,24 +83,26 @@ class MapValuesComputedComputedMap<K, V, VParent>
           final change = e.value;
           if (change is ChangeRecordInsert<Computed<V>>) {
             assert(_changesState[key] == null);
-            _changes.add(KeyChanges(
-                {key: ChangeRecordInsert<V>(_noValueSentinel)}.lock));
-            final sub = change.value.listen(
-                (e) => _computationListener(key, e), _changes.addError,
+            final sap = _SubscriptionAndProduced<V>();
+            sap._sub = change.value.listen(
+                (e) => _computationListener(sap, key, e), _changes.addError,
                 sync: true);
-            _changesState[key] = sub;
+            _changesState[key] = sap;
           } else if (change is ChangeRecordUpdate<Computed<V>>) {
-            _changes.add(KeyChanges(
-                {key: ChangeRecordUpdate<V>(_noValueSentinel)}.lock));
-            final oldSub = _changesState[key]!;
-            _changesState[key] = change.newValue.listen(
-                (e) => _computationListener(key, e), _changes.addError,
+            final sap = _changesState[key]!;
+            final oldSub = sap._sub;
+            sap._sub = change.newValue.listen(
+                (e) => _computationListener(sap, key, e), _changes.addError,
                 sync: true);
             oldSub.cancel();
+            // TODO: We need to "remove" the key until the new computation gains a value, no?
           } else if (change is ChangeRecordDelete<Computed<V>>) {
-            final sub = _changesState.remove(key)!;
-            sub.cancel();
-            _changes.add(KeyChanges({key: ChangeRecordDelete<V>()}.lock));
+            final sap = _changesState[key]!;
+            sap._sub.cancel();
+            _changesState.remove(key);
+            if (sap._produced) {
+              _changes.add(KeyChanges({key: ChangeRecordDelete<V>()}.lock));
+            }
           }
         }
       }
@@ -104,10 +116,11 @@ class MapValuesComputedComputedMap<K, V, VParent>
           // TODO: Shouldn't this be a broadcast stream? It is semantically change/event stream after all, and not a value
           assert(_computedChangesSubscription == null);
           _computedChangesSubscription = _computedChanges.listen(
-              _computedChangesListener, _changes.addError);
+              _computedChangesListener,
+              _changes.addError); // TODO: make this sync?
         },
         onCancel: () {
-          _changesState.values.forEach((sub) => sub.cancel());
+          _changesState.values.forEach((sap) => sap._sub.cancel());
           _changesState.clear();
           _computedChangesSubscription!.cancel();
         });
@@ -157,8 +170,13 @@ class MapValuesComputedComputedMap<K, V, VParent>
       }
       return null;
     }, assertIdempotent: false);
-    final resultComputation = _keyComputationCache.wrap(
-        key, () => computationComputation.use?.useOr(_noValueSentinel));
+    final resultComputation = _keyComputationCache.wrap(key, () {
+      try {
+        return computationComputation.use?.use;
+      } on NoValueException {
+        return null;
+      }
+    });
 
     return resultComputation;
   }
