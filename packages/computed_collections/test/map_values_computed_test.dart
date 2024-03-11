@@ -21,20 +21,16 @@ void main() {
       expect(lastRes, {}.lock);
       s.add(KeyChanges({0: ChangeRecordInsert(1)}.lock));
       expect(lastRes, {0: noValueSentinel}.lock);
-      await Future.value();
+      await Future.value(); // Wait for Computed to subscribe to s2
       expect(lastRes, {0: 1}.lock);
       s2.add(1);
       expect(lastRes, {0: 2}.lock);
 
       s.add(KeyChanges({0: ChangeRecordUpdate(2)}.lock));
-      expect(lastRes, {0: noValueSentinel}.lock);
-      await Future.value();
       expect(lastRes, {0: 3}.lock);
       s2.add(2);
       expect(lastRes, {0: 4}.lock);
       s.add(KeyChanges({1: ChangeRecordInsert(1)}.lock));
-      expect(lastRes, {0: 4, 1: noValueSentinel}.lock);
-      await Future.value();
       expect(lastRes, {0: 4, 1: 3}.lock);
       s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
       expect(lastRes, {1: 3}.lock);
@@ -97,7 +93,7 @@ void main() {
       expect(lastRes1, null);
 
       s.add(KeyChanges({0: ChangeRecordInsert(1)}.lock));
-      await Future.value();
+      await Future.value(); // TODO: why do we need this?
       expect(cCnt, 2);
       expect(callCnt1, noValueSentinel == null ? 1 : 2);
       expect(lastRes1, noValueSentinel);
@@ -145,23 +141,16 @@ void main() {
       expect(callCnt, 1);
       expect(
           lastRes, KeyChanges({0: ChangeRecordInsert(noValueSentinel)}.lock));
-      await Future.value();
+      await Future.value(); // Wait for computed to subscribe to s2
       expect(callCnt, 2);
       expect(lastRes, KeyChanges({0: ChangeRecordUpdate(6)}.lock));
 
       s.add(KeyChanges({1: ChangeRecordInsert(2)}.lock));
-      expect(callCnt, 3);
       expect(
-          lastRes, KeyChanges({1: ChangeRecordInsert(noValueSentinel)}.lock));
-      await Future.value();
-      expect(callCnt, 4);
+          callCnt, 4); // TODO: can we get rid of the "transient" sentinel here?
       expect(lastRes, KeyChanges({1: ChangeRecordUpdate(7)}.lock));
 
       s.add(KeyChanges({0: ChangeRecordUpdate(2)}.lock));
-      expect(callCnt, 5);
-      expect(
-          lastRes, KeyChanges({0: ChangeRecordUpdate(noValueSentinel)}.lock));
-      await Future.value();
       expect(callCnt, 6);
       expect(lastRes, KeyChanges({0: ChangeRecordUpdate(7)}.lock));
 

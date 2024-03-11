@@ -58,7 +58,8 @@ class MapValuesComputedComputedMap<K, V, VParent>
     void _computedChangesListener(ChangeEvent<K, Computed<V>> computedChanges) {
       if (computedChanges is ChangeEventReplace<K, Computed<V>>) {
         _changesState.values.forEach((sub) => sub.cancel());
-        _changesState.clear();
+        _changesState
+            .clear(); // TODO: Delay the cancellation to remove the microtask lag
         _changes.add(ChangeEventReplace(computedChanges.newCollection
             .map((key, value) => MapEntry(key, _noValueSentinel))));
         computedChanges.newCollection.forEach((key, value) {
@@ -72,19 +73,20 @@ class MapValuesComputedComputedMap<K, V, VParent>
           final change = e.value;
           if (change is ChangeRecordInsert<Computed<V>>) {
             assert(_changesState[key] == null);
-            final sub = change.value
-                .listen((e) => _computationListener(key, e), _changes.addError);
-            _changesState[key] = sub;
             _changes.add(KeyChanges(
                 {key: ChangeRecordInsert<V>(_noValueSentinel)}.lock));
+            final sub = change.value.listen(
+                (e) => _computationListener(key, e), _changes.addError,
+                sync: true);
+            _changesState[key] = sub;
           } else if (change is ChangeRecordUpdate<Computed<V>>) {
-            final oldSub = _changesState[key]!;
-            _changesState[key] = change.newValue.listen(
-                (e) => _computationListener(key, e),
-                _changes.addError); // TODO: listenSync would be handy here
-            oldSub.cancel();
             _changes.add(KeyChanges(
                 {key: ChangeRecordUpdate<V>(_noValueSentinel)}.lock));
+            final oldSub = _changesState[key]!;
+            _changesState[key] = change.newValue.listen(
+                (e) => _computationListener(key, e), _changes.addError,
+                sync: true);
+            oldSub.cancel();
           } else if (change is ChangeRecordDelete<Computed<V>>) {
             final sub = _changesState.remove(key)!;
             sub.cancel();
