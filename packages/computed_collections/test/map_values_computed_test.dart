@@ -115,8 +115,11 @@ void main() {
   test('propagates the change stream', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
     final s2 = ValueStream<int>.seeded(5, sync: true);
+    final s3 = ValueStream<int>(sync: true);
     final m1 = IComputedMap.fromChangeStream(s);
-    final m2 = m1.mapValuesComputed((key, value) => $(() => value + s2.use));
+    var useS2 = true;
+    final m2 = m1.mapValuesComputed(
+        (key, value) => $(() => value + (useS2 ? s2.use : s3.use)));
     ChangeEvent<int, int?>? lastRes;
     var callCnt = 0;
     final sub = m2.changes.listen((event) {
@@ -140,27 +143,37 @@ void main() {
     expect(callCnt, 3);
     expect(lastRes, KeyChanges({0: ChangeRecordUpdate(7)}.lock));
 
-    s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
+    useS2 = false;
+    s.add(KeyChanges({0: ChangeRecordUpdate(3)}.lock));
     expect(callCnt, 4);
+    expect(lastRes,
+        KeyChanges({0: ChangeRecordDelete()}.lock)); // s3 has no value yet
+    s3.add(0);
+    expect(callCnt, 5);
+    expect(lastRes, KeyChanges({0: ChangeRecordInsert(3)}.lock));
+    useS2 = true;
+
+    s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
+    expect(callCnt, 6);
     expect(lastRes, KeyChanges({0: ChangeRecordDelete()}.lock));
 
     // TODO: Also try deleting/updating a key which has not produced a value yet
 
     s.add(ChangeEventReplace({0: 5, 1: 6, 2: 7}.lock));
-    expect(callCnt, 5);
+    expect(callCnt, 7);
     expect(lastRes, ChangeEventReplace({}.lock));
     await Future.value();
-    expect(callCnt, 8);
+    expect(callCnt, 10);
     expect(lastRes, KeyChanges({2: ChangeRecordInsert(12)}.lock));
     // TODO: how to verify that 0 and 1 also changed?
 
     s2.add(6);
-    expect(callCnt, 11);
+    expect(callCnt, 13);
     expect(lastRes, KeyChanges({2: ChangeRecordUpdate(13)}.lock));
     // TODO: how to verify that 0 and 1 also changed?
 
     await Future.value(); // No more calls
-    expect(callCnt, 11);
+    expect(callCnt, 13);
 
     sub.cancel();
   });

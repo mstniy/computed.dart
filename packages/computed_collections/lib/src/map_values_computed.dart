@@ -11,6 +11,7 @@ import 'cs_computedmap.dart';
 class _SubscriptionAndProduced<T> {
   late ComputedSubscription<T> _sub;
   bool _produced = false;
+  bool _flag = false;
 
   _SubscriptionAndProduced();
 }
@@ -63,6 +64,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
             : ChangeRecordInsert<V>(value)
       }.lock));
       sap._produced = true;
+      sap._flag = true;
     }
 
     void _computedChangesListener(ChangeEvent<K, Computed<V>> computedChanges) {
@@ -91,11 +93,17 @@ class MapValuesComputedComputedMap<K, V, VParent>
           } else if (change is ChangeRecordUpdate<Computed<V>>) {
             final sap = _changesState[key]!;
             final oldSub = sap._sub;
+            sap._flag = false;
             sap._sub = change.newValue.listen(
                 (e) => _computationListener(sap, key, e), _changes.addError,
                 sync: true);
             oldSub.cancel();
-            // TODO: We need to "remove" the key until the new computation gains a value, no?
+            if (!sap._flag && sap._produced) {
+              // Computed did not synchronously call the listener
+              // Emit a deletion event if this key used to exist
+              _changes.add(KeyChanges({key: ChangeRecordDelete<V>()}.lock));
+              sap._produced = false;
+            }
           } else if (change is ChangeRecordDelete<Computed<V>>) {
             final sap = _changesState[key]!;
             sap._sub.cancel();
