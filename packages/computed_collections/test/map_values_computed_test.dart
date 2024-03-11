@@ -113,13 +113,17 @@ void main() {
   });
 
   test('propagates the change stream', () async {
+    //TODO: mirror the edge cases tested in this one to all the others
+    // Or combine them?
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
     final s2 = ValueStream<int>.seeded(5, sync: true);
     final s3 = ValueStream<int>(sync: true);
+    final s4 = ValueStream<int>.seeded(6, sync: true);
+    $(() => s4.use).listen(null, null); // Force s4 to have a synchronous value
     final m1 = IComputedMap.fromChangeStream(s);
-    var useS2 = true;
-    final m2 = m1.mapValuesComputed(
-        (key, value) => $(() => value + (useS2 ? s2.use : s3.use)));
+    ValueStream<int> vsToUse = s2;
+    final m2 =
+        m1.mapValuesComputed((key, value) => $(() => value + vsToUse.use));
     ChangeEvent<int, int?>? lastRes;
     var callCnt = 0;
     final sub = m2.changes.listen((event) {
@@ -129,51 +133,81 @@ void main() {
 
     await Future.value();
     expect(callCnt, 0);
+    // Insertion, the computation has no value
     s.add(KeyChanges({0: ChangeRecordInsert(1)}.lock));
     expect(callCnt, 0);
     await Future.value(); // Wait for computed to subscribe to s2
     expect(callCnt, 1);
     expect(lastRes, KeyChanges({0: ChangeRecordInsert(6)}.lock));
 
+    // Insertion, the computation has value
     s.add(KeyChanges({1: ChangeRecordInsert(2)}.lock));
     expect(callCnt, 2);
     expect(lastRes, KeyChanges({1: ChangeRecordInsert(7)}.lock));
 
+    // Update, there was a value, there is a value
     s.add(KeyChanges({0: ChangeRecordUpdate(2)}.lock));
     expect(callCnt, 3);
     expect(lastRes, KeyChanges({0: ChangeRecordUpdate(7)}.lock));
 
-    useS2 = false;
+    vsToUse = s3;
+    // Update, there was a value, not anymore
     s.add(KeyChanges({0: ChangeRecordUpdate(3)}.lock));
     expect(callCnt, 4);
     expect(lastRes,
         KeyChanges({0: ChangeRecordDelete()}.lock)); // s3 has no value yet
-    s3.add(0);
-    expect(callCnt, 5);
-    expect(lastRes, KeyChanges({0: ChangeRecordInsert(3)}.lock));
-    useS2 = true;
 
-    s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
+    // Update, there was no value, now there is
+    vsToUse = s4;
+    s.add(KeyChanges({0: ChangeRecordUpdate(4)}.lock));
+    expect(callCnt, 5);
+    expect(lastRes, KeyChanges({0: ChangeRecordInsert(10)}.lock));
+
+    // Update, there was a value, not anymore
+    vsToUse = s3;
+    s.add(KeyChanges({0: ChangeRecordUpdate(3)}.lock));
     expect(callCnt, 6);
+    expect(lastRes,
+        KeyChanges({0: ChangeRecordDelete()}.lock)); // s3 still has no value
+
+    // Update, there was no value, there is no value
+    s.add(KeyChanges({0: ChangeRecordUpdate(4)}.lock));
+    expect(callCnt, 6); // No event should occur
+
+    // Delete, there was no value
+    s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
+    expect(callCnt, 6); // No event should occur
+
+    // Insertion of a computation without value
+    s.add(KeyChanges({0: ChangeRecordInsert(3)}.lock));
+    expect(callCnt, 6); // No event should occur
+
+    // Insertion event due to the computation gaining value
+    s3.add(0);
+    expect(callCnt, 7);
+    expect(lastRes, KeyChanges({0: ChangeRecordInsert(3)}.lock));
+    vsToUse = s2;
+
+    // Deletion, there was value
+    s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
+    expect(callCnt, 8);
     expect(lastRes, KeyChanges({0: ChangeRecordDelete()}.lock));
 
-    // TODO: Also try deleting/updating a key which has not produced a value yet
-
     s.add(ChangeEventReplace({0: 5, 1: 6, 2: 7}.lock));
-    expect(callCnt, 7);
+    expect(callCnt, 9);
     expect(lastRes, ChangeEventReplace({}.lock));
     await Future.value();
-    expect(callCnt, 10);
+    expect(callCnt, 12);
     expect(lastRes, KeyChanges({2: ChangeRecordInsert(12)}.lock));
     // TODO: how to verify that 0 and 1 also changed?
 
     s2.add(6);
-    expect(callCnt, 13);
+    expect(callCnt, 15);
     expect(lastRes, KeyChanges({2: ChangeRecordUpdate(13)}.lock));
     // TODO: how to verify that 0 and 1 also changed?
 
     await Future.value(); // No more calls
-    expect(callCnt, 13);
+    expect(callCnt, 15);
 
     sub.cancel();
   });
