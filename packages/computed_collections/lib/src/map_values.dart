@@ -18,6 +18,7 @@ class MapValuesComputedMap<K, V, VParent>
 
   MapValuesComputedMap(this._parent, this._convert) {
     _changes = Computed(() {
+      // TODO: make this a stream map instead? does it have laziness?
       final change = _parent.changes.use;
       if (change is ChangeEventReplace<K, VParent>) {
         return ChangeEventReplace(change.newCollection
