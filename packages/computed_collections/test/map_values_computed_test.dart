@@ -20,34 +20,27 @@ void main() {
       await Future.value();
       expect(lastRes, {}.lock);
       s.add(KeyChanges({0: ChangeRecordInsert(1)}.lock));
-      await Future.value();
       expect(lastRes, {0: noValueSentinel}.lock);
       await Future.value();
       expect(lastRes, {0: 1}.lock);
       s2.add(1);
-      await Future.value();
       expect(lastRes, {0: 2}.lock);
 
       s.add(KeyChanges({0: ChangeRecordUpdate(2)}.lock));
-      await Future.value();
       expect(lastRes, {0: noValueSentinel}.lock);
       await Future.value();
       expect(lastRes, {0: 3}.lock);
       s2.add(2);
-      await Future.value();
       expect(lastRes, {0: 4}.lock);
       s.add(KeyChanges({1: ChangeRecordInsert(1)}.lock));
-      await Future.value();
       expect(lastRes, {0: 4, 1: noValueSentinel}.lock);
-      await Future.value();
+      await Future
+          .value(); // TODO: we can remove these by subscribing to the new computation before cancelling the old subscription
       expect(lastRes, {0: 4, 1: 3}.lock);
       s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
-      await Future.value();
       expect(lastRes, {1: 3}.lock);
       s2.add(3);
       s.add(ChangeEventReplace({4: 5}.lock));
-      await Future.value();
-      await Future.value();
       expect(lastRes, {4: noValueSentinel}.lock);
       await Future.value();
       expect(lastRes, {4: 8}.lock);
@@ -150,7 +143,6 @@ void main() {
       await Future.value();
       expect(callCnt, 0);
       s.add(KeyChanges({0: ChangeRecordInsert(1)}.lock));
-      await Future.value();
       expect(callCnt, 1);
       expect(
           lastRes, KeyChanges({0: ChangeRecordInsert(noValueSentinel)}.lock));
@@ -159,7 +151,6 @@ void main() {
       expect(lastRes, KeyChanges({0: ChangeRecordUpdate(6)}.lock));
 
       s.add(KeyChanges({1: ChangeRecordInsert(2)}.lock));
-      await Future.value();
       expect(callCnt, 3);
       expect(
           lastRes, KeyChanges({1: ChangeRecordInsert(noValueSentinel)}.lock));
@@ -168,7 +159,6 @@ void main() {
       expect(lastRes, KeyChanges({1: ChangeRecordUpdate(7)}.lock));
 
       s.add(KeyChanges({0: ChangeRecordUpdate(2)}.lock));
-      await Future.value();
       expect(callCnt, 5);
       expect(
           lastRes, KeyChanges({0: ChangeRecordUpdate(noValueSentinel)}.lock));
@@ -177,12 +167,10 @@ void main() {
       expect(lastRes, KeyChanges({0: ChangeRecordUpdate(7)}.lock));
 
       s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
-      await Future.value();
       expect(callCnt, 7);
       expect(lastRes, KeyChanges({0: ChangeRecordDelete()}.lock));
 
       s.add(ChangeEventReplace({0: 5, 1: 6, 2: 7}.lock));
-      await Future.value();
       expect(callCnt, 8);
       expect(
           lastRes,
@@ -192,25 +180,14 @@ void main() {
             2: noValueSentinel
           }.lock));
       await Future.value();
-      expect(callCnt, 9);
-      expect(lastRes, KeyChanges({0: ChangeRecordUpdate(10)}.lock));
-      await Future.value();
-      expect(callCnt, 10);
-      expect(lastRes, KeyChanges({1: ChangeRecordUpdate(11)}.lock));
-      await Future.value();
       expect(callCnt, 11);
       expect(lastRes, KeyChanges({2: ChangeRecordUpdate(12)}.lock));
+      // TODO: how to verify that 0 and 1 also changed?
 
       s2.add(6);
-      await Future.value();
-      expect(callCnt, 12);
-      expect(lastRes, KeyChanges({0: ChangeRecordUpdate(11)}.lock));
-      await Future.value();
-      expect(callCnt, 13);
-      expect(lastRes, KeyChanges({1: ChangeRecordUpdate(12)}.lock));
-      await Future.value();
       expect(callCnt, 14);
       expect(lastRes, KeyChanges({2: ChangeRecordUpdate(13)}.lock));
+      // TODO: how to verify that 0 and 1 also changed?
 
       await Future.value(); // No more calls
       expect(callCnt, 14);

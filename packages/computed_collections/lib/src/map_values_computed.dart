@@ -95,15 +95,19 @@ class MapValuesComputedComputedMap<K, V, VParent>
 
     ComputedSubscription<ChangeEvent<K, Computed<V>>>?
         _computedChangesSubscription;
-    _changes = ValueStream(onListen: () {
-      assert(_computedChangesSubscription == null);
-      _computedChangesSubscription =
-          _computedChanges.listen(_computedChangesListener, _changes.addError);
-    }, onCancel: () {
-      _changesState.values.forEach((sub) => sub.cancel());
-      _changesState.clear();
-      _computedChangesSubscription!.cancel();
-    });
+    _changes = ValueStream(
+        sync: true,
+        onListen: () {
+          // TODO: Shouldn't this be a broadcast stream? It is semantically change/event stream after all, and not a value
+          assert(_computedChangesSubscription == null);
+          _computedChangesSubscription = _computedChanges.listen(
+              _computedChangesListener, _changes.addError);
+        },
+        onCancel: () {
+          _changesState.values.forEach((sub) => sub.cancel());
+          _changesState.clear();
+          _computedChangesSubscription!.cancel();
+        });
     _changesComputed = $(() => _changes.use);
     _snapshot = ChangeStreamComputedMap(_changes, () {
       final entries = _parent.snapshot.use
