@@ -78,10 +78,11 @@ class MapValuesComputedComputedMap<K, V, VParent>
             _changes.add(KeyChanges(
                 {key: ChangeRecordInsert<V>(_noValueSentinel)}.lock));
           } else if (change is ChangeRecordUpdate<Computed<V>>) {
-            final sub = _changesState[key]!;
-            sub.cancel();
-            _changesState[key] = change.newValue
-                .listen((e) => _computationListener(key, e), _changes.addError);
+            final oldSub = _changesState[key]!;
+            _changesState[key] = change.newValue.listen(
+                (e) => _computationListener(key, e),
+                _changes.addError); // TODO: listenSync would be handy here
+            oldSub.cancel();
             _changes.add(KeyChanges(
                 {key: ChangeRecordUpdate<V>(_noValueSentinel)}.lock));
           } else if (change is ChangeRecordDelete<Computed<V>>) {

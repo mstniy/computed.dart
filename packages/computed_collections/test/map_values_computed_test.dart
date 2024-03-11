@@ -34,8 +34,7 @@ void main() {
       expect(lastRes, {0: 4}.lock);
       s.add(KeyChanges({1: ChangeRecordInsert(1)}.lock));
       expect(lastRes, {0: 4, 1: noValueSentinel}.lock);
-      await Future
-          .value(); // TODO: we can remove these by subscribing to the new computation before cancelling the old subscription
+      await Future.value();
       expect(lastRes, {0: 4, 1: 3}.lock);
       s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
       expect(lastRes, {1: 3}.lock);
