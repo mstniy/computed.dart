@@ -72,14 +72,19 @@ class Computed<T> {
   /// For memoized computations, the listener will be called only
   /// when the result of the computation changes.
   ///
-  /// If [sync] is true and either the computation already has a value or
-  /// its value can be computed immediately, the listeners will be called before
-  /// [listen] returns.
-  /// If [sync] is false, the listeners will be called in a separate microtask.
+  /// If the computation does have a value, the listener will be called on
+  /// in a separate microtask. If the computation did not have any listeners
+  /// or downstream computations, it will be computed.
   ComputedSubscription<T> listen(
-          void Function(T event)? onData, Function? onError,
-          {bool sync = false}) =>
-      _impl.listen(onData, onError, sync);
+          void Function(T event)? onData, Function? onError) =>
+      _impl.listen(onData, onError, null);
+
+  /// As with [listen], but if the computation already has a value or
+  /// its value can be computed immediately, the listeners will be called
+  /// before [listenSync] returns, and after calling [onSync].
+  ComputedSubscription<T> listenSync(void Function() onSync,
+          void Function(T event)? onData, Function? onError) =>
+      _impl.listen(onData, onError, onSync);
 
   /// Fixes the result of this computation to the given value.
   ///

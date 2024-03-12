@@ -31,7 +31,7 @@ void main() {
     final sub = c.listen((event) {
       lCnt++;
       lastEvent = event;
-    }, (e) => fail(e.toString()), false);
+    }, (e) => fail(e.toString()), null);
 
     s.add(0);
     expect(odcCnt, 1);

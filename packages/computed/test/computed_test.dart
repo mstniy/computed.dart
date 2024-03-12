@@ -686,23 +686,42 @@ void main() {
     });
 
     test('sync works', () async {
-      final c = $(() => 42);
-      var flag = false;
-      c.listen((event) {
-        expect(flag, false);
+      final c1 = $(() => 42);
+      final c2 = $(() => throw 42);
+      final c3 = $(() => throw NoValueException());
+      var syncFlag = false;
+      var listenFlag = false;
+
+      void onSync() {
+        expect(syncFlag, false);
+        syncFlag = true;
+      }
+
+      c1.listenSync(onSync, (event) {
+        expect(listenFlag, false);
         expect(event, 42);
-        flag = true;
-      }, (e) => e.toString(), sync: true).cancel();
-      expect(flag, true);
-      flag = false;
-      c.listen((event) {
-        expect(flag, false);
-        expect(event, 42);
-        flag = true;
-      }, (e) => e.toString(), sync: false).cancel();
-      expect(flag, false);
-      await Future.value();
-      expect(flag, true);
+        listenFlag = true;
+      }, (e) => e.toString()).cancel();
+      expect(syncFlag, true);
+      expect(listenFlag, true);
+
+      // Also test for computations with synchronous exceptions
+      syncFlag = false;
+      listenFlag = false;
+      c2.listenSync(onSync, (_) => fail('must have called onError'), (err) {
+        expect(listenFlag, false);
+        expect(err, 42);
+        listenFlag = true;
+      }).cancel();
+      expect(syncFlag, true);
+      expect(listenFlag, true);
+
+      // Also test for computation which do not have a synchronous value
+      c3
+          .listenSync(() => fail('called onSync'),
+              (v) => fail('called onValue'), (err) => fail('called onError'))
+          .cancel();
+      await Future.value(); // Still must not call
     });
   });
 

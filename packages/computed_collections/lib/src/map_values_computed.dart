@@ -11,7 +11,6 @@ import 'cs_computedmap.dart';
 class _SubscriptionAndProduced<T> {
   late ComputedSubscription<T> _sub;
   bool _produced = false;
-  bool _flag = false;
 
   _SubscriptionAndProduced();
 }
@@ -61,7 +60,6 @@ class MapValuesComputedComputedMap<K, V, VParent>
       final oldProduced = sap._produced;
       // Run this before adding to the stream, as it is a sync stream and the `add` might run arbitrary code
       sap._produced = true;
-      sap._flag = true;
       _changes.add(KeyChanges({
         key: oldProduced
             ? ChangeRecordUpdate<V>(value)
@@ -91,21 +89,19 @@ class MapValuesComputedComputedMap<K, V, VParent>
           if (change is ChangeRecordInsert<Computed<V>>) {
             assert(_changesState[key] == null);
             final sap = _SubscriptionAndProduced<V>();
-            sap._sub = change.value.listen(
-                (e) => _computationListener(sap, key, e), _changes.addError,
-                sync: true);
+            sap._sub = change.value.listenSync(() => null,
+                (e) => _computationListener(sap, key, e), _changes.addError);
             _changesState[key] = sap;
           } else if (change is ChangeRecordUpdate<Computed<V>>) {
             final sap = _changesState[key]!;
             final oldSub = sap._sub;
-            sap._flag = false;
-            sap._sub = change.newValue.listen(
-                (e) => _computationListener(sap, key, e), _changes.addError,
-                sync: true);
+            var producedNew = false;
+            sap._sub = change.newValue.listenSync(() => producedNew = true,
+                (e) => _computationListener(sap, key, e), _changes.addError);
             oldSub.cancel();
-            if (!sap._flag && sap._produced) {
-              // Computed did not synchronously call the listener
-              // Emit a deletion event if this key used to exist
+            if (!producedNew && sap._produced) {
+              // Computed did not synchronously call the listener, although it used to have a value
+              // Emit a deletion event then
               sap._produced = false;
               _changes.add(KeyChanges({key: ChangeRecordDelete<V>()}.lock));
             }

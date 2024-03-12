@@ -263,8 +263,8 @@ class ComputedImpl<T> {
     _rerunGraph();
   }
 
-  ComputedSubscription<T> listen(
-      void Function(T event)? onData, Function? onError, bool sync) {
+  ComputedSubscription<T> listen(void Function(T event)? onData,
+      Function? onError, void Function()? onSync) {
     final sub = _ComputedSubscriptionImpl<T>(this, onData, onError);
     if (_novalue) {
       try {
@@ -280,7 +280,8 @@ class ComputedImpl<T> {
         final lastError = _lastResult!._exc!;
         final lastST = _lastResult!._st!;
         if (onError != null) {
-          if (sync) {
+          if (onSync != null) {
+            onSync();
             onError(lastError);
           } else {
             scheduleMicrotask(() {
@@ -292,7 +293,8 @@ class ComputedImpl<T> {
         }
       } else if (_lastResult!._isValue && onData != null) {
         final lastResult = _lastResult!._value as T;
-        if (sync) {
+        if (onSync != null) {
+          onSync();
           onData(lastResult);
         } else {
           scheduleMicrotask(() {
