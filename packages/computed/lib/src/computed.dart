@@ -264,7 +264,7 @@ class ComputedImpl<T> {
   }
 
   ComputedSubscription<T> listen(
-      void Function(T event)? onData, Function? onError, bool sync) {
+      void Function(T event)? onData, Function? onError) {
     final sub = _ComputedSubscriptionImpl<T>(this, onData, onError);
     if (_novalue) {
       try {
@@ -280,25 +280,17 @@ class ComputedImpl<T> {
         final lastError = _lastResult!._exc!;
         final lastST = _lastResult!._st!;
         if (onError != null) {
-          if (sync) {
+          scheduleMicrotask(() {
             onError(lastError);
-          } else {
-            scheduleMicrotask(() {
-              onError(lastError);
-            });
-          }
+          });
         } else if (_listeners.length == 1) {
           Zone.current.handleUncaughtError(lastError, lastST);
         }
       } else if (_lastResult!._isValue && onData != null) {
         final lastResult = _lastResult!._value as T;
-        if (sync) {
+        scheduleMicrotask(() {
           onData(lastResult);
-        } else {
-          scheduleMicrotask(() {
-            onData(lastResult);
-          });
-        }
+        });
       }
     }
     return sub;

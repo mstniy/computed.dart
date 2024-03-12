@@ -640,70 +640,48 @@ void main() {
     });
   });
 
-  group('listen', () {
-    test('listen invokes handleUncaughtError if needed', () async {
-      var ueCount = 0;
-      Object? lastError;
-      void hUE(Zone self, ZoneDelegate parent, Zone zone, Object error,
-          StackTrace stackTrace) {
-        expect(stackTrace.toString(), contains('myThrower'));
-        ueCount++;
-        lastError = error;
-      }
+  test('listen invokes handleUncaughtError if needed', () async {
+    var ueCount = 0;
+    Object? lastError;
+    void hUE(Zone self, ZoneDelegate parent, Zone zone, Object error,
+        StackTrace stackTrace) {
+      expect(stackTrace.toString(), contains('myThrower'));
+      ueCount++;
+      lastError = error;
+    }
 
-      void myThrower(int toThrow) => throw toThrow;
+    void myThrower(int toThrow) => throw toThrow;
 
-      final s = ValueStream(sync: true);
-      s.add(0);
+    final s = ValueStream(sync: true);
+    s.add(0);
 
-      final c = $(() => myThrower(s.useOr(42)));
-      final zone = Zone.current
-          .fork(specification: ZoneSpecification(handleUncaughtError: hUE));
-      final sub1 = zone.run(() => c.listen((event) {}, null));
-      expect(ueCount, 1);
-      expect(lastError, 42);
-      await Future.value();
-      expect(ueCount, 2);
-      expect(lastError, 0);
+    final c = $(() => myThrower(s.useOr(42)));
+    final zone = Zone.current
+        .fork(specification: ZoneSpecification(handleUncaughtError: hUE));
+    final sub1 = zone.run(() => c.listen((event) {}, null));
+    expect(ueCount, 1);
+    expect(lastError, 42);
+    await Future.value();
+    expect(ueCount, 2);
+    expect(lastError, 0);
 
-      s.add(1);
-      expect(ueCount, 3);
-      expect(lastError, 1);
+    s.add(1);
+    expect(ueCount, 3);
+    expect(lastError, 1);
 
-      final sub2 = zone.run(() => c.listen((event) {}, (err) {}));
+    final sub2 = zone.run(() => c.listen((event) {}, (err) {}));
 
-      s.add(2);
-      expect(ueCount, 3);
+    s.add(2);
+    expect(ueCount, 3);
 
-      sub2.cancel();
+    sub2.cancel();
 
-      s.add(3);
-      expect(ueCount, 4);
-      expect(lastError, 3);
+    s.add(3);
+    expect(ueCount, 4);
+    expect(lastError, 3);
 
-      sub1.cancel();
-      sub2.cancel();
-    });
-
-    test('sync works', () async {
-      final c = $(() => 42);
-      var flag = false;
-      c.listen((event) {
-        expect(flag, false);
-        expect(event, 42);
-        flag = true;
-      }, (e) => e.toString(), sync: true).cancel();
-      expect(flag, true);
-      flag = false;
-      c.listen((event) {
-        expect(flag, false);
-        expect(event, 42);
-        flag = true;
-      }, (e) => e.toString(), sync: false).cancel();
-      expect(flag, false);
-      await Future.value();
-      expect(flag, true);
-    });
+    sub1.cancel();
+    sub2.cancel();
   });
 
   test('computation listeners can be changed', () {
