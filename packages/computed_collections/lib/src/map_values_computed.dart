@@ -11,7 +11,6 @@ import 'cs_computedmap.dart';
 class _SubscriptionAndProduced<T> {
   late ComputedSubscription<T> _sub;
   bool _produced = false;
-  bool _flag = false;
 
   _SubscriptionAndProduced();
 }
@@ -64,7 +63,6 @@ class MapValuesComputedComputedMap<K, V, VParent>
             : ChangeRecordInsert<V>(value)
       }.lock));
       sap._produced = true;
-      sap._flag = true;
     }
 
     void _computedChangesListener(ChangeEvent<K, Computed<V>> computedChanges) {
@@ -119,7 +117,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
       _computedChangesSubscription =
           _computedChanges.listen(_computedChangesListener, _changes.addError);
     }, onCancel: () {
-      _changesState.values.forEach((sub) => sub.cancel());
+      _changesState.values.forEach((sap) => sap._sub.cancel());
       _changesState.clear();
       _computedChangesSubscription!.cancel();
     });
