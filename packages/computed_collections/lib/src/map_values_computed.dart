@@ -58,15 +58,13 @@ class MapValuesComputedComputedMap<K, V, VParent>
     });
 
     void _computationListener(_SubscriptionAndProduced<V> sap, K key, V value) {
-      final oldProduced = sap._produced;
-      // Run this before adding to the stream, as it is a sync stream and the `add` might run arbitrary code
-      sap._produced = true;
-      sap._flag = true;
       _changes.add(KeyChanges({
-        key: oldProduced
+        key: sap._produced
             ? ChangeRecordUpdate<V>(value)
             : ChangeRecordInsert<V>(value)
       }.lock));
+      sap._produced = true;
+      sap._flag = true;
     }
 
     void _computedChangesListener(ChangeEvent<K, Computed<V>> computedChanges) {
@@ -74,16 +72,13 @@ class MapValuesComputedComputedMap<K, V, VParent>
         _changesState.values.forEach((sap) => sap._sub.cancel());
         _changesState
             .clear(); // TODO: Delay the cancellation to remove the microtask lag
+        _changes.add(ChangeEventReplace(<K, V>{}.lock));
         computedChanges.newCollection.forEach((key, value) {
           final sap = _SubscriptionAndProduced<V>();
           sap._sub = value.listen(
-              // TODO: tricky to make this sync. move the flag from SAP into the local closure where the sync listen/add is called
-              // TODO: make sure to test the there is/n't sync value edge cases once we implement that
-              (e) => _computationListener(sap, key, e),
-              _changes.addError);
+              (e) => _computationListener(sap, key, e), _changes.addError);
           _changesState[key] = sap;
         });
-        _changes.add(ChangeEventReplace(<K, V>{}.lock));
       } else if (computedChanges is KeyChanges<K, Computed<V>>) {
         for (var e in computedChanges.changes.entries) {
           final key = e.key;
@@ -106,8 +101,8 @@ class MapValuesComputedComputedMap<K, V, VParent>
             if (!sap._flag && sap._produced) {
               // Computed did not synchronously call the listener
               // Emit a deletion event if this key used to exist
-              sap._produced = false;
               _changes.add(KeyChanges({key: ChangeRecordDelete<V>()}.lock));
+              sap._produced = false;
             }
           } else if (change is ChangeRecordDelete<Computed<V>>) {
             final sap = _changesState[key]!;
