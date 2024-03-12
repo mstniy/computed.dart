@@ -87,20 +87,16 @@ class MapValuesComputedComputedMap<K, V, VParent>
             assert(_changesState[key] == null);
             final sap = _SubscriptionAndProduced<V>();
             sap._sub = change.value.listen(
-                (e) => _computationListener(sap, key, e), _changes.addError,
-                sync: true);
+                (e) => _computationListener(sap, key, e), _changes.addError);
             _changesState[key] = sap;
           } else if (change is ChangeRecordUpdate<Computed<V>>) {
             final sap = _changesState[key]!;
             final oldSub = sap._sub;
-            sap._flag = false;
             sap._sub = change.newValue.listen(
-                (e) => _computationListener(sap, key, e), _changes.addError,
-                sync: true);
+                (e) => _computationListener(sap, key, e), _changes.addError);
             oldSub.cancel();
-            if (!sap._flag && sap._produced) {
-              // Computed did not synchronously call the listener
-              // Emit a deletion event if this key used to exist
+            // Emit a deletion event if this key used to exist
+            if (sap._produced) {
               _changes.add(KeyChanges({key: ChangeRecordDelete<V>()}.lock));
               sap._produced = false;
             }
