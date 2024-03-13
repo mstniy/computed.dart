@@ -171,7 +171,7 @@ class ChangeStreamComputedMap<K, V>
     late final ValueStream<V?> stream;
     final computation = $(() => stream.use);
     stream = ValueStream<V?>(
-        sync: true,
+        sync: true, // TODO: Audit the sync stream
         onListen: () {
           final streams = _keyValueStreams.putIfAbsent(
               key, () => <ValueStream<V?>, Computed<V?>>{});

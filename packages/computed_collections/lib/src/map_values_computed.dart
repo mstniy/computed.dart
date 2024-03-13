@@ -22,7 +22,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
   final Computed<V> Function(K key, VParent value) _convert;
   late final ValueStream<ChangeEvent<K, V>> _changes;
   late final Computed<ChangeEvent<K, V>> _changesComputed;
-  final _changesState = <K, _SubscriptionAndProduced<V>>{};
+  var _changesState = <K, _SubscriptionAndProduced<V>>{};
   late final Computed<IMap<K, V>> _snapshot;
   final _keyComputationCache = ComputationCache<K, V?>();
 
@@ -67,16 +67,16 @@ class MapValuesComputedComputedMap<K, V, VParent>
 
     void _computedChangesListener(ChangeEvent<K, Computed<V>> computedChanges) {
       if (computedChanges is ChangeEventReplace<K, Computed<V>>) {
-        _changesState.values.forEach((sap) => sap._sub.cancel());
-        _changesState
-            .clear(); // TODO: Delay the cancellation to remove the microtask lag
         _changes.add(ChangeEventReplace(<K, V>{}.lock));
+        final newChangesState = <K, _SubscriptionAndProduced<V>>{};
         computedChanges.newCollection.forEach((key, value) {
           final sap = _SubscriptionAndProduced<V>();
           sap._sub = value.listen(
               (e) => _computationListener(sap, key, e), _changes.addError);
-          _changesState[key] = sap;
+          newChangesState[key] = sap;
         });
+        _changesState.values.forEach((sap) => sap._sub.cancel());
+        _changesState = newChangesState;
       } else if (computedChanges is KeyChanges<K, Computed<V>>) {
         for (var e in computedChanges.changes.entries) {
           final key = e.key;
