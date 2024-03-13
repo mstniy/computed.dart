@@ -166,18 +166,28 @@ void main() {
     expect(callCnt, 5);
     expect(lastRes,
         KeyChanges({0: ChangeRecordDelete()}.lock)); // s3 has no value yet
+    s.add(KeyChanges({0: ChangeRecordUpdate(4)}.lock));
+    await Future.value();
+    expect(
+        callCnt, 5); // Not notified, as the key 0 already did not have a value
+    s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
+    await Future.value();
+    expect(
+        callCnt, 5); // Not notified, as the key 0 already did not have a value
+    s.add(KeyChanges({0: ChangeRecordInsert(4)}.lock));
+    await Future.value();
+    await Future.value();
+    expect(callCnt, 5); // Not notified, as s3 still has no value
     s3.add(0);
     await Future.value();
     expect(callCnt, 6);
-    expect(lastRes, KeyChanges({0: ChangeRecordInsert(3)}.lock));
+    expect(lastRes, KeyChanges({0: ChangeRecordInsert(4)}.lock));
     useS2 = true;
 
     s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
     await Future.value();
     expect(callCnt, 7);
     expect(lastRes, KeyChanges({0: ChangeRecordDelete()}.lock));
-
-    // TODO: Also try deleting/updating a key which has not produced a value yet
 
     s.add(ChangeEventReplace({0: 5, 1: 6, 2: 7}.lock));
     await Future.value();
