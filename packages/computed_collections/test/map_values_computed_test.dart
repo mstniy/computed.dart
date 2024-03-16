@@ -206,16 +206,16 @@ void main() {
     s2.add(6);
     await Future.value();
     expect(callCnt, 12);
-    expect(lastRes, KeyChanges({0: ChangeRecordUpdate(11)}.lock));
-    await Future.value();
-    expect(callCnt, 13);
-    expect(lastRes, KeyChanges({1: ChangeRecordUpdate(12)}.lock));
-    await Future.value();
-    expect(callCnt, 14);
-    expect(lastRes, KeyChanges({2: ChangeRecordUpdate(13)}.lock));
+    expect(
+        lastRes,
+        KeyChanges({
+          0: ChangeRecordUpdate(11),
+          1: ChangeRecordUpdate(12),
+          2: ChangeRecordUpdate(13)
+        }.lock));
 
     await Future.value(); // No more calls
-    expect(callCnt, 14);
+    expect(callCnt, 12);
 
     sub.cancel();
   });

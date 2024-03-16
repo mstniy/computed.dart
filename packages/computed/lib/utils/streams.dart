@@ -1,5 +1,14 @@
 import 'dart:async';
 
+class _ValueOrException<T> {
+  final bool _isValue;
+  Object? _exc;
+  T? _value;
+
+  _ValueOrException.value(this._value) : _isValue = true;
+  _ValueOrException.exc(this._exc) : _isValue = false;
+}
+
 /// A [StreamController]-like class.
 ///
 /// This class:
@@ -12,9 +21,9 @@ import 'dart:async';
 /// Note that most of these properties are similar to rxdart's BehaviorSubject.
 class ValueStream<T> extends Stream<T> {
   late StreamController<T> _controller;
-  T? _lastValue;
-  Object? _lastError;
-  bool? _lastWasError;
+  _ValueOrException<T>? _lastNotifiedValue;
+  _ValueOrException<T>? _lastAddedValue;
+  bool _controllerAddScheduled = false;
   final bool _sync;
   final void Function()? _userOnListen;
   final void Function()? _userOnCancel;
@@ -40,26 +49,52 @@ class ValueStream<T> extends Stream<T> {
     return res;
   }
 
-  /// Adds the given value to this stream, unless if it compares `==` to the last added value.
-  /// If there are no listeners, buffers the last value.
-  void add(T t) {
-    if (_lastWasError == false && _lastValue == t) return;
-    _lastWasError = false;
-    _lastValue = t;
+  void _controllerAddMicrotask() {
+    _controllerAddScheduled = false;
+    if (_lastNotifiedValue?._isValue == true &&
+        _lastAddedValue!._isValue &&
+        _lastNotifiedValue!._value == _lastAddedValue!._value) return;
     if (_controller.hasListener) {
+      _lastNotifiedValue = _lastAddedValue;
       // Otherwise the controller will buffer
-      _controller.add(t);
+      if (_lastAddedValue!._isValue) {
+        _controller.add(_lastAddedValue!._value as T);
+      } else {
+        _controller.addError(_lastAddedValue!._exc!);
+      }
     }
   }
 
-  /// Adds the given error to this stream.
-  /// If there are no listeners, buffers the last error.
+  /// If this ValueStream is sync, adds [t] to the stream and notifies listeners.
+  ///
+  /// If this ValueStream is not sync, Schedules [t] to be added to the
+  /// stream in the next microtask. Further calls to [add] or [addError] within
+  /// a single microtask will override previous calls.
+  /// In the next microtask, the last-added value is added to the stream,
+  /// unless if it compares `==` to the value last added to the stream.
+  ///
+  /// If there are no listeners, buffers [t] and drops any previusly
+  /// buffered values/errors.
+  void add(T t) {
+    _lastAddedValue = _ValueOrException.value(t);
+    if (!_sync) {
+      if (_controllerAddScheduled) return;
+      _controllerAddScheduled = true;
+      scheduleMicrotask(_controllerAddMicrotask);
+    } else {
+      _controllerAddMicrotask();
+    }
+  }
+
+  /// As with [add], but for adding errors.
   void addError(Object o) {
-    _lastWasError = true;
-    _lastError = o;
-    if (_controller.hasListener) {
-      // Otherwise the controller will buffer
-      _controller.addError(o);
+    _lastAddedValue = _ValueOrException.exc(o);
+    if (!_sync) {
+      if (_controllerAddScheduled) return;
+      _controllerAddScheduled = true;
+      scheduleMicrotask(_controllerAddMicrotask);
+    } else {
+      _controllerAddMicrotask();
     }
   }
 
@@ -72,81 +107,21 @@ class ValueStream<T> extends Stream<T> {
 
   void _setController() {
     _controller =
-        StreamController(sync: _sync, onListen: _onListen, onCancel: _onCancel);
+        StreamController(sync: true, onListen: _onListen, onCancel: _onCancel);
   }
 
   void _onListen() {
-    if (_lastWasError == false) {
-      _controller.add(_lastValue as T);
-    } else if (_lastWasError == true) {
-      _controller.addError(_lastError!);
+    if (_lastAddedValue != null) {
+      if (_controllerAddScheduled) return;
+      _controllerAddScheduled = true;
+      scheduleMicrotask(_controllerAddMicrotask);
     }
     if (_userOnListen != null) _userOnListen!();
   }
 
   void _onCancel() {
+    _lastNotifiedValue = null;
     _setController(); // The old one is no good anymore
     if (_userOnCancel != null) _userOnCancel!();
-  }
-}
-
-/// A [Stream] of resources.
-///
-/// This class is similar in semantics to [ValueStream], except that it creates new resources
-/// using the provided function when a new listener is attached, unless if there is an existing
-/// non-disposed resource, and disposes of the existing resource, if there is any, upon listener
-/// cancellation and the addition of a new resource/error.
-class ResourceStream<T> extends ValueStream<T> {
-  /// A [ResourceStream] with functions to create and dispose of resources.
-  ResourceStream(this._create, this._dispose,
-      {void Function()? onListen,
-      FutureOr<void> Function()? onCancel,
-      bool sync = false})
-      : super(onListen: onListen, onCancel: onCancel, sync: sync);
-
-  final T Function() _create;
-  final void Function(T) _dispose;
-
-  @override
-  void _onListen() {
-    if (_lastWasError != false) {
-      try {
-        _lastValue = _create();
-        _lastWasError = false;
-      } catch (e) {
-        _lastWasError = true;
-        _lastError = e;
-      }
-    }
-    super._onListen();
-  }
-
-  @override
-  void _onCancel() {
-    _maybeDispose();
-    super._onCancel();
-  }
-
-  /// Adds the given resource to this stream.
-  /// If there is an existing resource, disposes of it.
-  /// If there are no listeners, buffers the last resource.
-  @override
-  void add(T t) {
-    _maybeDispose();
-    super.add(t);
-  }
-
-  /// Adds the given error to this stream.
-  /// If there is an existing resource, disposes of it.
-  /// If there are no listeners, buffers the last error.
-  @override
-  void addError(Object o) {
-    _maybeDispose();
-    super.addError(o);
-  }
-
-  void _maybeDispose() {
-    if (_lastWasError == false) _dispose(_lastValue as T);
-    _lastWasError = null;
   }
 }

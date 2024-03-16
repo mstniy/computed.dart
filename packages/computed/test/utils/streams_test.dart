@@ -3,7 +3,7 @@ import 'package:test/test.dart';
 
 void main() {
   group('ValueStream', () {
-    test('values are not buffered', () async {
+    test('values produced while not being listened are not buffered', () async {
       final s = ValueStream(sync: true);
       s.add(0);
       s.add(1);
@@ -16,12 +16,68 @@ void main() {
         lastEvent = event;
       }, onError: (e) => fail(e.toString()));
 
-      for (var i = 0; i < 2; i++) {
-        await Future.value(); // Just in case
-      }
+      expect(lCnt, 0);
+
+      await Future.value();
 
       expect(lCnt, 1);
       expect(lastEvent, 1);
+
+      await Future.value();
+
+      expect(lCnt, 1);
+    });
+
+    test('values produced in the same microtask are not buffered', () async {
+      final s = ValueStream();
+
+      var lCnt = 0;
+      int? lastEvent;
+
+      var eCnt = 0;
+      int? lastError;
+
+      s.listen((event) {
+        lCnt++;
+        lastEvent = event;
+      }, onError: (e) {
+        eCnt++;
+        lastError = e;
+      });
+
+      expect(lCnt, 0);
+
+      s.add(0);
+      s.add(1);
+
+      expect(lCnt, 0);
+
+      await Future.value();
+
+      expect(lCnt, 1);
+      expect(lastEvent, 1);
+
+      await Future.value();
+
+      expect(lCnt, 1);
+      expect(eCnt, 0);
+
+      s.addError(0);
+      s.addError(1);
+
+      expect(lCnt, 1);
+      expect(eCnt, 0);
+
+      await Future.value();
+
+      expect(lCnt, 1);
+      expect(eCnt, 1);
+      expect(lastError, 1);
+
+      await Future.value();
+
+      expect(lCnt, 1);
+      expect(eCnt, 1);
     });
 
     test('dedups equal values', () async {
@@ -203,156 +259,6 @@ void main() {
       await Future.value();
 
       expect(lCnt, 1);
-    });
-  });
-
-  group('ResourceStream', () {
-    test('respects create/dispose', () async {
-      var cCnt = 0;
-      int create() {
-        return cCnt++;
-      }
-
-      var dCnt = 0;
-      int? lastDispose;
-      void dispose(int i) {
-        dCnt++;
-        lastDispose = i;
-      }
-
-      var lCnt = 0;
-      int? lastEvent;
-      void listener(e) {
-        lCnt++;
-        lastEvent = e;
-      }
-
-      final s = ResourceStream(create, dispose, sync: true);
-      expect(cCnt, 0);
-      var sub = s.listen(listener, onError: (e) => fail(e.toString()));
-      await Future.value();
-      expect(cCnt, 1);
-      expect(dCnt, 0);
-      expect(lCnt, 1);
-      expect(lastEvent, 0);
-      sub.cancel();
-      expect(cCnt, 1);
-      expect(dCnt, 1);
-      expect(lastDispose, 0);
-      expect(lCnt, 1);
-      sub = s.listen(listener, onError: (e) => fail(e.toString()));
-      await Future.value();
-      expect(cCnt, 2);
-      expect(dCnt, 1);
-      expect(lCnt, 2);
-      expect(lastEvent, 1);
-      s.add(42);
-      expect(cCnt, 2);
-      expect(dCnt, 2);
-      expect(lCnt, 3);
-      expect(lastDispose, 1);
-      sub.cancel();
-      expect(cCnt, 2);
-      expect(dCnt, 3);
-      expect(lCnt, 3);
-      expect(lastDispose, 42);
-    });
-    test('propagates exceptions thrown by create', () async {
-      var cCnt = 0;
-      int? createReturn;
-      int createThrow = 42;
-      int create() {
-        cCnt++;
-        if (createReturn != null) {
-          return createReturn;
-        } else {
-          throw createThrow;
-        }
-      }
-
-      var dCnt = 0;
-      int? lastDispose;
-      void dispose(int i) {
-        dCnt++;
-        lastDispose = i;
-      }
-
-      var lCnt = 0;
-      int? lastEvent;
-      void listener(e) {
-        lCnt++;
-        lastEvent = e;
-      }
-
-      var eCnt = 0;
-      int? lastErr;
-      void errorListener(e) {
-        eCnt++;
-        lastErr = e;
-      }
-
-      final s = ResourceStream(create, dispose, sync: true);
-      expect(cCnt, 0);
-      var sub = s.listen(listener, onError: errorListener);
-      await Future.value();
-      expect(cCnt, 1);
-      expect(dCnt, 0);
-      expect(lCnt, 0);
-      expect(eCnt, 1);
-      expect(lastErr, 42);
-      s.add(0);
-      expect(cCnt, 1);
-      expect(dCnt, 0);
-      expect(lCnt, 1);
-      expect(eCnt, 1);
-      expect(lastEvent, 0);
-      sub.cancel();
-      await Future.value();
-      expect(cCnt, 1);
-      expect(dCnt, 1);
-      expect(lCnt, 1);
-      expect(eCnt, 1);
-      expect(lastDispose, 0);
-
-      s.addError(1);
-      createReturn = 2;
-      sub = s.listen(listener, onError: errorListener);
-      await Future.value();
-      expect(cCnt, 2);
-      expect(dCnt, 1);
-      expect(lCnt, 2);
-      expect(eCnt, 1);
-      expect(lastEvent, 2);
-
-      s.addError(3);
-      expect(cCnt, 2);
-      expect(dCnt, 2);
-      expect(lCnt, 2);
-      expect(eCnt, 2);
-      expect(lastDispose, 2);
-      expect(lastErr, 3);
-
-      sub.cancel();
-      expect(cCnt, 2);
-      expect(dCnt, 2);
-      expect(lCnt, 2);
-      expect(eCnt, 2);
-
-      s.add(3);
-      sub = s.listen(listener, onError: errorListener);
-      await Future.value();
-      expect(cCnt, 2);
-      expect(dCnt, 2);
-      expect(lCnt, 3);
-      expect(eCnt, 2);
-      expect(lastEvent, 3);
-
-      sub.cancel();
-      expect(cCnt, 2);
-      expect(dCnt, 3);
-      expect(lCnt, 3);
-      expect(eCnt, 2);
-      expect(lastDispose, 3);
     });
   });
 }

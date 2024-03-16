@@ -22,6 +22,9 @@ class KeyChanges<K, V> extends ChangeEvent<K, V> {
 
   @override
   int get hashCode => changes.hashCode;
+
+  @override
+  String toString() => changes.toString();
 }
 
 @immutable
@@ -35,6 +38,9 @@ class ChangeRecordInsert<V> extends ChangeRecord<V> {
 
   @override
   int get hashCode => value.hashCode;
+
+  @override
+  String toString() => value.toString();
 }
 
 @immutable
@@ -58,6 +64,9 @@ class ChangeRecordUpdate<V> extends ChangeRecord<V> {
 
   @override
   int get hashCode => newValue.hashCode;
+
+  @override
+  String toString() => newValue.toString();
 }
 
 @immutable
@@ -71,4 +80,7 @@ class ChangeEventReplace<K, V> extends ChangeEvent<K, V> {
 
   @override
   int get hashCode => newCollection.hashCode;
+
+  @override
+  String toString() => newCollection.toString();
 }
