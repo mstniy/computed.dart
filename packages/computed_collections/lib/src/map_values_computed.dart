@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:computed/computed.dart';
 import 'package:computed/utils/computation_cache.dart';
 import 'package:computed/utils/streams.dart';
@@ -27,8 +29,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
   final _keyComputationCache = ComputationCache<K, V?>();
 
   MapValuesComputedComputedMap(this._parent, this._convert) {
-    // We use async here because Computed does not have semantics operator==
-    final _computedChanges = Computed.async(() {
+    final _computedChanges = Computed(() {
       final change = _parent.changes.use;
       if (change is ChangeEventReplace<K, VParent>) {
         return ChangeEventReplace(change.newCollection
@@ -54,20 +55,63 @@ class MapValuesComputedComputedMap<K, V, VParent>
       } else {
         throw TypeError();
       }
-    });
+    }, assertIdempotent: false);
+
+    ChangeEvent<K, V>? _changesLastAdded;
+    void _changesAddMerge(ChangeEvent<K, V> change) {
+      if (_changesLastAdded == null) {
+        _changesLastAdded = change;
+        _changes.add(change);
+        scheduleMicrotask(() => _changesLastAdded = null);
+        return;
+      }
+      if (change is ChangeEventReplace<K, V>) {
+        _changesLastAdded = change;
+        _changes.add(change);
+      } else {
+        assert(change is KeyChanges<K, V>);
+        if (_changesLastAdded is KeyChanges<K, V>) {
+          _changesLastAdded = KeyChanges((_changesLastAdded as KeyChanges<K, V>)
+              .changes
+              .addAll((change as KeyChanges<K, V>).changes));
+          _changes.add(_changesLastAdded!);
+        } else {
+          assert(_changesLastAdded is ChangeEventReplace<K, V>);
+          final keyChanges = (change as KeyChanges<K, V>).changes;
+          final keyDeletions =
+              keyChanges.entries.where((e) => e.value is ChangeRecordDelete<K>);
+          _changesLastAdded = ChangeEventReplace(
+              (_changesLastAdded as ChangeEventReplace<K, V>)
+                  .newCollection
+                  .addEntries(keyChanges.entries
+                      .where((e) => e.value is! ChangeRecordDelete<K>)
+                      .map((e) => MapEntry(
+                          e.key,
+                          (e.value is ChangeRecordInsert<V>)
+                              ? (e.value as ChangeRecordInsert<V>).value
+                              : (e.value as ChangeRecordUpdate<V>).newValue))));
+          keyDeletions.forEach((e) => _changesLastAdded = ChangeEventReplace(
+              (_changesLastAdded as ChangeEventReplace<K, V>)
+                  .newCollection
+                  .remove(e.key)));
+          _changes.add(_changesLastAdded!);
+        }
+      }
+    }
 
     void _computationListener(_SubscriptionAndProduced<V> sap, K key, V value) {
-      _changes.add(KeyChanges({
+      _changesAddMerge(KeyChanges({
         key: sap._produced
             ? ChangeRecordUpdate<V>(value)
             : ChangeRecordInsert<V>(value)
       }.lock));
-      sap._produced = true;
+      sap._produced =
+          true; // TODO: all interaction with sap should happen inside the microtask, no?
     }
 
     void _computedChangesListener(ChangeEvent<K, Computed<V>> computedChanges) {
       if (computedChanges is ChangeEventReplace<K, Computed<V>>) {
-        _changes.add(ChangeEventReplace(<K, V>{}.lock));
+        _changesAddMerge(ChangeEventReplace(<K, V>{}.lock));
         final newChangesState = <K, _SubscriptionAndProduced<V>>{};
         computedChanges.newCollection.forEach((key, value) {
           final sap = _SubscriptionAndProduced<V>();
@@ -89,21 +133,22 @@ class MapValuesComputedComputedMap<K, V, VParent>
             _changesState[key] = sap;
           } else if (change is ChangeRecordUpdate<Computed<V>>) {
             final sap = _changesState[key]!;
+            // Emit a deletion event if this key used to exist
+            if (sap._produced) {
+              _changesAddMerge(KeyChanges({key: ChangeRecordDelete<V>()}.lock));
+              sap._produced = false;
+            }
             final oldSub = sap._sub;
             sap._sub = change.newValue.listen(
                 (e) => _computationListener(sap, key, e), _changes.addError);
             oldSub.cancel();
-            // Emit a deletion event if this key used to exist
-            if (sap._produced) {
-              _changes.add(KeyChanges({key: ChangeRecordDelete<V>()}.lock));
-              sap._produced = false;
-            }
           } else if (change is ChangeRecordDelete<Computed<V>>) {
             final sap = _changesState[key]!;
             sap._sub.cancel();
             _changesState.remove(key);
             if (sap._produced) {
-              _changes.add(KeyChanges({key: ChangeRecordDelete<V>()}.lock));
+              //////////// TODO: this breaks down with the "intra-microtask scratch pad" logic
+              _changesAddMerge(KeyChanges({key: ChangeRecordDelete<V>()}.lock));
             }
           }
         }
