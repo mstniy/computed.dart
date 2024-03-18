@@ -275,23 +275,27 @@ class ComputedImpl<T> {
       }
     }
     _listeners.add(sub);
+
     if (!_novalue) {
-      if (!_lastResult!._isValue) {
-        final lastError = _lastResult!._exc!;
-        final lastST = _lastResult!._st!;
-        if (onError != null) {
-          scheduleMicrotask(() {
-            onError(lastError);
-          });
-        } else if (_listeners.length == 1) {
-          Zone.current.handleUncaughtError(lastError, lastST);
-        }
-      } else if (_lastResult!._isValue && onData != null) {
-        final lastResult = _lastResult!._value as T;
-        scheduleMicrotask(() {
-          onData(lastResult);
-        });
+      if (!_lastResult!._isValue &&
+          onError == null &&
+          _memoizedDownstreamComputations.isEmpty &&
+          _nonMemoizedDownstreamComputations.isEmpty) {
+        Zone.current.handleUncaughtError(_lastResult!._exc!, _lastResult!._st!);
       }
+      scheduleMicrotask(() {
+        if (!_novalue && _listeners.contains(sub)) {
+          if (!_lastResult!._isValue) {
+            final lastError = _lastResult!._exc!;
+            if (sub._onError != null) {
+              sub._onError!(lastError);
+            }
+          } else if (_lastResult!._isValue && sub._onData != null) {
+            final lastResult = _lastResult!._value as T;
+            sub._onData!(lastResult);
+          }
+        }
+      });
     }
     return sub;
   }
@@ -543,7 +547,11 @@ class ComputedImpl<T> {
           listener._onError!(_lastResult!._exc!);
         }
       }
-      if (_listeners.isNotEmpty && !onErrorNotified) {
+      if (_listeners
+              .isNotEmpty && // As then we must have been called from an initial listen(), and it will handle this itself
+          !onErrorNotified &&
+          _memoizedDownstreamComputations.isEmpty &&
+          _nonMemoizedDownstreamComputations.isEmpty) {
         // Propagate to the Zone
         Zone.current.handleUncaughtError(_lastResult!._exc!, _lastResult!._st!);
       }

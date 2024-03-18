@@ -684,6 +684,37 @@ void main() {
     sub2.cancel();
   });
 
+  test(
+      'does not invoke handleUncaughtError if there are downstream computations',
+      () async {
+    final s = ValueStream(sync: true);
+    s.add(0);
+
+    final c = $(() => throw s.useOr(42));
+    final c2 = $(() {
+      try {
+        c.use;
+      } catch (e) {}
+    });
+    final sub3 = c2.listen((event) {}, null);
+    final sub1 = c.listen((event) {}, null);
+    await Future.value();
+
+    s.add(1);
+
+    final sub2 = c.listen((event) {}, (err) {});
+
+    s.add(2);
+
+    sub2.cancel();
+
+    s.add(3);
+
+    sub1.cancel();
+    sub2.cancel();
+    sub3.cancel();
+  });
+
   test('computation listeners can be changed', () {
     final controller = StreamController<int>.broadcast(
         sync: true); // Use a broadcast stream to make debugging easier
@@ -1619,6 +1650,42 @@ void main() {
     expect(cnt, 4);
     controller.add(1);
     expect(cnt, 6);
+
+    sub1.cancel();
+    sub2.cancel();
+  });
+
+  test(
+      '(regression) listeners attached and cancalled within the same microtask are not fired',
+      () async {
+    final c = $(() => 42);
+    c.listen((_) => fail('must not fire'), (e) => fail(e.toString())).cancel();
+    await Future.value();
+    final sub1 = c.listen(null, null);
+    c.listen((_) => fail('must not fire'), (e) => fail(e.toString())).cancel();
+    await Future.value();
+    sub1.cancel();
+  });
+
+  test('(regression) initial call to listeners are made with up-to-date values',
+      () async {
+    final s1 = StreamController(sync: true);
+    final stream1 = s1.stream;
+    final s2 = StreamController(sync: true);
+    final stream2 = s2.stream;
+    final c2 = $(() => stream2.use);
+    final sub2 = c2.listen(null, null);
+    s1.add(0);
+    final c = $(() => stream1.use + stream2.useOr(0));
+    var flag = false;
+    final sub1 = c.listen((e) {
+      expect(flag, false);
+      expect(e, 1);
+      flag = true;
+    }, (e) => fail(e.toString()));
+    s2.add(1);
+    await Future.value();
+    expect(flag, true);
 
     sub1.cancel();
     sub2.cancel();
