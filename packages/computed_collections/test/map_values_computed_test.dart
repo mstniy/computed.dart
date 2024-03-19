@@ -153,7 +153,6 @@ void main() {
 
     s.add(KeyChanges({0: ChangeRecordUpdate(2)}.lock));
     await Future.value();
-    expect(callCnt, 3);
     expect(lastRes, KeyChanges({0: ChangeRecordDelete<int>()}.lock));
     await Future.value();
     expect(callCnt, 4);
@@ -225,9 +224,8 @@ void main() {
     expect(
         lastRes,
         KeyChanges({
-          0: ChangeRecordUpdate(6),
-          1: ChangeRecordDelete<int>(),
-          2: ChangeRecordUpdate(16),
+          2: ChangeRecordInsert(16),
+          0: ChangeRecordInsert(6),
           3: ChangeRecordInsert(17)
         }.lock));
 

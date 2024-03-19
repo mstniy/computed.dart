@@ -62,7 +62,26 @@ class MapValuesComputedComputedMap<K, V, VParent>
       if (_changesLastAdded == null) {
         _changesLastAdded = change;
         _changes.add(change);
-        scheduleMicrotask(() => _changesLastAdded = null);
+        scheduleMicrotask(() {
+          // "commit" the changes to the _changesState
+          if (_changesLastAdded is ChangeEventReplace<K, V>) {
+            final changesLastAdded =
+                _changesLastAdded as ChangeEventReplace<K, V>;
+            for (var e in _changesState.entries) {
+              e.value._produced =
+                  changesLastAdded.newCollection.containsKey(e.key);
+            }
+          } else {
+            final changes = (_changesLastAdded as KeyChanges<K, V>).changes;
+            for (var change in changes.entries) {
+              _changesState[change.key]
+                      ?._produced = // TODO: can't we just replace this with true? _changesState[change.key] is already gone if it is a deletion event
+                  change.value is ChangeRecordInsert<V> ||
+                      change.value is ChangeRecordUpdate<V>;
+            }
+          }
+          _changesLastAdded = null;
+        });
         return;
       }
       if (change is ChangeEventReplace<K, V>) {
@@ -76,6 +95,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
               .addAll((change as KeyChanges<K, V>).changes));
           _changes.add(_changesLastAdded!);
         } else {
+          // TODO: cover this branch in the tests
           assert(_changesLastAdded is ChangeEventReplace<K, V>);
           final keyChanges = (change as KeyChanges<K, V>).changes;
           final keyDeletions =
@@ -105,8 +125,6 @@ class MapValuesComputedComputedMap<K, V, VParent>
             ? ChangeRecordUpdate<V>(value)
             : ChangeRecordInsert<V>(value)
       }.lock));
-      sap._produced =
-          true; // TODO: all interaction with sap should happen inside the microtask, no?
     }
 
     void _computedChangesListener(ChangeEvent<K, Computed<V>> computedChanges) {
@@ -120,7 +138,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
           newChangesState[key] = sap;
         });
         _changesState.values.forEach((sap) => sap._sub.cancel());
-        _changesState = newChangesState;
+        _changesState = newChangesState; // TODO: this loses _produced-ness
       } else if (computedChanges is KeyChanges<K, Computed<V>>) {
         for (var e in computedChanges.changes.entries) {
           final key = e.key;
@@ -136,7 +154,6 @@ class MapValuesComputedComputedMap<K, V, VParent>
             // Emit a deletion event if this key used to exist
             if (sap._produced) {
               _changesAddMerge(KeyChanges({key: ChangeRecordDelete<V>()}.lock));
-              sap._produced = false;
             }
             final oldSub = sap._sub;
             sap._sub = change.newValue.listen(
@@ -147,7 +164,6 @@ class MapValuesComputedComputedMap<K, V, VParent>
             sap._sub.cancel();
             _changesState.remove(key);
             if (sap._produced) {
-              //////////// TODO: this breaks down with the "intra-microtask scratch pad" logic
               _changesAddMerge(KeyChanges({key: ChangeRecordDelete<V>()}.lock));
             }
           }
