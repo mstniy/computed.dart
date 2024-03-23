@@ -2085,6 +2085,31 @@ void main() {
     sub.cancel();
   });
 
+  test(
+      '(regression) avoids double-notifying new listeners if the computation changes value during the same microtask',
+      () async {
+    final s = StreamController(sync: true);
+    final stream = s.stream;
+    final c = $(() => stream.use);
+    var flag = false;
+    s.add(0);
+    final sub2 = c.listen(null, null);
+    await Future.value();
+    // c now has a value
+    final sub1 = c.listen((event) {
+      expect(flag, false);
+      expect(event, 1);
+      flag = true;
+    }, (e) => fail(e.toString()));
+    // c changes value
+    s.add(1);
+    await Future.value();
+    expect(flag, true);
+
+    sub1.cancel();
+    sub2.cancel();
+  });
+
   group('prev', () {
     test('works on streams', () async {
       final controller1 = StreamController<int>.broadcast(

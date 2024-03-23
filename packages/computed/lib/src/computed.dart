@@ -157,7 +157,8 @@ class ComputedImpl<T> {
   final _memoizedDownstreamComputations = <ComputedImpl>{};
   final _nonMemoizedDownstreamComputations = <ComputedImpl>{};
 
-  final _listeners = <_ComputedSubscriptionImpl<T>>{};
+  // If mapped to false -> not notified yet
+  final _listeners = <_ComputedSubscriptionImpl<T>, bool>{};
 
   T Function() _f;
   final T Function() _origF;
@@ -274,7 +275,7 @@ class ComputedImpl<T> {
         // It is fine if we don't have a value yet
       }
     }
-    _listeners.add(sub);
+    _listeners[sub] = false;
 
     if (!_novalue) {
       if (!_lastResult!._isValue &&
@@ -284,7 +285,10 @@ class ComputedImpl<T> {
         Zone.current.handleUncaughtError(_lastResult!._exc!, _lastResult!._st!);
       }
       scheduleMicrotask(() {
-        if (!_novalue && _listeners.contains(sub)) {
+        if (_listeners[sub] != false)
+          return; // We have been cancelled or the listener has already been notified
+        // No need to set the value of _listeners here, it will never be used again
+        if (!_novalue) {
           if (!_lastResult!._isValue) {
             final lastError = _lastResult!._exc!;
             if (sub._onError != null) {
@@ -541,7 +545,8 @@ class ComputedImpl<T> {
     if (!_lastResult!._isValue) {
       // Exception
       var onErrorNotified = false;
-      for (var listener in _listeners) {
+      for (var listener in _listeners.keys) {
+        _listeners[listener] = true;
         if (listener._onError != null) {
           onErrorNotified = true;
           listener._onError!(_lastResult!._exc!);
@@ -556,7 +561,8 @@ class ComputedImpl<T> {
         Zone.current.handleUncaughtError(_lastResult!._exc!, _lastResult!._st!);
       }
     } else {
-      for (var listener in _listeners) {
+      for (var listener in _listeners.keys) {
+        _listeners[listener] = true;
         if (listener._onData != null) {
           listener._onData!(_lastResult!._value as T);
         }
