@@ -49,10 +49,10 @@ class MapValuesComputedComputedMap<K, V, VParent>
     void _changesAddMerge(ChangeEvent<K, V> change) {
       if (_changesLastAdded == null) {
         _changesLastAdded = change;
-        _changes.add(change);
         scheduleMicrotask(() {
           _changesLastAdded = null;
         });
+        _changes.add(change);
         return;
       }
       if (change is ChangeEventReplace<K, V>) {
@@ -66,7 +66,6 @@ class MapValuesComputedComputedMap<K, V, VParent>
               .addAll((change as KeyChanges<K, V>).changes));
           _changes.add(_changesLastAdded!);
         } else {
-          // TODO: cover this branch in the tests
           assert(_changesLastAdded is ChangeEventReplace<K, V>);
           final keyChanges = (change as KeyChanges<K, V>).changes;
           final keyDeletions =
@@ -88,7 +87,8 @@ class MapValuesComputedComputedMap<K, V, VParent>
     }
 
     void _computationListener(K key, V value) {
-      _changesAddMerge(KeyChanges({key: ChangeRecordValue<V>(value)}.lock));
+      _changesAddMerge(KeyChanges(
+          <K, ChangeRecord<V>>{key: ChangeRecordValue<V>(value)}.lock));
     }
 
     void _computedChangesListener(ChangeEvent<K, Computed<V>> computedChanges) {
@@ -107,7 +107,8 @@ class MapValuesComputedComputedMap<K, V, VParent>
           final change = e.value;
           if (change is ChangeRecordValue<Computed<V>>) {
             // Emit a deletion event, as the key won't have a value until the next microtask
-            _changesAddMerge(KeyChanges({key: ChangeRecordDelete<V>()}.lock));
+            _changesAddMerge(KeyChanges(
+                <K, ChangeRecord<V>>{key: ChangeRecordDelete<V>()}.lock));
             final oldSub = _changesState[key];
             _changesState[key] = change.value
                 .listen((e) => _computationListener(key, e), _changes.addError);
@@ -115,7 +116,8 @@ class MapValuesComputedComputedMap<K, V, VParent>
           } else if (change is ChangeRecordDelete<Computed<V>>) {
             _changesState[key]?.cancel();
             _changesState.remove(key);
-            _changesAddMerge(KeyChanges({key: ChangeRecordDelete<V>()}.lock));
+            _changesAddMerge(KeyChanges(
+                <K, ChangeRecord<V>>{key: ChangeRecordDelete<V>()}.lock));
           }
         }
       }
