@@ -38,8 +38,7 @@ class AddComputedMap<K, V>
         if (changes.isEmpty) throw NoValueException();
         return KeyChanges(IMap.fromEntries(changes));
       } else {
-        assert(false);
-        return KeyChanges(<K, ChangeRecord<V>>{}.lock);
+        throw TypeError();
       }
     });
   }

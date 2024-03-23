@@ -218,19 +218,14 @@ void main() {
     s.add(ChangeEventReplace({0: 8, 1: 9, 2: 10}.lock));
     s.add(KeyChanges({0: ChangeRecordValue(0)}.lock));
     s.add(KeyChanges({1: ChangeRecordDelete<int>()}.lock));
+    s2.add(7);
     s.add(KeyChanges({3: ChangeRecordValue(11)}.lock));
     await Future.value();
     expect(callCnt, 13);
-    expect(lastRes, ChangeEventReplace({}.lock));
+    expect(lastRes, ChangeEventReplace({2: 17, 0: 7}.lock));
     await Future.value();
     expect(callCnt, 14);
-    expect(
-        lastRes,
-        KeyChanges({
-          2: ChangeRecordValue(16),
-          0: ChangeRecordValue(6),
-          3: ChangeRecordValue(17)
-        }.lock));
+    expect(lastRes, KeyChanges({3: ChangeRecordValue(18)}.lock));
 
     await Future.value(); // No more calls
     expect(callCnt, 14);
