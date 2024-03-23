@@ -15,11 +15,11 @@ void main() {
     }, (e) => fail(e.toString()));
     await Future.value();
     expect(lastRes, {}.lock);
-    s.add(KeyChanges({0: ChangeRecordInsert(1)}.lock));
+    s.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
     expect(lastRes, {0: 1}.lock);
-    s.add(KeyChanges({1: ChangeRecordInsert(2)}.lock));
+    s.add(KeyChanges({1: ChangeRecordValue(2)}.lock));
     expect(lastRes, {0: 1, 1: 2}.lock);
-    s.add(KeyChanges({1: ChangeRecordUpdate(3)}.lock));
+    s.add(KeyChanges({1: ChangeRecordValue(3)}.lock));
     expect(lastRes, {0: 1, 1: 3}.lock);
     s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
     expect(lastRes, {1: 3}.lock);
@@ -45,15 +45,15 @@ void main() {
     expect(callCnt1, 1);
     expect(lastRes1, null);
 
-    s.add(KeyChanges({0: ChangeRecordInsert(01)}.lock));
+    s.add(KeyChanges({0: ChangeRecordValue(01)}.lock));
     expect(callCnt1, 2);
     expect(lastRes1, 1);
 
-    s.add(KeyChanges({1: ChangeRecordInsert(2)}.lock));
+    s.add(KeyChanges({1: ChangeRecordValue(2)}.lock));
     expect(callCnt1, 2);
-    s.add(KeyChanges({1: ChangeRecordUpdate(3)}.lock));
+    s.add(KeyChanges({1: ChangeRecordValue(3)}.lock));
     expect(callCnt1, 2);
-    s.add(KeyChanges({0: ChangeRecordUpdate(4)}.lock));
+    s.add(KeyChanges({0: ChangeRecordValue(4)}.lock));
     expect(callCnt1, 3);
     expect(lastRes1, 4);
 
@@ -98,7 +98,7 @@ void main() {
     expect(callCnt3, 1);
     expect(lastRes3, 1);
 
-    s.add(KeyChanges({1: ChangeRecordUpdate(2)}.lock));
+    s.add(KeyChanges({1: ChangeRecordValue(2)}.lock));
     expect(callCnt1, 5);
     expect(callCnt2, 3);
     expect(callCnt3, 2);
@@ -167,7 +167,7 @@ void main() {
     await Future.value(); // TODO: why do we need that?
     expect(callCnt2, 2);
     expect(lastExc2, 42);
-    s.add(KeyChanges({0: ChangeRecordInsert(1)}.lock));
+    s.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
     expect(callCnt1, 2);
     expect(callCnt2, 2);
 
@@ -208,9 +208,9 @@ void main() {
 
     await Future.value();
     expect(callCnt, 0);
-    s.add(KeyChanges({0: ChangeRecordInsert(1)}.lock));
+    s.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
     expect(callCnt, 1);
-    expect(lastRes, KeyChanges({0: ChangeRecordInsert(1)}.lock));
+    expect(lastRes, KeyChanges({0: ChangeRecordValue(1)}.lock));
 
     sub.cancel();
   });

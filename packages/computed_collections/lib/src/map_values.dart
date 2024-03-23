@@ -27,12 +27,9 @@ class MapValuesComputedMap<K, V, VParent>
         return KeyChanges(IMap.fromEntries(change.changes.entries.map((e) {
           final key = e.key;
           final upstreamChange = e.value;
-          if (upstreamChange is ChangeRecordInsert<VParent>) {
+          if (upstreamChange is ChangeRecordValue<VParent>) {
             return MapEntry(
-                key, ChangeRecordInsert(_convert(key, upstreamChange.value)));
-          } else if (upstreamChange is ChangeRecordUpdate<VParent>) {
-            return MapEntry(key,
-                ChangeRecordUpdate<V>(_convert(key, upstreamChange.newValue)));
+                key, ChangeRecordValue(_convert(key, upstreamChange.value)));
           } else if (upstreamChange is ChangeRecordDelete<VParent>) {
             return MapEntry(key, ChangeRecordDelete<V>());
           } else {

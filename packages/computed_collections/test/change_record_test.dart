@@ -5,18 +5,14 @@ import 'package:test/test.dart';
 void main() {
   group('ChangeRecord', () {
     test('operator== works', () async {
-      expect(ChangeRecordInsert<int>(0), ChangeRecordInsert<int>(0));
-      expect(ChangeRecordInsert<int>(0), ChangeRecordInsert<int?>(0));
-      expect(ChangeRecordInsert<int>(0), isNot(ChangeRecordInsert<int>(1)));
-
-      expect(ChangeRecordUpdate<int>(0), ChangeRecordUpdate<int>(0));
-      expect(ChangeRecordUpdate<int>(0), ChangeRecordUpdate<int?>(0));
-      expect(ChangeRecordUpdate<int>(0), isNot(ChangeRecordUpdate<int>(1)));
+      expect(ChangeRecordValue<int>(0), ChangeRecordValue<int>(0));
+      expect(ChangeRecordValue<int>(0), ChangeRecordValue<int?>(0));
+      expect(ChangeRecordValue<int>(0), isNot(ChangeRecordValue<int>(1)));
 
       expect(ChangeRecordDelete<int>(), ChangeRecordDelete<int>());
       expect(ChangeRecordDelete<int>(), ChangeRecordDelete<int?>());
       expect(ChangeRecordDelete<int>(), ChangeRecordDelete<String>());
-      expect(ChangeRecordDelete<int>(), isNot(ChangeRecordInsert<int>(0)));
+      expect(ChangeRecordDelete<int>(), isNot(ChangeRecordValue<int>(0)));
 
       expect(ChangeEventReplace<int, int>({0: 1}.lock),
           ChangeEventReplace<int, int>({0: 1}.lock));

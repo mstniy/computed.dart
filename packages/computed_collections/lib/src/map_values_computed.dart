@@ -10,13 +10,6 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'computedmap_mixins.dart';
 import 'cs_computedmap.dart';
 
-class _SubscriptionAndProduced<T> {
-  late ComputedSubscription<T> _sub;
-  bool _produced = false;
-
-  _SubscriptionAndProduced();
-}
-
 class MapValuesComputedComputedMap<K, V, VParent>
     with ComputedMapMixin<K, V>
     implements IComputedMap<K, V> {
@@ -24,7 +17,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
   final Computed<V> Function(K key, VParent value) _convert;
   late final ValueStream<ChangeEvent<K, V>> _changes;
   late final Computed<ChangeEvent<K, V>> _changesComputed;
-  var _changesState = <K, _SubscriptionAndProduced<V>>{};
+  var _changesState = <K, ComputedSubscription<V>>{};
   late final Computed<IMap<K, V>> _snapshot;
   final _keyComputationCache = ComputationCache<K, V?>();
 
@@ -38,14 +31,9 @@ class MapValuesComputedComputedMap<K, V, VParent>
         return KeyChanges(IMap.fromEntries(change.changes.entries.map((e) {
           final key = e.key;
           final upstreamChange = e.value;
-          if (upstreamChange is ChangeRecordInsert<VParent>) {
+          if (upstreamChange is ChangeRecordValue<VParent>) {
             return MapEntry(
-                key, ChangeRecordInsert(_convert(key, upstreamChange.value)));
-          } else if (upstreamChange is ChangeRecordUpdate<VParent>) {
-            return MapEntry(
-                key,
-                ChangeRecordUpdate<Computed<V>>(
-                    _convert(key, upstreamChange.newValue)));
+                key, ChangeRecordValue(_convert(key, upstreamChange.value)));
           } else if (upstreamChange is ChangeRecordDelete<VParent>) {
             return MapEntry(key, ChangeRecordDelete<Computed<V>>());
           } else {
@@ -63,23 +51,6 @@ class MapValuesComputedComputedMap<K, V, VParent>
         _changesLastAdded = change;
         _changes.add(change);
         scheduleMicrotask(() {
-          // "commit" the changes to the _changesState
-          if (_changesLastAdded is ChangeEventReplace<K, V>) {
-            final changesLastAdded =
-                _changesLastAdded as ChangeEventReplace<K, V>;
-            for (var e in _changesState.entries) {
-              e.value._produced =
-                  changesLastAdded.newCollection.containsKey(e.key);
-            }
-          } else {
-            final changes = (_changesLastAdded as KeyChanges<K, V>).changes;
-            for (var change in changes.entries) {
-              _changesState[change.key]
-                      ?._produced = // TODO: can't we just replace this with true? _changesState[change.key] is already gone if it is a deletion event
-                  change.value is ChangeRecordInsert<V> ||
-                      change.value is ChangeRecordUpdate<V>;
-            }
-          }
           _changesLastAdded = null;
         });
         return;
@@ -106,10 +77,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
                   .addEntries(keyChanges.entries
                       .where((e) => e.value is! ChangeRecordDelete<K>)
                       .map((e) => MapEntry(
-                          e.key,
-                          (e.value is ChangeRecordInsert<V>)
-                              ? (e.value as ChangeRecordInsert<V>).value
-                              : (e.value as ChangeRecordUpdate<V>).newValue))));
+                          e.key, (e.value as ChangeRecordValue<V>).value))));
           keyDeletions.forEach((e) => _changesLastAdded = ChangeEventReplace(
               (_changesLastAdded as ChangeEventReplace<K, V>)
                   .newCollection
@@ -119,53 +87,35 @@ class MapValuesComputedComputedMap<K, V, VParent>
       }
     }
 
-    void _computationListener(_SubscriptionAndProduced<V> sap, K key, V value) {
-      _changesAddMerge(KeyChanges({
-        key: sap._produced
-            ? ChangeRecordUpdate<V>(value)
-            : ChangeRecordInsert<V>(value)
-      }.lock));
+    void _computationListener(K key, V value) {
+      _changesAddMerge(KeyChanges({key: ChangeRecordValue<V>(value)}.lock));
     }
 
     void _computedChangesListener(ChangeEvent<K, Computed<V>> computedChanges) {
       if (computedChanges is ChangeEventReplace<K, Computed<V>>) {
         _changesAddMerge(ChangeEventReplace(<K, V>{}.lock));
-        final newChangesState = <K, _SubscriptionAndProduced<V>>{};
+        final newChangesState = <K, ComputedSubscription<V>>{};
         computedChanges.newCollection.forEach((key, value) {
-          final sap = _SubscriptionAndProduced<V>();
-          sap._sub = value.listen(
-              (e) => _computationListener(sap, key, e), _changes.addError);
-          newChangesState[key] = sap;
+          newChangesState[key] = value.listen(
+              (e) => _computationListener(key, e), _changes.addError);
         });
-        _changesState.values.forEach((sap) => sap._sub.cancel());
-        _changesState = newChangesState; // TODO: this loses _produced-ness
+        _changesState.values.forEach((sub) => sub.cancel());
+        _changesState = newChangesState;
       } else if (computedChanges is KeyChanges<K, Computed<V>>) {
         for (var e in computedChanges.changes.entries) {
           final key = e.key;
           final change = e.value;
-          if (change is ChangeRecordInsert<Computed<V>>) {
-            assert(_changesState[key] == null);
-            final sap = _SubscriptionAndProduced<V>();
-            sap._sub = change.value.listen(
-                (e) => _computationListener(sap, key, e), _changes.addError);
-            _changesState[key] = sap;
-          } else if (change is ChangeRecordUpdate<Computed<V>>) {
-            final sap = _changesState[key]!;
-            // Emit a deletion event if this key used to exist
-            if (sap._produced) {
-              _changesAddMerge(KeyChanges({key: ChangeRecordDelete<V>()}.lock));
-            }
-            final oldSub = sap._sub;
-            sap._sub = change.newValue.listen(
-                (e) => _computationListener(sap, key, e), _changes.addError);
-            oldSub.cancel();
+          if (change is ChangeRecordValue<Computed<V>>) {
+            // Emit a deletion event, as the key won't have a value until the next microtask
+            _changesAddMerge(KeyChanges({key: ChangeRecordDelete<V>()}.lock));
+            final oldSub = _changesState[key];
+            _changesState[key] = change.value
+                .listen((e) => _computationListener(key, e), _changes.addError);
+            oldSub?.cancel();
           } else if (change is ChangeRecordDelete<Computed<V>>) {
-            final sap = _changesState[key]!;
-            sap._sub.cancel();
+            _changesState[key]?.cancel();
             _changesState.remove(key);
-            if (sap._produced) {
-              _changesAddMerge(KeyChanges({key: ChangeRecordDelete<V>()}.lock));
-            }
+            _changesAddMerge(KeyChanges({key: ChangeRecordDelete<V>()}.lock));
           }
         }
       }
@@ -178,7 +128,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
       _computedChangesSubscription =
           _computedChanges.listen(_computedChangesListener, _changes.addError);
     }, onCancel: () {
-      _changesState.values.forEach((sap) => sap._sub.cancel());
+      _changesState.values.forEach((sub) => sub.cancel());
       _changesState.clear();
       _computedChangesSubscription!.cancel();
     });

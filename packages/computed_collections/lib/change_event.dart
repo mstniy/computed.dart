@@ -28,13 +28,13 @@ class KeyChanges<K, V> extends ChangeEvent<K, V> {
 }
 
 @immutable
-class ChangeRecordInsert<V> extends ChangeRecord<V> {
+class ChangeRecordValue<V> extends ChangeRecord<V> {
   final V value;
 
-  ChangeRecordInsert(this.value);
+  ChangeRecordValue(this.value);
 
   bool operator ==(Object other) =>
-      other is ChangeRecordInsert && other.value == value;
+      other is ChangeRecordValue && other.value == value;
 
   @override
   int get hashCode => value.hashCode;
@@ -51,22 +51,6 @@ class ChangeRecordDelete<V> extends ChangeRecord<V> {
 
   @override
   int get hashCode => 0;
-}
-
-@immutable
-class ChangeRecordUpdate<V> extends ChangeRecord<V> {
-  final V newValue;
-
-  ChangeRecordUpdate(this.newValue);
-
-  bool operator ==(Object other) =>
-      other is ChangeRecordUpdate && other.newValue == newValue;
-
-  @override
-  int get hashCode => newValue.hashCode;
-
-  @override
-  String toString() => newValue.toString();
 }
 
 @immutable

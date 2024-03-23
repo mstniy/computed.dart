@@ -17,11 +17,11 @@ void main() {
       }, (e) => fail(e.toString()));
       await Future.value();
       expect(lastRes, {0: 1}.lock);
-      s.add(KeyChanges({0: ChangeRecordInsert(1)}.lock));
+      s.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
       expect(lastRes, {0: 1}.lock);
-      s.add(KeyChanges({0: ChangeRecordUpdate(2)}.lock));
+      s.add(KeyChanges({0: ChangeRecordValue(2)}.lock));
       expect(lastRes, {0: 1}.lock);
-      s.add(KeyChanges({1: ChangeRecordInsert(2)}.lock));
+      s.add(KeyChanges({1: ChangeRecordValue(2)}.lock));
       expect(lastRes, {0: 1, 1: 2}.lock);
       s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
       expect(lastRes, {0: 1, 1: 2}.lock);
@@ -46,11 +46,11 @@ void main() {
     }, (e) => fail(e.toString()));
     await Future.value();
     expect(lastRes, {0: 1, 2: 3}.lock);
-    s.add(KeyChanges({0: ChangeRecordInsert(1)}.lock));
+    s.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
     expect(lastRes, {0: 1, 2: 3}.lock);
-    s.add(KeyChanges({0: ChangeRecordUpdate(2)}.lock));
+    s.add(KeyChanges({0: ChangeRecordValue(2)}.lock));
     expect(lastRes, {0: 1, 2: 3}.lock);
-    s.add(KeyChanges({4: ChangeRecordInsert(5)}.lock));
+    s.add(KeyChanges({4: ChangeRecordValue(5)}.lock));
     expect(lastRes, {0: 1, 2: 3, 4: 5}.lock);
     s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
     expect(lastRes, {0: 1, 2: 3, 4: 5}.lock);
@@ -77,14 +77,14 @@ void main() {
     expect(callCnt1, 1);
     expect(lastRes1, 1);
 
-    s.add(KeyChanges({0: ChangeRecordInsert(1)}.lock));
+    s.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
     expect(callCnt1, 1);
 
-    s.add(KeyChanges({1: ChangeRecordInsert(2)}.lock));
+    s.add(KeyChanges({1: ChangeRecordValue(2)}.lock));
     expect(callCnt1, 1);
-    s.add(KeyChanges({1: ChangeRecordUpdate(3)}.lock));
+    s.add(KeyChanges({1: ChangeRecordValue(3)}.lock));
     expect(callCnt1, 1);
-    s.add(KeyChanges({0: ChangeRecordUpdate(4)}.lock));
+    s.add(KeyChanges({0: ChangeRecordValue(4)}.lock));
     expect(callCnt1, 1);
     s.add(ChangeEventReplace({5: 6}.lock));
     expect(callCnt1, 1);
@@ -104,11 +104,11 @@ void main() {
     s.add(KeyChanges({5: ChangeRecordDelete<int>()}.lock));
     expect(callCnt1, 1);
     expect(callCnt2, 1);
-    s.add(KeyChanges({1: ChangeRecordInsert(2)}.lock));
+    s.add(KeyChanges({1: ChangeRecordValue(2)}.lock));
     expect(callCnt1, 1);
     expect(callCnt2, 2);
     expect(lastRes2, 2);
-    s.add(KeyChanges({1: ChangeRecordUpdate(3)}.lock));
+    s.add(KeyChanges({1: ChangeRecordValue(3)}.lock));
     expect(callCnt1, 1);
     expect(callCnt2, 3);
     expect(lastRes2, 3);
@@ -138,16 +138,16 @@ void main() {
 
     await Future.value();
     expect(callCnt, 0);
-    s.add(KeyChanges({0: ChangeRecordInsert(1)}.lock));
+    s.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
     expect(callCnt, 0);
-    s.add(KeyChanges({1: ChangeRecordInsert(2)}.lock));
+    s.add(KeyChanges({1: ChangeRecordValue(2)}.lock));
     expect(callCnt, 1);
-    expect(lastRes, KeyChanges({1: ChangeRecordInsert(2)}.lock));
-    s.add(KeyChanges({0: ChangeRecordUpdate(2)}.lock));
+    expect(lastRes, KeyChanges({1: ChangeRecordValue(2)}.lock));
+    s.add(KeyChanges({0: ChangeRecordValue(2)}.lock));
     expect(callCnt, 1);
-    s.add(KeyChanges({1: ChangeRecordUpdate(3)}.lock));
+    s.add(KeyChanges({1: ChangeRecordValue(3)}.lock));
     expect(callCnt, 2);
-    expect(lastRes, KeyChanges({1: ChangeRecordUpdate(3)}.lock));
+    expect(lastRes, KeyChanges({1: ChangeRecordValue(3)}.lock));
     s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
     expect(callCnt, 2);
     s.add(KeyChanges({1: ChangeRecordDelete<int>()}.lock));

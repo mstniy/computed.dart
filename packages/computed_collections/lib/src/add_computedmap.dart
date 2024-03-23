@@ -21,21 +21,18 @@ class AddComputedMap<K, V>
         return ChangeEventReplace(changeEvent.newCollection.add(_key, _value));
       } else if (changeEvent is KeyChanges<K, V>) {
         final changes = changeEvent.changes.entries.map((upstreamChange) {
-          if (upstreamChange.value is ChangeRecordInsert<V>) {
-            if (upstreamChange.key == _key)
+          if (upstreamChange.value is ChangeRecordValue<V>) {
+            if (upstreamChange.key == _key) {
               return <MapEntry<K, ChangeRecord<V>>>[];
-            return [upstreamChange];
-          } else if (upstreamChange.value is ChangeRecordUpdate<V>) {
-            if (upstreamChange.key == _key)
-              return <MapEntry<K, ChangeRecord<V>>>[];
+            }
             return [upstreamChange];
           } else if (upstreamChange.value is ChangeRecordDelete<V>) {
-            if (upstreamChange.key == _key)
+            if (upstreamChange.key == _key) {
               return <MapEntry<K, ChangeRecord<V>>>[];
+            }
             return [upstreamChange];
           } else {
-            assert(false);
-            return <MapEntry<K, ChangeRecord<V>>>[];
+            throw TypeError();
           }
         }).expand((e) => e);
         if (changes.isEmpty) throw NoValueException();
