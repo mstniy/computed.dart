@@ -1,22 +1,26 @@
 import 'dart:async';
 
-import 'package:computed/utils/streams.dart';
 import 'package:computed_collections/change_event.dart';
 
-class MergingChangeStream<K, V> extends ValueStream<ChangeEvent<K, V>> {
+class MergingChangeStream<K, V> extends Stream<ChangeEvent<K, V>> {
   ChangeEvent<K, V>? _changesLastAdded;
+  final StreamController<ChangeEvent<K, V>> _stream;
   MergingChangeStream({void Function()? onListen, void Function()? onCancel})
-      : super(sync: true, onListen: onListen, onCancel: onCancel);
-  @override
+      : _stream = StreamController.broadcast(
+            sync: true, onListen: onListen, onCancel: onCancel);
+
+  void _maybeFlushChanges() {
+    if (_changesLastAdded == null) return; // Already flushed
+    final oldChangesLastAdded = _changesLastAdded!;
+    _changesLastAdded = null;
+    _stream.add(oldChangesLastAdded);
+  }
+
   void add(ChangeEvent<K, V> change) {
     if (_changesLastAdded == null) {
       _changesLastAdded = change;
-      scheduleMicrotask(() {
-        // Batch the changes until the next microtask, then add to the stream
-        final oldChangesLastAdded = _changesLastAdded!;
-        _changesLastAdded = null;
-        super.add(oldChangesLastAdded);
-      });
+      // Batch the changes until the next microtask, then add to the stream
+      scheduleMicrotask(_maybeFlushChanges);
     } else if (change is ChangeEventReplace<K, V>) {
       _changesLastAdded = change;
     } else {
@@ -45,5 +49,17 @@ class MergingChangeStream<K, V> extends ValueStream<ChangeEvent<K, V>> {
     }
   }
 
-  // TODO: Logic for "merging" errors with values
+  void addError(Object o) {
+    _maybeFlushChanges();
+    _stream.addError(o);
+  }
+
+  @override
+  StreamSubscription<ChangeEvent<K, V>> listen(
+          void Function(ChangeEvent<K, V> event)? onData,
+          {Function? onError,
+          void Function()? onDone,
+          bool? cancelOnError}) =>
+      _stream.stream.listen(onData,
+          onError: onError, onDone: onDone, cancelOnError: cancelOnError);
 }
