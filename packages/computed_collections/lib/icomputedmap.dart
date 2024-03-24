@@ -23,11 +23,9 @@ abstract class IComputedMap<K, V> {
   void fixThrow(Object e);
 
   @visibleForTesting
-  // ignore: invalid_use_of_visible_for_testing_member
   void mock(IMap<K, V> Function() mock);
 
   @visibleForTesting
-  // ignore: invalid_use_of_visible_for_testing_member
   void unmock();
 
   Computed<IMap<K, V>> get snapshot;
