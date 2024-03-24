@@ -31,7 +31,6 @@ class ComputationCache<K, V> {
         _onDisposeError = onDisposeError;
 
   Computed<V> wrap(K key, V Function() computation) {
-    // TODO: Take the parameterized computation as part of the constructor
     final cachedComputation = _m[key];
     if (cachedComputation != null) return cachedComputation;
     late final Computed<V> newComputation;
