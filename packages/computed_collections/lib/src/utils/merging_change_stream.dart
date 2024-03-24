@@ -6,13 +6,16 @@ import 'package:computed_collections/change_event.dart';
 class MergingChangeStream<K, V> extends ValueStream<ChangeEvent<K, V>> {
   ChangeEvent<K, V>? _changesLastAdded;
   MergingChangeStream({void Function()? onListen, void Function()? onCancel})
-      : super(onListen: onListen, onCancel: onCancel);
+      : super(sync: true, onListen: onListen, onCancel: onCancel);
   @override
   void add(ChangeEvent<K, V> change) {
     if (_changesLastAdded == null) {
       _changesLastAdded = change;
       scheduleMicrotask(() {
+        // Batch the changes until the next microtask, then add to the stream
+        final oldChangesLastAdded = _changesLastAdded!;
         _changesLastAdded = null;
+        super.add(oldChangesLastAdded);
       });
     } else if (change is ChangeEventReplace<K, V>) {
       _changesLastAdded = change;
@@ -40,7 +43,6 @@ class MergingChangeStream<K, V> extends ValueStream<ChangeEvent<K, V>> {
                 .remove(e.key)));
       }
     }
-    super.add(_changesLastAdded!);
   }
 
   // TODO: Logic for "merging" errors with values
