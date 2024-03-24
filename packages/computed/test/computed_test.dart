@@ -1761,6 +1761,20 @@ void main() {
       sub.cancel();
     });
 
+    test('(regression) calling unmock on a non-mocked computation is noop',
+        () async {
+      var cCnt = 0;
+      final c = $(() {
+        cCnt++;
+      });
+      final sub = c.listen(null, null);
+      await Future.value();
+      expect(cCnt, 2);
+      c.unmock();
+      expect(cCnt, 2);
+      sub.cancel();
+    });
+
     test('fixThrow works', () async {
       final c1 = Computed(() {
         return 0;

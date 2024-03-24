@@ -98,6 +98,7 @@ class Computed<T> {
   void mock(T Function() mock) => _impl.mock(mock);
 
   /// Replaces [f] with the original, undoing [fix], [fixThrow] and [mock].
+  /// If this computations has not already been mocked, does nothing.
   @visibleForTesting
   void unmock() => _impl.unmock();
 

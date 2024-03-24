@@ -353,6 +353,7 @@ class ComputedImpl<T> {
   }
 
   void unmock() {
+    if (identical(_f, _origF)) return; // Already not mocked
     _f = _origF;
     _lastResult = null; // Invalid
     GlobalCtx._currentUpdate = _Token();
