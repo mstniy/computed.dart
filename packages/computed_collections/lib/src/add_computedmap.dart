@@ -17,28 +17,19 @@ class AddComputedMap<K, V>
     _snapshot = $(() => _parent.snapshot.use.add(this._key, this._value));
     _changes = Computed(() {
       final changeEvent = _parent.changes.use;
-      if (changeEvent is ChangeEventReplace<K, V>) {
-        return ChangeEventReplace(changeEvent.newCollection.add(_key, _value));
-      } else if (changeEvent is KeyChanges<K, V>) {
-        final changes = changeEvent.changes.entries.map((upstreamChange) {
-          if (upstreamChange.value is ChangeRecordValue<V>) {
+      switch (changeEvent) {
+        case ChangeEventReplace<K, V>():
+          return ChangeEventReplace(
+              changeEvent.newCollection.add(_key, _value));
+        case KeyChanges<K, V>():
+          final changes = changeEvent.changes.entries.map((upstreamChange) {
             if (upstreamChange.key == _key) {
               return <MapEntry<K, ChangeRecord<V>>>[];
             }
             return [upstreamChange];
-          } else if (upstreamChange.value is ChangeRecordDelete<V>) {
-            if (upstreamChange.key == _key) {
-              return <MapEntry<K, ChangeRecord<V>>>[];
-            }
-            return [upstreamChange];
-          } else {
-            throw TypeError();
-          }
-        }).expand((e) => e);
-        if (changes.isEmpty) throw NoValueException();
-        return KeyChanges(IMap.fromEntries(changes));
-      } else {
-        throw TypeError();
+          }).expand((e) => e);
+          if (changes.isEmpty) throw NoValueException();
+          return KeyChanges(IMap.fromEntries(changes));
       }
     });
   }

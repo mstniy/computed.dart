@@ -2,12 +2,12 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:meta/meta.dart';
 
 @immutable
-abstract class ChangeEvent<K, V> {
+sealed class ChangeEvent<K, V> {
   ChangeEvent();
 }
 
 @immutable
-abstract class ChangeRecord<V> {
+sealed class ChangeRecord<V> {
   ChangeRecord();
 }
 

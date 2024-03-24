@@ -60,15 +60,13 @@ class ChangeStreamComputedMap<K, V>
         } else if (change is KeyChanges<K, V>) {
           for (var e in change.changes.entries) {
             final key = e.key;
-            final record = e.value;
-            if (record is ChangeRecordValue<V>) {
-              keysToNotify.add(key);
-              prev = prev.add(key, record.value);
-            } else if (record is ChangeRecordDelete<V>) {
-              keysToNotify.add(key);
-              prev = prev.remove(key);
-            } else {
-              assert(false);
+            switch (e.value) {
+              case ChangeRecordValue<V>(value: var value):
+                keysToNotify.add(key);
+                prev = prev.add(key, value);
+              case ChangeRecordDelete<V>():
+                keysToNotify.add(key);
+                prev = prev.remove(key);
             }
           }
         }

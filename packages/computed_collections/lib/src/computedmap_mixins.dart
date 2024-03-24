@@ -6,7 +6,7 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import '../icomputedmap.dart';
 import 'add_computedmap.dart';
 
-class ComputedMapMixin<K, V> {
+mixin class ComputedMapMixin<K, V> {
   IComputedMap<K, V> add(K key, V value) =>
       AddComputedMap(this as IComputedMap<K, V>, key, value);
 

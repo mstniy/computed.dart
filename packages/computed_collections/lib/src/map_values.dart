@@ -20,25 +20,21 @@ class MapValuesComputedMap<K, V, VParent>
     _changes = Computed(() {
       // TODO: make this a stream map instead? does it have laziness?
       final change = _parent.changes.use;
-      if (change is ChangeEventReplace<K, VParent>) {
-        return ChangeEventReplace(change.newCollection
-            .map(((key, value) => MapEntry(key, _convert(key, value)))));
-      } else if (change is KeyChanges<K, VParent>) {
-        return KeyChanges(IMap.fromEntries(change.changes.entries.map((e) {
-          final key = e.key;
-          final upstreamChange = e.value;
-          if (upstreamChange is ChangeRecordValue<VParent>) {
-            return MapEntry(
-                key, ChangeRecordValue(_convert(key, upstreamChange.value)));
-          } else if (upstreamChange is ChangeRecordDelete<VParent>) {
-            return MapEntry(key, ChangeRecordDelete<V>());
-          } else {
-            throw TypeError();
-          }
-        })));
-      } else {
-        throw TypeError();
-      }
+      return switch (change) {
+        ChangeEventReplace<K, VParent>() => ChangeEventReplace(change
+            .newCollection
+            .map(((key, value) => MapEntry(key, _convert(key, value))))),
+        KeyChanges<K, VParent>() =>
+          KeyChanges(IMap.fromEntries(change.changes.entries.map((e) {
+            final key = e.key;
+            return switch (e.value) {
+              ChangeRecordValue<VParent>(value: var value) =>
+                MapEntry(key, ChangeRecordValue(_convert(key, value))),
+              ChangeRecordDelete<VParent>() =>
+                MapEntry(key, ChangeRecordDelete<V>())
+            };
+          }))),
+      };
     });
     // TODO: asStream introduces a lag of one microtask here
     //  Can we change it to make the api more uniform?
