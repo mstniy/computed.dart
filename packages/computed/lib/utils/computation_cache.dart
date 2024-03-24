@@ -53,6 +53,8 @@ class ComputationCache<K, V> {
     }
 
     newComputation = Computed(() {
+      // TODO: This whole logic, including checking for cached computation and mocks, only needs to run "onListen", which computations don't (directly) have.
+      //  Will be much easier with the global `.self(.prev)` (just check if it throws NVE). Downside: Will redo it until we gain value (not wrong, just suboptimal)
       final cachedComputation = _m[key];
       if (cachedComputation != null &&
           !identical(cachedComputation, newComputation))
