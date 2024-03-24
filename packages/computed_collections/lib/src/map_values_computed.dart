@@ -111,6 +111,8 @@ class MapValuesComputedComputedMap<K, V, VParent>
                 .listen((e) => _computationListener(key, e), _changes.addError);
             oldSub?.cancel();
             // Emit a deletion event, as the key won't have a value until the next microtask
+            // Note that if the new computation has a value already, this will be overwritten
+            // by [_computationListener].
             _changesAddMerge(KeyChanges(
                 <K, ChangeRecord<V>>{key: ChangeRecordDelete<V>()}.lock));
           } else if (change is ChangeRecordDelete<Computed<V>>) {
