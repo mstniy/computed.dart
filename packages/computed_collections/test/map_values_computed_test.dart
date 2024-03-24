@@ -142,71 +142,53 @@ void main() {
     expect(callCnt, 0);
     await Future.value();
     expect(callCnt, 1);
-    expect(lastRes, KeyChanges({0: ChangeRecordDelete()}.lock));
-    await Future.value();
-    expect(callCnt, 2);
     expect(lastRes, KeyChanges({0: ChangeRecordValue(6)}.lock));
 
     s.add(KeyChanges({1: ChangeRecordValue(2)}.lock));
     await Future.value();
-    expect(callCnt, 3);
-    expect(lastRes, KeyChanges({1: ChangeRecordDelete()}.lock));
-    await Future.value();
-    expect(callCnt, 4);
+    expect(callCnt, 2);
     expect(lastRes, KeyChanges({1: ChangeRecordValue(7)}.lock));
 
     s.add(KeyChanges({0: ChangeRecordValue(2)}.lock));
     await Future.value();
-    expect(callCnt, 5);
-    expect(lastRes, KeyChanges({0: ChangeRecordDelete()}.lock));
-    await Future.value();
-    expect(callCnt, 6);
+    expect(callCnt, 3);
     expect(lastRes, KeyChanges({0: ChangeRecordValue(7)}.lock));
 
     useS2 = false;
     s.add(KeyChanges({0: ChangeRecordValue(3)}.lock));
     await Future.value();
-    expect(callCnt, 7);
+    expect(callCnt, 4);
     expect(lastRes, KeyChanges({0: ChangeRecordDelete()}.lock));
     s.add(KeyChanges({0: ChangeRecordValue(4)}.lock));
     await Future.value();
-    expect(callCnt, 7); // Not notified, as the last event was already deletion
+    expect(callCnt, 4); // Not notified, as the last event was already deletion
     expect(lastRes, KeyChanges({0: ChangeRecordDelete()}.lock));
     s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
     await Future.value();
-    expect(callCnt, 7);
+    expect(callCnt, 4);
     s.add(KeyChanges({0: ChangeRecordValue(4)}.lock));
     await Future.value();
     await Future.value();
-    expect(callCnt, 7); // Not notified, as s3 still has no value
+    expect(callCnt, 4); // Not notified, as s3 still has no value
     s3.add(0);
     await Future.value();
-    expect(callCnt, 8);
+    expect(callCnt, 5);
     expect(lastRes, KeyChanges({0: ChangeRecordValue(4)}.lock));
     useS2 = true;
 
     s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
     await Future.value();
-    expect(callCnt, 9);
+    expect(callCnt, 6);
     expect(lastRes, KeyChanges({0: ChangeRecordDelete()}.lock));
 
     s.add(ChangeEventReplace({0: 5, 1: 6, 2: 7}.lock));
     await Future.value();
-    expect(callCnt, 10);
-    expect(lastRes, ChangeEventReplace({}.lock));
-    await Future.value();
-    expect(callCnt, 11);
-    expect(
-        lastRes,
-        KeyChanges({
-          0: ChangeRecordValue(10),
-          1: ChangeRecordValue(11),
-          2: ChangeRecordValue(12)
-        }.lock));
+    expect(callCnt, 7);
+    expect(lastRes, ChangeEventReplace({0: 10, 1: 11, 2: 12}.lock));
 
     s2.add(6);
     await Future.value();
-    expect(callCnt, 12);
+    expect(callCnt, 8);
     expect(
         lastRes,
         KeyChanges({
@@ -221,14 +203,14 @@ void main() {
     s2.add(7);
     s.add(KeyChanges({3: ChangeRecordValue(11)}.lock));
     await Future.value();
-    expect(callCnt, 13);
+    expect(callCnt, 9);
     expect(lastRes, ChangeEventReplace({2: 17, 0: 7}.lock));
     await Future.value();
-    expect(callCnt, 14);
+    expect(callCnt, 10);
     expect(lastRes, KeyChanges({3: ChangeRecordValue(18)}.lock));
 
     await Future.value(); // No more calls
-    expect(callCnt, 14);
+    expect(callCnt, 10);
 
     sub.cancel();
   });

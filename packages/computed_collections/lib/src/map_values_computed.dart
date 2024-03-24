@@ -93,7 +93,6 @@ class MapValuesComputedComputedMap<K, V, VParent>
 
     void _computedChangesListener(ChangeEvent<K, Computed<V>> computedChanges) {
       if (computedChanges is ChangeEventReplace<K, Computed<V>>) {
-        _changesAddMerge(ChangeEventReplace(<K, V>{}.lock));
         final newChangesState = <K, ComputedSubscription<V>>{};
         computedChanges.newCollection.forEach((key, value) {
           newChangesState[key] = value.listen(
@@ -101,18 +100,19 @@ class MapValuesComputedComputedMap<K, V, VParent>
         });
         _changesState.values.forEach((sub) => sub.cancel());
         _changesState = newChangesState;
+        _changesAddMerge(ChangeEventReplace(<K, V>{}.lock));
       } else if (computedChanges is KeyChanges<K, Computed<V>>) {
         for (var e in computedChanges.changes.entries) {
           final key = e.key;
           final change = e.value;
           if (change is ChangeRecordValue<Computed<V>>) {
-            // Emit a deletion event, as the key won't have a value until the next microtask
-            _changesAddMerge(KeyChanges(
-                <K, ChangeRecord<V>>{key: ChangeRecordDelete<V>()}.lock));
             final oldSub = _changesState[key];
             _changesState[key] = change.value
                 .listen((e) => _computationListener(key, e), _changes.addError);
             oldSub?.cancel();
+            // Emit a deletion event, as the key won't have a value until the next microtask
+            _changesAddMerge(KeyChanges(
+                <K, ChangeRecord<V>>{key: ChangeRecordDelete<V>()}.lock));
           } else if (change is ChangeRecordDelete<Computed<V>>) {
             _changesState[key]?.cancel();
             _changesState.remove(key);
