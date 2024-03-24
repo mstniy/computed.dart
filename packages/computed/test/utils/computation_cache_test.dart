@@ -172,69 +172,47 @@ void main() {
 
     test('can mock/unmock', () async {
       final cache = ComputationCache<int, int>();
-      // Mock a key without a leader
-      cache.mock(0, () => 1);
+      var lCnt1 = 0;
+      int? lastRes1;
+      final c1 = cache.wrap(1, () => 1);
+      final sub = c1.listen((value) {
+        lCnt1++;
+        lastRes1 = value;
+      }, (e) => fail(e.toString()));
+      await Future.value();
+      expect(lCnt1, 1);
+      expect(lastRes1, 1);
+      // Mock the computations
+      cache.mock((key) => key + 1);
+      // Keys with leader are mocked
+      expect(lCnt1, 2);
+      expect(lastRes1, 2);
+      // Keys without leaders must also be mocked
       final c = cache.wrap(0, () => 0);
       var lCnt = 0;
       int? lastRes;
-      var sub = c.listen((event) {
+      var sub0 = c.listen((event) {
         lCnt++;
         lastRes = event;
       }, (e) => fail(e.toString()));
       await Future.value();
       expect(lCnt, 1);
       expect(lastRes, 1); // And not 0
-      // Mock a key with a leader
-      cache.mock(0, () => 2);
+      sub0.cancel(); // Key 0 loses its leader
+      // Unmock the computations
+      cache.unmock();
+      // Must unmock keys with existing leaders
+      expect(lCnt1, 3);
+      expect(lastRes1, 1);
+      // Must unmock keys without existing leaders
+      sub0 = c.listen((event) {
+        lCnt++;
+        lastRes = event;
+      }, (e) => fail(e.toString()));
+      await Future.value();
       expect(lCnt, 2);
-      expect(lastRes, 2);
-      // Unmock a key with a leader
-      cache.unmock(0);
-      expect(lCnt, 3);
       expect(lastRes, 0);
-      sub.cancel(); // Key 0 loses its leader -> no active listeners
-      // Mock it again
-      cache.mock(0, () => 1);
-      // Unmock a key without a leader
-      cache.unmock(0);
-      sub = c.listen((event) {
-        lCnt++;
-        lastRes = event;
-      }, (e) => fail(e.toString()));
-      await Future.value();
-      expect(lCnt, 4);
-      expect(lastRes, 0); // Not mocked
-    });
 
-    test('can fix keys', () async {
-      final cache = ComputationCache<int, int>();
-      final c = cache.wrap(0, () => 0);
-      cache.fix(0, 1);
-      var lCnt = 0;
-      int? lastRes;
-      final sub = c.listen((event) {
-        lCnt++;
-        lastRes = event;
-      }, (e) => fail(e.toString()));
-      await Future.value();
-      expect(lCnt, 1);
-      expect(lastRes, 1); // And not 0
-      sub.cancel();
-    });
-
-    test('can fixThrow keys', () async {
-      final cache = ComputationCache<int, int>();
-      final c = cache.wrap(0, () => 0);
-      cache.fixThrow(0, 1);
-      var lCnt = 0;
-      int? lastRes;
-      final sub = c.listen((event) => fail('should produce an error'), (e) {
-        lCnt++;
-        lastRes = e;
-      });
-      await Future.value();
-      expect(lCnt, 1);
-      expect(lastRes, 1);
       sub.cancel();
     });
   });
