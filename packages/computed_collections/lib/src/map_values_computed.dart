@@ -1,10 +1,8 @@
-import 'dart:async';
-
 import 'package:computed/computed.dart';
 import 'package:computed/utils/computation_cache.dart';
-import 'package:computed/utils/streams.dart';
 import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/icomputedmap.dart';
+import 'package:computed_collections/src/utils/merging_change_stream.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import 'computedmap_mixins.dart';
@@ -15,7 +13,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
     implements IComputedMap<K, V> {
   final IComputedMap<K, VParent> _parent;
   final Computed<V> Function(K key, VParent value) _convert;
-  late final ValueStream<ChangeEvent<K, V>> _changes;
+  late final MergingChangeStream<K, V> _changes;
   late final Computed<ChangeEvent<K, V>> _changesComputed;
   var _changesState = <K, ComputedSubscription<V>>{};
   late final Computed<IMap<K, V>> _snapshot;
@@ -45,49 +43,8 @@ class MapValuesComputedComputedMap<K, V, VParent>
       }
     }, assertIdempotent: false);
 
-    ChangeEvent<K, V>? _changesLastAdded;
-    void _changesAddMerge(ChangeEvent<K, V> change) {
-      if (_changesLastAdded == null) {
-        _changesLastAdded = change;
-        scheduleMicrotask(() {
-          _changesLastAdded = null;
-        });
-        _changes.add(change);
-        return;
-      }
-      if (change is ChangeEventReplace<K, V>) {
-        _changesLastAdded = change;
-        _changes.add(change);
-      } else {
-        assert(change is KeyChanges<K, V>);
-        if (_changesLastAdded is KeyChanges<K, V>) {
-          _changesLastAdded = KeyChanges((_changesLastAdded as KeyChanges<K, V>)
-              .changes
-              .addAll((change as KeyChanges<K, V>).changes));
-          _changes.add(_changesLastAdded!);
-        } else {
-          assert(_changesLastAdded is ChangeEventReplace<K, V>);
-          final keyChanges = (change as KeyChanges<K, V>).changes;
-          final keyDeletions =
-              keyChanges.entries.where((e) => e.value is ChangeRecordDelete<K>);
-          _changesLastAdded = ChangeEventReplace(
-              (_changesLastAdded as ChangeEventReplace<K, V>)
-                  .newCollection
-                  .addEntries(keyChanges.entries
-                      .where((e) => e.value is! ChangeRecordDelete<K>)
-                      .map((e) => MapEntry(
-                          e.key, (e.value as ChangeRecordValue<V>).value))));
-          keyDeletions.forEach((e) => _changesLastAdded = ChangeEventReplace(
-              (_changesLastAdded as ChangeEventReplace<K, V>)
-                  .newCollection
-                  .remove(e.key)));
-          _changes.add(_changesLastAdded!);
-        }
-      }
-    }
-
     void _computationListener(K key, V value) {
-      _changesAddMerge(KeyChanges(
+      _changes.add(KeyChanges(
           <K, ChangeRecord<V>>{key: ChangeRecordValue<V>(value)}.lock));
     }
 
@@ -100,7 +57,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
         });
         _changesState.values.forEach((sub) => sub.cancel());
         _changesState = newChangesState;
-        _changesAddMerge(ChangeEventReplace(<K, V>{}.lock));
+        _changes.add(ChangeEventReplace(<K, V>{}.lock));
       } else if (computedChanges is KeyChanges<K, Computed<V>>) {
         for (var e in computedChanges.changes.entries) {
           final key = e.key;
@@ -113,12 +70,12 @@ class MapValuesComputedComputedMap<K, V, VParent>
             // Emit a deletion event, as the key won't have a value until the next microtask
             // Note that if the new computation has a value already, this will be overwritten
             // by [_computationListener].
-            _changesAddMerge(KeyChanges(
+            _changes.add(KeyChanges(
                 <K, ChangeRecord<V>>{key: ChangeRecordDelete<V>()}.lock));
           } else if (change is ChangeRecordDelete<Computed<V>>) {
             _changesState[key]?.cancel();
             _changesState.remove(key);
-            _changesAddMerge(KeyChanges(
+            _changes.add(KeyChanges(
                 <K, ChangeRecord<V>>{key: ChangeRecordDelete<V>()}.lock));
           }
         }
@@ -127,7 +84,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
 
     ComputedSubscription<ChangeEvent<K, Computed<V>>>?
         _computedChangesSubscription;
-    _changes = ValueStream(onListen: () {
+    _changes = MergingChangeStream(onListen: () {
       assert(_computedChangesSubscription == null);
       _computedChangesSubscription =
           _computedChanges.listen(_computedChangesListener, _changes.addError);
