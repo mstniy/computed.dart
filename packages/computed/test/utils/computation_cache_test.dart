@@ -169,5 +169,73 @@ void main() {
       sub3.cancel();
       sub4.cancel();
     });
+
+    test('can mock/unmock', () async {
+      final cache = ComputationCache<int, int>();
+      // Mock a key without a leader
+      cache.mock(0, () => 1);
+      final c = cache.wrap(0, () => 0);
+      var lCnt = 0;
+      int? lastRes;
+      var sub = c.listen((event) {
+        lCnt++;
+        lastRes = event;
+      }, (e) => fail(e.toString()));
+      await Future.value();
+      expect(lCnt, 1);
+      expect(lastRes, 1); // And not 0
+      // Mock a key with a leader
+      cache.mock(0, () => 2);
+      expect(lCnt, 2);
+      expect(lastRes, 2);
+      // Unmock a key with a leader
+      cache.unmock(0);
+      expect(lCnt, 3);
+      expect(lastRes, 0);
+      sub.cancel(); // Key 0 loses its leader -> no active listeners
+      // Mock it again
+      cache.mock(0, () => 1);
+      // Unmock a key without a leader
+      cache.unmock(0);
+      sub = c.listen((event) {
+        lCnt++;
+        lastRes = event;
+      }, (e) => fail(e.toString()));
+      await Future.value();
+      expect(lCnt, 4);
+      expect(lastRes, 0); // Not mocked
+    });
+
+    test('can fix keys', () async {
+      final cache = ComputationCache<int, int>();
+      final c = cache.wrap(0, () => 0);
+      cache.fix(0, 1);
+      var lCnt = 0;
+      int? lastRes;
+      final sub = c.listen((event) {
+        lCnt++;
+        lastRes = event;
+      }, (e) => fail(e.toString()));
+      await Future.value();
+      expect(lCnt, 1);
+      expect(lastRes, 1); // And not 0
+      sub.cancel();
+    });
+
+    test('can fixThrow keys', () async {
+      final cache = ComputationCache<int, int>();
+      final c = cache.wrap(0, () => 0);
+      cache.fixThrow(0, 1);
+      var lCnt = 0;
+      int? lastRes;
+      final sub = c.listen((event) => fail('should produce an error'), (e) {
+        lCnt++;
+        lastRes = e;
+      });
+      await Future.value();
+      expect(lCnt, 1);
+      expect(lastRes, 1);
+      sub.cancel();
+    });
   });
 }
