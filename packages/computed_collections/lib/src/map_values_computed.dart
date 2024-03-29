@@ -163,7 +163,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
   }
 
   @override
-  void mock(IMap<K, V> Function() mock) {
+  void mock(IComputedMap<K, V> mock) {
     // TODO: implement mock
   }
 

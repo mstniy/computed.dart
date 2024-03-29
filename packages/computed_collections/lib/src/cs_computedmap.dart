@@ -113,9 +113,9 @@ class ChangeStreamComputedMap<K, V>
 
   @visibleForTesting
   // ignore: invalid_use_of_visible_for_testing_member
-  void mock(IMap<K, V> Function() mock) => _c.mock(() {
+  void mock(IComputedMap<K, V> mock) => _c.mock(() {
         try {
-          final mockRes = mock();
+          final mockRes = mock.snapshot.use;
           _curRes = _ValueOrException.value(mockRes);
         } on NoValueException {
           rethrow; // Propagate

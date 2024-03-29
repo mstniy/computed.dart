@@ -23,7 +23,7 @@ abstract class IComputedMap<K, V> {
   void fixThrow(Object e);
 
   @visibleForTesting
-  void mock(IMap<K, V> Function() mock);
+  void mock(IComputedMap<K, V> mock);
 
   @visibleForTesting
   void unmock();

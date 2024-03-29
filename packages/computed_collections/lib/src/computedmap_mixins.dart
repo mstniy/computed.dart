@@ -1,8 +1,11 @@
 import 'package:computed/computed.dart';
+import 'package:computed/utils/computation_cache.dart';
 import 'package:computed_collections/src/map_values.dart';
 import 'package:computed_collections/src/map_values_computed.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
+import 'package:meta/meta.dart';
 
+import '../change_event.dart';
 import '../icomputedmap.dart';
 import 'add_computedmap.dart';
 
@@ -80,5 +83,93 @@ mixin class ComputedMapMixin<K, V> {
       Computed<V> Function(K key, V value) update) {
     // TODO: implement updateAllComputed
     throw UnimplementedError();
+  }
+}
+
+mixin ComputedMapMockMixin<K, V> {
+  Computed<ChangeEvent<K, V>> get changes;
+  Computed<IMap<K, V>> get snapshot;
+  Computed<int> get length;
+  Computed<bool> get isEmpty;
+  Computed<bool> get isNotEmpty;
+  ComputationCache<K, V?> get keyComputations;
+  ComputationCache<K, bool> get containsKeyComputations;
+  ComputationCache<V, bool> get containsValueComputations;
+
+  @visibleForTesting
+  void fix(IMap<K, V> value) {
+    // TODO: Replace this function body with a mock to a constant computed map on [value] once we implement that
+
+    // ignore: invalid_use_of_visible_for_testing_member
+    changes.fix(ChangeEventReplace(value));
+    // ignore: invalid_use_of_visible_for_testing_member
+    snapshot.fix(value);
+    // ignore: invalid_use_of_visible_for_testing_member
+    keyComputations.mock((key) => value[key]);
+    // ignore: invalid_use_of_visible_for_testing_member
+    containsKeyComputations.mock((key) => value.containsKey(key));
+    // ignore: invalid_use_of_visible_for_testing_member
+    containsValueComputations.mock((v) => value.containsValue(v));
+    // ignore: invalid_use_of_visible_for_testing_member
+    isEmpty.fix(value.isEmpty);
+    // ignore: invalid_use_of_visible_for_testing_member
+    isNotEmpty.fix(value.isNotEmpty);
+    // ignore: invalid_use_of_visible_for_testing_member
+    length.fix(value.length);
+  }
+
+  @visibleForTesting
+  void fixThrow(Object e) {
+    for (var c in [changes, snapshot, isEmpty, isNotEmpty, length]) {
+      // ignore: invalid_use_of_visible_for_testing_member
+      c.fixThrow(e);
+    }
+    for (var cc in [
+      keyComputations,
+      containsKeyComputations,
+      containsValueComputations
+    ]) {
+      // ignore: invalid_use_of_visible_for_testing_member
+      cc.mock((key) => throw e);
+    }
+  }
+
+  @visibleForTesting
+  void mock(IComputedMap<K, V> mock) {
+    // ignore: invalid_use_of_visible_for_testing_member
+    changes.mock(() => mock.changes.use);
+    // ignore: invalid_use_of_visible_for_testing_member
+    snapshot.mock(() => mock.snapshot.use);
+    // ignore: invalid_use_of_visible_for_testing_member
+    keyComputations.mock((key) => mock[key].use);
+    // Note that this pattern (of calling functions that return computations and `use`ing their results)
+    // inside another computation) assumes that they will always return the exact same computation
+    // for long as there is a listener (note that `ComputationCache` satisfies this).
+    // ignore: invalid_use_of_visible_for_testing_member
+    containsKeyComputations.mock((key) => mock.containsKey(key).use);
+    // ignore: invalid_use_of_visible_for_testing_member
+    containsValueComputations.mock((v) => mock.containsValue(v).use);
+    // ignore: invalid_use_of_visible_for_testing_member
+    isEmpty.mock(() => mock.isEmpty.use);
+    // ignore: invalid_use_of_visible_for_testing_member
+    isNotEmpty.mock(() => mock.isNotEmpty.use);
+    // ignore: invalid_use_of_visible_for_testing_member
+    length.mock(() => mock.length.use);
+  }
+
+  @visibleForTesting
+  void unmock() {
+    for (var c in [changes, snapshot, isEmpty, isNotEmpty, length]) {
+      // ignore: invalid_use_of_visible_for_testing_member
+      c.unmock();
+    }
+    for (var cc in [
+      keyComputations,
+      containsKeyComputations,
+      containsValueComputations
+    ]) {
+      // ignore: invalid_use_of_visible_for_testing_member
+      cc.unmock();
+    }
   }
 }

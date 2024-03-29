@@ -1,4 +1,3 @@
-import 'package:computed/computed.dart';
 import 'package:computed/utils/streams.dart';
 import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/icomputedmap.dart';
@@ -331,7 +330,8 @@ void main() {
 
       s2.add({0: 1}.lock);
 
-      m.mock(() => s2.use);
+      m.mock(IComputedMap.fromChangeStream(
+          s2.map((coll) => ChangeEventReplace(coll))));
       expect(callCnt1, 1);
       expect(callCnt2, 1);
       await Future.value(); // Wait for Computed to subscribe to `s2`
@@ -340,9 +340,14 @@ void main() {
       expect(lastRes1, {0: 1}.lock);
       expect(lastRes2, 1);
 
-      m.mock(() => throw 42);
+      m.mock(IComputedMap.fromChangeStream(Stream.error(42)));
       expect(callCnt1, 3);
       expect(callCnt2, 3);
+      expect(lastRes1, {}.lock);
+      expect(lastRes2, null);
+      await Future.value();
+      expect(callCnt1, 4);
+      expect(callCnt2, 4);
       expect(lastExc1, 42);
       expect(lastExc2, 42);
 
