@@ -215,5 +215,31 @@ void main() {
 
       sub.cancel();
     });
+
+    test('(regression) can un- and re-subscribe to a key while mocked',
+        () async {
+      final cache = ComputationCache<int, int>();
+      cache.mock((key) => 0);
+      var lCnt = 0;
+      int? lastRes;
+      final c = cache.wrap(1, () => 1);
+      var sub = c.listen((value) {
+        lCnt++;
+        lastRes = value;
+      }, (e) => fail(e.toString()));
+      await Future.value();
+      expect(lCnt, 1);
+      expect(lastRes, 0);
+      sub.cancel();
+      sub = c.listen((value) {
+        lCnt++;
+        lastRes = value;
+      }, (e) => fail(e.toString()));
+      await Future.value();
+      expect(lCnt, 2);
+      expect(lastRes, 0);
+
+      sub.cancel();
+    });
   });
 }

@@ -38,11 +38,14 @@ class ComputationCache<K, V> {
     void onDisposeFinally() {
       final cachedComputation = _m[key];
       if (identical(cachedComputation, newComputation)) {
-        _m.remove(key);
+        final removed = _m.remove(key);
+        assert(removed != null);
       }
       if (_mock != null) {
         // ignore: invalid_use_of_visible_for_testing_member
         newComputation.unmock();
+        final removed = _mocks.remove(key);
+        assert(removed != null);
       }
     }
 
