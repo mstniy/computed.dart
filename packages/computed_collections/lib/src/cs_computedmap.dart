@@ -25,7 +25,7 @@ class _ValueOrException<T> {
 }
 
 class ChangeStreamComputedMap<K, V>
-    with ComputedMapMixin<K, V>
+    with OperatorsMixin<K, V>
     implements IComputedMap<K, V> {
   final IMap<K, V> Function()? _initialValueComputer;
   final Stream<ChangeEvent<K, V>> _stream;

@@ -9,7 +9,7 @@ import '../change_event.dart';
 import '../icomputedmap.dart';
 import 'add_computedmap.dart';
 
-mixin class ComputedMapMixin<K, V> {
+mixin class OperatorsMixin<K, V> {
   IComputedMap<K, V> add(K key, V value) =>
       AddComputedMap(this as IComputedMap<K, V>, key, value);
 
@@ -86,7 +86,7 @@ mixin class ComputedMapMixin<K, V> {
   }
 }
 
-mixin ComputedMapMockMixin<K, V> {
+mixin MockMixin<K, V> {
   Computed<ChangeEvent<K, V>> get changes;
   Computed<IMap<K, V>> get snapshot;
   Computed<int> get length;

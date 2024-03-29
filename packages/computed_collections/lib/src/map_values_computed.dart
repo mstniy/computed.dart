@@ -9,7 +9,7 @@ import 'computedmap_mixins.dart';
 import 'cs_computedmap.dart';
 
 class MapValuesComputedComputedMap<K, V, VParent>
-    with ComputedMapMixin<K, V>
+    with OperatorsMixin<K, V>
     implements IComputedMap<K, V> {
   final IComputedMap<K, VParent> _parent;
   final Computed<V> Function(K key, VParent value) _convert;

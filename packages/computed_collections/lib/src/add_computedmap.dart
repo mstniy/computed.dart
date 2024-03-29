@@ -7,7 +7,7 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'computedmap_mixins.dart';
 
 class AddComputedMap<K, V>
-    with ComputedMapMixin<K, V>, ComputedMapMockMixin<K, V>
+    with OperatorsMixin<K, V>, MockMixin<K, V>
     implements IComputedMap<K, V> {
   K _key;
   V _value;
