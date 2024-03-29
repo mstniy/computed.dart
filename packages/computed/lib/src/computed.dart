@@ -348,16 +348,24 @@ class ComputedImpl<T> {
 
   void mock(T Function() mock) {
     _f = mock;
-    GlobalCtx._currentUpdate = _Token();
-    _rerunGraph();
+    if (_listeners.isNotEmpty ||
+        _nonMemoizedDownstreamComputations.isNotEmpty ||
+        _memoizedDownstreamComputations.isNotEmpty) {
+      GlobalCtx._currentUpdate = _Token();
+      _rerunGraph();
+    }
   }
 
   void unmock() {
     if (identical(_f, _origF)) return; // Already not mocked
     _f = _origF;
     _lastResult = null; // Invalid
-    GlobalCtx._currentUpdate = _Token();
-    _rerunGraph();
+    if (_listeners.isNotEmpty ||
+        _nonMemoizedDownstreamComputations.isNotEmpty ||
+        _memoizedDownstreamComputations.isNotEmpty) {
+      GlobalCtx._currentUpdate = _Token();
+      _rerunGraph();
+    }
   }
 
   // This is public so that it can be customized by subclasses

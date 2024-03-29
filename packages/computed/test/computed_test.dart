@@ -1775,6 +1775,16 @@ void main() {
       sub.cancel();
     });
 
+    test(
+        '(regression) calling mock and unmock on an unused computation does not run it',
+        () {
+      var cCnt = 0;
+      final c = $(() => cCnt++);
+      c.mock(() => cCnt++);
+      c.unmock();
+      expect(cCnt, 0);
+    });
+
     test('fixThrow works', () async {
       final c1 = Computed(() {
         return 0;
