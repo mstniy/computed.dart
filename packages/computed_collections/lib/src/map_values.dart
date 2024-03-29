@@ -8,16 +8,27 @@ import 'computedmap_mixins.dart';
 import 'cs_computedmap.dart';
 
 class MapValuesComputedMap<K, V, VParent>
-    with OperatorsMixin<K, V>
+    with OperatorsMixin<K, V>, MockMixin<K, V>
     implements IComputedMap<K, V> {
   final IComputedMap<K, VParent> _parent;
   final V Function(K key, VParent value) _convert;
-  late final Computed<ChangeEvent<K, V>> _changes;
-  late final Computed<IMap<K, V>> _snapshot;
-  final _keyComputationCache = ComputationCache<K, V?>();
+  final Computed<bool> isEmpty;
+  final Computed<int> length;
+  late final Computed<ChangeEvent<K, V>> changes;
+  late final Computed<IMap<K, V>> snapshot;
 
-  MapValuesComputedMap(this._parent, this._convert) {
-    _changes = Computed(() {
+  @override
+  Computed<bool> get isNotEmpty => _parent.isNotEmpty;
+  final keyComputations = ComputationCache<K, V?>();
+  final containsKeyComputations = ComputationCache<K, bool>();
+  final containsValueComputations = ComputationCache<V, bool>();
+
+  MapValuesComputedMap(this._parent, this._convert)
+      // We wrap the parent's attributes into new computations
+      // so that they are independently mockable
+      : isEmpty = $(() => _parent.isEmpty.use),
+        length = $(() => _parent.length.use) {
+    changes = Computed(() {
       // TODO: make this a stream map instead? does it have laziness?
       final change = _parent.changes.use;
       return switch (change) {
@@ -38,33 +49,19 @@ class MapValuesComputedMap<K, V, VParent>
     });
     // TODO: asStream introduces a lag of one microtask here
     //  Can we change it to make the api more uniform?
-    _snapshot = ChangeStreamComputedMap(
-            _changes.asStream,
+    snapshot = ChangeStreamComputedMap(
+            changes.asStream,
             () => _parent.snapshot.use
                 .map(((key, value) => MapEntry(key, _convert(key, value)))))
         .snapshot;
   }
 
   @override
-  Computed<ChangeEvent<K, V>> get changes => _changes;
+  Computed<bool> containsKey(K key) =>
+      containsKeyComputations.wrap(key, () => _parent.containsKey(key).use);
 
   @override
-  Computed<bool> containsKey(K key) => _parent.containsKey(key);
-
-  @override
-  Computed<bool> get isEmpty => _parent.isEmpty;
-
-  @override
-  Computed<bool> get isNotEmpty => _parent.isNotEmpty;
-
-  @override
-  Computed<int> get length => _parent.length;
-
-  @override
-  Computed<IMap<K, V>> get snapshot => _snapshot;
-
-  @override
-  Computed<V?> operator [](K key) => _keyComputationCache.wrap(key, () {
+  Computed<V?> operator [](K key) => keyComputations.wrap(key, () {
         if (_parent.containsKey(key).use) {
           return _convert(key, _parent[key].use as VParent);
         }
@@ -72,28 +69,6 @@ class MapValuesComputedMap<K, V, VParent>
       });
 
   @override
-  Computed<bool> containsValue(V value) {
-    // TODO: implement containsValue
-    throw UnimplementedError();
-  }
-
-  @override
-  void fix(IMap<K, V> value) {
-    // TODO: implement fix
-  }
-
-  @override
-  void fixThrow(Object e) {
-    // TODO: implement fixThrow
-  }
-
-  @override
-  void mock(IComputedMap<K, V> mock) {
-    // TODO: implement mock
-  }
-
-  @override
-  void unmock() {
-    // TODO: implement unmock
-  }
+  Computed<bool> containsValue(V value) => containsValueComputations.wrap(
+      value, () => snapshot.use.containsValue(value));
 }
