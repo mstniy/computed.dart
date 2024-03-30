@@ -1,26 +1,59 @@
+import 'dart:math';
+
 import 'package:computed/computed.dart';
+import 'package:computed/utils/streams.dart';
 import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/icomputedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:test/test.dart';
 
-Future<void> expectValue<T>(Computed<T> c, T value) async {
-  var flag = false;
+Future<List<T>> getValues<T>(Computed<T> c) async {
+  final values = <T>[];
   final sub = c.listen((event) {
-    expect(flag, false);
-    expect(event, value);
-    flag = true;
+    values.add(event);
   }, null);
-  await Future.value();
-  expect(flag, true);
   for (var i = 0; i < 5; i++) {
-    // Wait for several microtasks to make sure the value does not change
+    // Wait for several microtasks to make sure the value assumes its value
     await Future.value();
   }
   sub.cancel();
+
+  return values;
 }
 
-Future<void> testFixUnmock(IComputedMap<int, int> map) async {
+Future<T> getValue<T>(Computed<T> c) async {
+  final values = await getValues(c);
+  expect(values.length, 1);
+  return values.first;
+}
+
+Future<void> testCoherence(
+    IComputedMap<int, int> map, IMap<int, int> expected) async {
+  final nonExistentKey = expected.keys.reduce(max) + 1;
+  final nonExistentValue = expected.values.reduce(max) + 1;
+
+  expect(await getValue(map.snapshot), expected);
+  expect(await getValue(map[nonExistentKey]), null);
+  for (var e in expected.entries) {
+    expect(
+        await getValues(map[e.key]), anyOf(equals([null, e.value]), [e.value]));
+    expect(await getValues(map.containsKey(e.key)),
+        anyOf(equals([false, true]), [true]));
+    expect(await getValues(map.containsValue(e.value)),
+        anyOf(equals([false, true]), [true]));
+  }
+  expect(await getValue(map.containsKey(nonExistentKey)), false);
+
+  expect(await getValue(map.containsValue(nonExistentValue)), false);
+
+  expect(await getValue(map.isEmpty), expected.isEmpty);
+  expect(await getValue(map.isNotEmpty), expected.isNotEmpty);
+  expect(await getValue(map.length), expected.length);
+}
+
+Future<void> testFix(IComputedMap<int, int> map) async {
+  // A randomly chosen "sentinel" key/value pairs
+  // that we assume does not exist in `map`.
   const myKey = 58930586;
   const myValue = 1039572;
   const nonExistentKey = 0;
@@ -53,48 +86,76 @@ Future<void> testFixUnmock(IComputedMap<int, int> map) async {
   final isNotEmpty2 = map.isNotEmpty;
   final length2 = map.length;
 
-  await expectValue(changes1, ChangeEventReplace(myMap));
-  await expectValue(changes2, ChangeEventReplace(myMap));
+  expect(await getValue(changes1), ChangeEventReplace(myMap));
+  expect(await getValue(changes2), ChangeEventReplace(myMap));
 
-  await expectValue(snapshot1, myMap);
-  await expectValue(snapshot2, myMap);
+  expect(await getValue(snapshot1), myMap);
+  expect(await getValue(snapshot2), myMap);
 
-  await expectValue(key1_1, null);
-  await expectValue(key1_2, null);
+  expect(await getValue(key1_1), null);
+  expect(await getValue(key1_2), null);
 
-  await expectValue(key2_1, myValue);
-  await expectValue(key2_2, myValue);
+  expect(await getValue(key2_1), myValue);
+  expect(await getValue(key2_2), myValue);
 
-  await expectValue(containsKey1_1, false);
-  await expectValue(containsKey1_2, false);
+  expect(await getValue(containsKey1_1), false);
+  expect(await getValue(containsKey1_2), false);
 
-  await expectValue(containsKey2_1, true);
-  await expectValue(containsKey2_2, true);
+  expect(await getValue(containsKey2_1), true);
+  expect(await getValue(containsKey2_2), true);
 
-  await expectValue(containsValue1_1, false);
-  await expectValue(containsValue1_2, false);
+  expect(await getValue(containsValue1_1), false);
+  expect(await getValue(containsValue1_2), false);
 
-  await expectValue(containsValue2_1, true);
-  await expectValue(containsValue2_2, true);
+  expect(await getValue(containsValue2_1), true);
+  expect(await getValue(containsValue2_2), true);
 
-  await expectValue(isEmpty1, false);
-  await expectValue(isEmpty2, false);
+  expect(await getValue(isEmpty1), false);
+  expect(await getValue(isEmpty2), false);
 
-  await expectValue(isNotEmpty1, true);
-  await expectValue(isNotEmpty2, true);
+  expect(await getValue(isNotEmpty1), true);
+  expect(await getValue(isNotEmpty2), true);
 
-  await expectValue(length1, 1);
-  await expectValue(length2, 1);
+  expect(await getValue(length1), 1);
+  expect(await getValue(length2), 1);
 
-  // TODO: mock to an empty map
+  // Mock to an empty map
+  map.fix(<int, int>{}.lock);
 
-  // TODO: remember the original values, unmock, make sure it turns back
+  expect(await getValue(changes1), ChangeEventReplace({}.lock));
+  expect(await getValue(snapshot1), {}.lock);
+  expect(await getValue(key1_1), null);
+  expect(await getValue(key2_1), null);
+  expect(await getValue(containsKey1_1), false);
+  expect(await getValue(containsKey2_1), false);
+  expect(await getValue(containsValue1_1), false);
+  expect(await getValue(containsValue2_1), false);
+  expect(await getValue(isEmpty1), true);
+  expect(await getValue(isNotEmpty1), false);
+  expect(await getValue(length1), 0);
+
+  map.unmock();
+
+  // The sentinel key/values should disappear
+
+  expect(await getValue(key2_1), null);
+  expect(await getValue(key2_2), null);
+
+  expect(await getValue(containsKey2_1), false);
+  expect(await getValue(containsKey2_2), false);
+
+  expect(await getValue(containsValue2_1), false);
+  expect(await getValue(containsValue2_2), false);
 }
 
 void main() {
   test('add', () async {
-    final m = IComputedMap.fromChangeStream(
-        Stream.value(ChangeEventReplace({0: 1}.lock)));
-    await testFixUnmock(m.add(1, 2));
+    // We use a `ValueStream` here instead of a raw `StreamController`
+    // so that the maps can re-subscribe to it
+    final cs = ValueStream.seeded(ChangeEventReplace({0: 1}.lock));
+    final m = IComputedMap.fromChangeStream(cs);
+    final a = m.add(1, 2);
+    await testFix(a);
+    await testCoherence(a, {0: 1, 1: 2}.lock);
   });
 }
