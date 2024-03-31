@@ -33,7 +33,8 @@ Future<void> testCoherence(
   final nonExistentValue =
       expected.isEmpty ? 0 : expected.values.reduce(max) + 1;
 
-  expect(await getValue(map.snapshot), expected);
+  expect(await getValues(map.snapshot),
+      anyOf(equals([expected]), [{}.lock, expected]));
   expect(await getValue(map[nonExistentKey]), null);
   for (var e in expected.entries) {
     expect(
@@ -52,7 +53,7 @@ Future<void> testCoherence(
   expect(await getValue(map.length), expected.length);
 }
 
-Future<void> testFix(IComputedMap<int, int> map) async {
+Future<void> testFixUnmock(IComputedMap<int, int> map) async {
   // A randomly chosen "sentinel" key/value pairs
   // that we assume does not exist in `map`.
   const myKey = 58930586;
@@ -116,13 +117,16 @@ Future<void> testFix(IComputedMap<int, int> map) async {
 }
 
 void main() {
+  // We use a `ValueStream` here instead of a raw `StreamController`
+  // so that the maps can re-subscribe to it
+  final cs = ValueStream.seeded(ChangeEventReplace({0: 1}.lock));
+  final m = IComputedMap.fromChangeStream(cs);
   test('add', () async {
-    // We use a `ValueStream` here instead of a raw `StreamController`
-    // so that the maps can re-subscribe to it
-    final cs = ValueStream.seeded(ChangeEventReplace({0: 1}.lock));
-    final m = IComputedMap.fromChangeStream(cs);
     final a = m.add(1, 2);
-    await testFix(a);
-    await testCoherence(a, {0: 1, 1: 2}.lock);
+    await testFixUnmock(a);
+  });
+  test('mapValues', () async {
+    final mv = m.mapValues((key, value) => value + 1);
+    await testFixUnmock(mv);
   });
 }

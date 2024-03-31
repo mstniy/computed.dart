@@ -13,12 +13,11 @@ class MapValuesComputedMap<K, V, VParent>
   final IComputedMap<K, VParent> _parent;
   final V Function(K key, VParent value) _convert;
   final Computed<bool> isEmpty;
+  final Computed<bool> isNotEmpty;
   final Computed<int> length;
   late final Computed<ChangeEvent<K, V>> changes;
   late final Computed<IMap<K, V>> snapshot;
 
-  @override
-  Computed<bool> get isNotEmpty => _parent.isNotEmpty;
   final keyComputations = ComputationCache<K, V?>();
   final containsKeyComputations = ComputationCache<K, bool>();
   final containsValueComputations = ComputationCache<V, bool>();
@@ -27,6 +26,7 @@ class MapValuesComputedMap<K, V, VParent>
       // We wrap the parent's attributes into new computations
       // so that they are independently mockable
       : isEmpty = $(() => _parent.isEmpty.use),
+        isNotEmpty = $(() => _parent.isNotEmpty.use),
         length = $(() => _parent.length.use) {
     changes = Computed(() {
       // TODO: make this a stream map instead? does it have laziness?
@@ -50,7 +50,7 @@ class MapValuesComputedMap<K, V, VParent>
     // TODO: asStream introduces a lag of one microtask here
     //  Can we change it to make the api more uniform?
     snapshot = ChangeStreamComputedMap(
-            changes.asStream,
+            changes.asBroadcastStream,
             () => _parent.snapshot.use
                 .map(((key, value) => MapEntry(key, _convert(key, value)))))
         .snapshot;
