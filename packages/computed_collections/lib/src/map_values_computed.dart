@@ -4,20 +4,46 @@ import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/icomputedmap.dart';
 import 'package:computed_collections/src/utils/merging_change_stream.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
+import 'package:meta/meta.dart';
 
 import 'computedmap_mixins.dart';
 import 'cs_computedmap.dart';
 
+@immutable
+class _Option<T> {
+  final bool _is;
+  final T? _value;
+
+  _Option.some(this._value) : _is = true;
+  _Option.none()
+      : _is = false,
+        _value = null;
+
+  bool operator ==(Object other) =>
+      other is _Option &&
+      ((_is && other._is && _value == other._value) || (!_is && !other._is));
+
+  @override
+  String toString() => _is ? '_Option.some($_value)' : '_Option.none()';
+}
+
 class MapValuesComputedComputedMap<K, V, VParent>
-    with OperatorsMixin<K, V>
+    with OperatorsMixin<K, V>, MockMixin<K, V>
     implements IComputedMap<K, V> {
   final IComputedMap<K, VParent> _parent;
   final Computed<V> Function(K key, VParent value) _convert;
+  late final Computed<bool> isEmpty;
+  late final Computed<bool> isNotEmpty;
+  late final Computed<int> length;
   late final MergingChangeStream<K, V> _changes;
   late final Computed<ChangeEvent<K, V>> _changesComputed;
   var _changesState = <K, ComputedSubscription<V>>{};
-  late final Computed<IMap<K, V>> _snapshot;
-  final _keyComputationCache = ComputationCache<K, V?>();
+  late final Computed<IMap<K, V>> snapshot;
+
+  final keyComputations = ComputationCache<K, V?>();
+  final keyComputationsMaybeNVE = ComputationCache<K, _Option<V>>();
+  final containsKeyComputations = ComputationCache<K, bool>();
+  final containsValueComputations = ComputationCache<V, bool>();
 
   MapValuesComputedComputedMap(this._parent, this._convert) {
     final _computedChanges = Computed(() {
@@ -88,9 +114,10 @@ class MapValuesComputedComputedMap<K, V, VParent>
       _changesState.values.forEach((sub) => sub.cancel());
       _changesState.clear();
       _computedChangesSubscription!.cancel();
+      _computedChangesSubscription = null;
     });
     _changesComputed = $(() => _changes.use);
-    _snapshot = ChangeStreamComputedMap(_changes, () {
+    snapshot = ChangeStreamComputedMap(_changes, () {
       final entries = _parent.snapshot.use
           .map(((key, value) => MapEntry(key, _convert(key, value))));
       var gotNVE = false;
@@ -107,38 +134,50 @@ class MapValuesComputedComputedMap<K, V, VParent>
       if (gotNVE) throw NoValueException();
       return unwrapped;
     }).snapshot;
+
+    // To know the length of the collection we do indeed need to compute the values for all the keys
+    // as just because a key exists on the parent does not mean it also exists in us
+    // because the corresponding computation might not have a value yet
+    length = $(() => snapshot.use.length);
+
+    // TODO: We can be slightly smarter about this by not evaluating any computation as soon as
+    //  one of them gains a value. Cannot think of an easy way to implement this, though.
+    isEmpty = $(() => length.use == 0);
+    isNotEmpty = $(() => length.use > 0);
   }
 
   @override
   Computed<ChangeEvent<K, V>> get changes => _changesComputed;
 
-  @override
-  Computed<bool> containsKey(K key) => _parent.containsKey(key);
-
-  @override
-  Computed<bool> get isEmpty => _parent.isEmpty;
-
-  @override
-  Computed<bool> get isNotEmpty => _parent.isNotEmpty;
-
-  @override
-  Computed<int> get length => _parent.length;
-
-  @override
-  Computed<IMap<K, V>> get snapshot => _snapshot;
-
-  @override
-  Computed<V?> operator [](K key) {
+  Computed<_Option<V>> _getKeyComputationMaybeNVE(K key) {
     final computationComputation = Computed(() {
       if (_parent.containsKey(key).use) {
         return _convert(key, _parent[key].use as VParent);
       }
       return null;
     }, assertIdempotent: false);
-    final resultComputation = _keyComputationCache.wrap(key, () {
+    return keyComputationsMaybeNVE.wrap(key, () {
+      final c = computationComputation.use;
+      if (c == null) {
+        // The key does not exist in the parent
+        return _Option.none();
+      }
+      return _Option.some(c
+          .use); // Note that this will throw an NVE if the mapped computation has no value, hence the name
+    });
+  }
+
+  @override
+  Computed<V?> operator [](K key) {
+    final keyComputationMaybeNVE = _getKeyComputationMaybeNVE(key);
+    final resultComputation = keyComputations.wrap(key, () {
       try {
-        return computationComputation.use?.use;
+        final option = keyComputationMaybeNVE.use;
+        if (!option._is) return null; // The key does not exist in the parent
+        // The key exists in the parent and the mapped computation has a value
+        return option._value;
       } on NoValueException {
+        // The key exists in the parent, but the mapped computation has no value
         return null;
       }
     });
@@ -147,28 +186,24 @@ class MapValuesComputedComputedMap<K, V, VParent>
   }
 
   @override
-  Computed<bool> containsValue(V value) {
-    // TODO: implement containsValue
-    throw UnimplementedError();
+  Computed<bool> containsKey(K key) {
+    final keyComputationMaybeNVE = _getKeyComputationMaybeNVE(key);
+    final resultComputation = containsKeyComputations.wrap(key, () {
+      try {
+        final option = keyComputationMaybeNVE.use;
+        if (!option._is) return false; // The key does not exist in the parent
+        // The key exists in the parent and the mapped computation has a value
+        return true;
+      } on NoValueException {
+        // The key exists in the parent, but the mapped computation has no value
+        return false;
+      }
+    });
+
+    return resultComputation;
   }
 
   @override
-  void fix(IMap<K, V> value) {
-    // TODO: implement fix
-  }
-
-  @override
-  void fixThrow(Object e) {
-    // TODO: implement fixThrow
-  }
-
-  @override
-  void mock(IComputedMap<K, V> mock) {
-    // TODO: implement mock
-  }
-
-  @override
-  void unmock() {
-    // TODO: implement unmock
-  }
+  Computed<bool> containsValue(V value) => containsValueComputations.wrap(
+      value, () => snapshot.use.containsValue(value));
 }

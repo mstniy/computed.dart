@@ -48,9 +48,12 @@ Future<void> testCoherence(
 
   expect(await getValue(map.containsValue(nonExistentValue)), false);
 
-  expect(await getValue(map.isEmpty), expected.isEmpty);
-  expect(await getValue(map.isNotEmpty), expected.isNotEmpty);
-  expect(await getValue(map.length), expected.length);
+  expect(await getValues(map.isEmpty),
+      anyOf(equals([true, expected.isEmpty]), [expected.isEmpty]));
+  expect(await getValues(map.isNotEmpty),
+      anyOf(equals([false, expected.isNotEmpty]), [expected.isNotEmpty]));
+  expect(await getValues(map.length),
+      anyOf(equals([0, expected.length]), [expected.length]));
 }
 
 Future<void> testFixUnmock(IComputedMap<int, int> map) async {
@@ -127,6 +130,10 @@ void main() {
   });
   test('mapValues', () async {
     final mv = m.mapValues((key, value) => value + 1);
+    await testFixUnmock(mv);
+  });
+  test('mapValuesComputed', () async {
+    final mv = m.mapValuesComputed((key, value) => $(() => value + 1));
     await testFixUnmock(mv);
   });
 }
