@@ -150,12 +150,17 @@ class MapValuesComputedComputedMap<K, V, VParent>
   Computed<ChangeEvent<K, V>> get changes => _changesComputed;
 
   Computed<_Option<V>> _getKeyComputationMaybeNVE(K key) {
+    // This logic is extracted to a separate cache so that the mapped computations'
+    // results are shared between `operator[]` and `containsKey`.
     final computationComputation = Computed(() {
       if (_parent.containsKey(key).use) {
         return _convert(key, _parent[key].use as VParent);
       }
       return null;
     }, assertIdempotent: false);
+    // We could mock this cache also, but it would be extra code for likely little gain.
+    // So `operator[]` and `containsKey` further wraps it to separate caches and let
+    // the [MockMixin] handle it.
     return keyComputationsMaybeNVE.wrap(key, () {
       final c = computationComputation.use;
       if (c == null) {
