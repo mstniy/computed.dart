@@ -59,6 +59,41 @@ void main() {
       sub.cancel();
     });
 
+    test('(regression) .use gracefully handles sync exceptions while listening',
+        () async {
+      final s = StreamController<int>();
+      final stream = s.stream;
+      stream.listen((event) {}).cancel(); // The stream is not usable anymore
+      final c = $(() => stream.use);
+      var cnt = 0;
+
+      void valueListener(int event) => fail('must not produce a value');
+      void errorListener(Object e) {
+        expect(e, isA<StateError>());
+        expect(
+            (e as StateError).message, 'Stream has already been listened to.');
+        cnt++;
+      }
+
+      var sub = c.listen(valueListener, errorListener);
+      expect(cnt, 0);
+      await Future.value();
+      expect(cnt, 1);
+
+      sub.cancel();
+
+      await Future.value();
+      expect(cnt, 1); // Must not be called again
+
+      sub = c.listen(valueListener, errorListener);
+
+      expect(cnt, 1);
+      await Future.value();
+      expect(cnt, 2);
+
+      sub.cancel();
+    });
+
     test('useOr works', () async {
       final controller = StreamController<int>.broadcast(
           sync: true); // Use a broadcast stream to make debugging easier
@@ -1464,6 +1499,41 @@ void main() {
 
       sub.cancel();
     });
+  });
+
+  test(
+      '(regression) gracefully handles sync exceptions while listening to data sources',
+      () async {
+    final s = StreamController();
+    final stream = s.stream;
+    stream.listen((event) {}).cancel(); // The stream is not usable anymore
+    final c = $(() => stream.react((p0) {}));
+    var cnt = 0;
+
+    void valueListener(void event) => fail('must not produce a value');
+    void errorListener(Object e) {
+      expect(e, isA<StateError>());
+      expect((e as StateError).message, 'Stream has already been listened to.');
+      cnt++;
+    }
+
+    var sub = c.listen(valueListener, errorListener);
+    expect(cnt, 0);
+    await Future.value();
+    expect(cnt, 1);
+
+    sub.cancel();
+
+    await Future.value();
+    expect(cnt, 1); // Must not be called again
+
+    sub = c.listen(valueListener, errorListener);
+
+    expect(cnt, 1);
+    await Future.value();
+    expect(cnt, 2);
+
+    sub.cancel();
   });
 
   test('asserts on detected side effects', () async {

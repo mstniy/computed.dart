@@ -108,7 +108,6 @@ class GlobalCtx {
           currentValue != null
               ? _ValueOrException.value(currentValue())
               : null);
-      GlobalCtx._routerExpando[dataSource] = rvoe;
       // Run the subscriber outside the sync zone
       final zone = Zone.current[_isComputedZone] == true
           ? Zone.current.parent!
@@ -117,6 +116,7 @@ class GlobalCtx {
 
       rvoe._router._dss ??= _DataSourceAndSubscription<T>(dataSource,
           currentValue != null ? GlobalCtx._currentUpdate : null, sub);
+      GlobalCtx._routerExpando[dataSource] = rvoe;
       if (currentValue != null) rvoe._router._evalF();
     }
 
