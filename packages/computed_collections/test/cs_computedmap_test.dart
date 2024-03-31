@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:computed/utils/streams.dart';
 import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/icomputedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:test/test.dart';
+
+import 'helpers.dart';
 
 void main() {
   test('snapshot works', () async {
@@ -212,6 +216,29 @@ void main() {
     expect(lastRes, KeyChanges({0: ChangeRecordValue(1)}.lock));
 
     sub.cancel();
+  });
+
+  test('disposes of the old value upon cancellation', () async {
+    final s = StreamController<ChangeEvent<int, int>>.broadcast(sync: true);
+    final stream = s.stream;
+    final m = IComputedMap.fromChangeStream(stream);
+    var lCnt = 0;
+    int? lastRes;
+    var sub = m[0].listen((event) {
+      lCnt++;
+      lastRes = event;
+    }, null);
+    await Future.value();
+    expect(lCnt, 1);
+    expect(lastRes, null);
+
+    s.add(ChangeEventReplace({0: 1}.lock));
+    expect(lCnt, 2);
+    expect(lastRes, 1);
+
+    sub.cancel();
+
+    await testCoherence(m, <int, int>{}.lock);
   });
 
   group('mocks', () {

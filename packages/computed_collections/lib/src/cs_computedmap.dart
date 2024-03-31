@@ -34,8 +34,7 @@ class ChangeStreamComputedMap<K, V>
   // The "keep-alive" subscription used by key streams, as we explicitly break the dependency DAG of Computed.
   ComputedSubscription<IMap<K, V>>? _cSub;
   final _keyValueStreams = <K, Map<ValueStream<V?>, Computed<V?>>>{};
-  _ValueOrException<IMap<K, V>>?
-      _curRes; // TODO: After adding support for disposing computations to Computed, set this to null as the disposer
+  _ValueOrException<IMap<K, V>>? _curRes;
   ChangeStreamComputedMap(this._stream, [this._initialValueComputer]) {
     _changes = $(() => _stream.use);
     final firstReactToken = IMap<K,
@@ -188,7 +187,8 @@ class ChangeStreamComputedMap<K, V>
     // Seed the stream
     if (_curRes != null) {
       if (_curRes!._isValue) {
-        stream.add(_curRes!.value[key]);
+        stream.add(_curRes!
+            .value[key]); // TODO: sync stream might call arbitrary code here
       } else {
         stream.addError(_curRes!._exc!);
       }
