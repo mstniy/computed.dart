@@ -29,8 +29,9 @@ Future<T> getValue<T>(Computed<T> c) async {
 
 Future<void> testCoherence(
     IComputedMap<int, int> map, IMap<int, int> expected) async {
-  final nonExistentKey = expected.keys.reduce(max) + 1;
-  final nonExistentValue = expected.values.reduce(max) + 1;
+  final nonExistentKey = expected.isEmpty ? 0 : expected.keys.reduce(max) + 1;
+  final nonExistentValue =
+      expected.isEmpty ? 0 : expected.values.reduce(max) + 1;
 
   expect(await getValue(map.snapshot), expected);
   expect(await getValue(map[nonExistentKey]), null);
@@ -60,92 +61,58 @@ Future<void> testFix(IComputedMap<int, int> map) async {
   const nonExistentValue = 0;
   final myMap = {myKey: myValue}.lock;
 
-  final changes1 = map.changes;
-  final snapshot1 = map.snapshot;
-  final key1_1 = map[nonExistentKey];
-  final key2_1 = map[myKey];
-  final containsKey1_1 = map.containsKey(nonExistentKey);
-  final containsKey2_1 = map.containsKey(myKey);
-  final containsValue1_1 = map.containsValue(nonExistentValue);
-  final containsValue2_1 = map.containsValue(myValue);
-  final isEmpty1 = map.isEmpty;
-  final isNotEmpty1 = map.isNotEmpty;
-  final length1 = map.length;
+  final original = (await getValues(map.snapshot)).last;
+
+  // Unlike `testCoherence`, these test that computations created before fixing
+  // the map also behave properly
+  final changes = map.changes;
+  final snapshot = map.snapshot;
+  final key1 = map[nonExistentKey];
+  final key2 = map[myKey];
+  final containsKey1 = map.containsKey(nonExistentKey);
+  final containsKey2 = map.containsKey(myKey);
+  final containsValue1 = map.containsValue(nonExistentValue);
+  final containsValue2 = map.containsValue(myValue);
+  final isEmpty = map.isEmpty;
+  final isNotEmpty = map.isNotEmpty;
+  final length = map.length;
 
   map.fix(myMap);
 
-  final changes2 = map.changes;
-  final snapshot2 = map.snapshot;
-  final key1_2 = map[nonExistentKey];
-  final key2_2 = map[myKey];
-  final containsKey1_2 = map.containsKey(nonExistentKey);
-  final containsKey2_2 = map.containsKey(myKey);
-  final containsValue1_2 = map.containsValue(nonExistentValue);
-  final containsValue2_2 = map.containsValue(myValue);
-  final isEmpty2 = map.isEmpty;
-  final isNotEmpty2 = map.isNotEmpty;
-  final length2 = map.length;
+  await testCoherence(map, myMap);
 
-  expect(await getValue(changes1), ChangeEventReplace(myMap));
-  expect(await getValue(changes2), ChangeEventReplace(myMap));
-
-  expect(await getValue(snapshot1), myMap);
-  expect(await getValue(snapshot2), myMap);
-
-  expect(await getValue(key1_1), null);
-  expect(await getValue(key1_2), null);
-
-  expect(await getValue(key2_1), myValue);
-  expect(await getValue(key2_2), myValue);
-
-  expect(await getValue(containsKey1_1), false);
-  expect(await getValue(containsKey1_2), false);
-
-  expect(await getValue(containsKey2_1), true);
-  expect(await getValue(containsKey2_2), true);
-
-  expect(await getValue(containsValue1_1), false);
-  expect(await getValue(containsValue1_2), false);
-
-  expect(await getValue(containsValue2_1), true);
-  expect(await getValue(containsValue2_2), true);
-
-  expect(await getValue(isEmpty1), false);
-  expect(await getValue(isEmpty2), false);
-
-  expect(await getValue(isNotEmpty1), true);
-  expect(await getValue(isNotEmpty2), true);
-
-  expect(await getValue(length1), 1);
-  expect(await getValue(length2), 1);
+  expect(await getValue(changes), ChangeEventReplace(myMap));
+  expect(await getValue(snapshot), myMap);
+  expect(await getValue(key1), null);
+  expect(await getValue(key2), myValue);
+  expect(await getValue(containsKey1), false);
+  expect(await getValue(containsKey2), true);
+  expect(await getValue(containsValue1), false);
+  expect(await getValue(containsValue2), true);
+  expect(await getValue(isEmpty), false);
+  expect(await getValue(isNotEmpty), true);
+  expect(await getValue(length), 1);
 
   // Mock to an empty map
   map.fix(<int, int>{}.lock);
 
-  expect(await getValue(changes1), ChangeEventReplace({}.lock));
-  expect(await getValue(snapshot1), {}.lock);
-  expect(await getValue(key1_1), null);
-  expect(await getValue(key2_1), null);
-  expect(await getValue(containsKey1_1), false);
-  expect(await getValue(containsKey2_1), false);
-  expect(await getValue(containsValue1_1), false);
-  expect(await getValue(containsValue2_1), false);
-  expect(await getValue(isEmpty1), true);
-  expect(await getValue(isNotEmpty1), false);
-  expect(await getValue(length1), 0);
+  await testCoherence(map, <int, int>{}.lock);
+
+  expect(await getValue(changes), ChangeEventReplace({}.lock));
+  expect(await getValue(snapshot), {}.lock);
+  expect(await getValue(key1), null);
+  expect(await getValue(key2), null);
+  expect(await getValue(containsKey1), false);
+  expect(await getValue(containsKey2), false);
+  expect(await getValue(containsValue1), false);
+  expect(await getValue(containsValue2), false);
+  expect(await getValue(isEmpty), true);
+  expect(await getValue(isNotEmpty), false);
+  expect(await getValue(length), 0);
 
   map.unmock();
 
-  // The sentinel key/values should disappear
-
-  expect(await getValue(key2_1), null);
-  expect(await getValue(key2_2), null);
-
-  expect(await getValue(containsKey2_1), false);
-  expect(await getValue(containsKey2_2), false);
-
-  expect(await getValue(containsValue2_1), false);
-  expect(await getValue(containsValue2_2), false);
+  await testCoherence(map, original);
 }
 
 void main() {
