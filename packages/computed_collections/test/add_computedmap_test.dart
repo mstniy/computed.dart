@@ -78,15 +78,20 @@ void main() {
     expect(lastRes1, 1);
 
     s.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
+    await Future.value();
     expect(callCnt1, 1);
 
     s.add(KeyChanges({1: ChangeRecordValue(2)}.lock));
+    await Future.value();
     expect(callCnt1, 1);
     s.add(KeyChanges({1: ChangeRecordValue(3)}.lock));
+    await Future.value();
     expect(callCnt1, 1);
     s.add(KeyChanges({0: ChangeRecordValue(4)}.lock));
+    await Future.value();
     expect(callCnt1, 1);
     s.add(ChangeEventReplace({5: 6}.lock));
+    await Future.value();
     expect(callCnt1, 1);
 
     var callCnt2 = 0;
@@ -102,17 +107,21 @@ void main() {
     expect(lastRes2, null);
 
     s.add(KeyChanges({5: ChangeRecordDelete<int>()}.lock));
+    await Future.value();
     expect(callCnt1, 1);
     expect(callCnt2, 1);
     s.add(KeyChanges({1: ChangeRecordValue(2)}.lock));
+    await Future.value();
     expect(callCnt1, 1);
     expect(callCnt2, 2);
     expect(lastRes2, 2);
     s.add(KeyChanges({1: ChangeRecordValue(3)}.lock));
+    await Future.value();
     expect(callCnt1, 1);
     expect(callCnt2, 3);
     expect(lastRes2, 3);
     s.add(ChangeEventReplace({1: 4}.lock));
+    await Future.value();
     expect(callCnt1, 1);
     expect(callCnt2, 4);
     expect(lastRes2, 4);
@@ -121,6 +130,7 @@ void main() {
     sub2.cancel();
 
     s.add(ChangeEventReplace({0: 3, 1: 5}.lock));
+    await Future.value();
     expect(callCnt1, 1); // The listeners have been cancelled
     expect(callCnt2, 4);
   });

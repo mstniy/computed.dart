@@ -41,7 +41,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
   late final Computed<IMap<K, V>> snapshot;
 
   final keyComputations = ComputationCache<K, V?>();
-  final keyComputationsMaybeNVE = ComputationCache<K, _Option<V>>();
+  final keyOptionComputations = ComputationCache<K, _Option<V>>();
   final containsKeyComputations = ComputationCache<K, bool>();
   final containsValueComputations = ComputationCache<V, bool>();
 
@@ -149,7 +149,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
   @override
   Computed<ChangeEvent<K, V>> get changes => _changesComputed;
 
-  Computed<_Option<V>> _getKeyComputationMaybeNVE(K key) {
+  Computed<_Option<V?>> _getKeyOptionComputation(K key) {
     // This logic is extracted to a separate cache so that the mapped computations'
     // results are shared between `operator[]` and `containsKey`.
     final computationComputation = Computed(() {
@@ -161,30 +161,29 @@ class MapValuesComputedComputedMap<K, V, VParent>
     // We could mock this cache also, but it would be extra code for likely little gain.
     // So `operator[]` and `containsKey` further wraps it to separate caches and let
     // the [MockMixin] handle it.
-    return keyComputationsMaybeNVE.wrap(key, () {
+    return keyOptionComputations.wrap(key, () {
       final c = computationComputation.use;
       if (c == null) {
         // The key does not exist in the parent
         return _Option.none();
       }
-      return _Option.some(c
-          .use); // Note that this will throw an NVE if the mapped computation has no value, hence the name
+      try {
+        return _Option.some(c.use);
+      } on NoValueException {
+        return _Option.none();
+      }
     });
   }
 
   @override
   Computed<V?> operator [](K key) {
-    final keyComputationMaybeNVE = _getKeyComputationMaybeNVE(key);
+    final keyOptionComputation = _getKeyOptionComputation(key);
     final resultComputation = keyComputations.wrap(key, () {
-      try {
-        final option = keyComputationMaybeNVE.use;
-        if (!option._is) return null; // The key does not exist in the parent
-        // The key exists in the parent and the mapped computation has a value
-        return option._value;
-      } on NoValueException {
-        // The key exists in the parent, but the mapped computation has no value
-        return null;
-      }
+      final option = keyOptionComputation.use;
+      if (!option._is)
+        return null; // The key does not exist in the parent or the mapped computations has no value yet
+      // The key exists in the parent and the mapped computation has a value
+      return option._value;
     });
 
     return resultComputation;
@@ -192,17 +191,13 @@ class MapValuesComputedComputedMap<K, V, VParent>
 
   @override
   Computed<bool> containsKey(K key) {
-    final keyComputationMaybeNVE = _getKeyComputationMaybeNVE(key);
+    final keyOptionComputation = _getKeyOptionComputation(key);
     final resultComputation = containsKeyComputations.wrap(key, () {
-      try {
-        final option = keyComputationMaybeNVE.use;
-        if (!option._is) return false; // The key does not exist in the parent
-        // The key exists in the parent and the mapped computation has a value
-        return true;
-      } on NoValueException {
-        // The key exists in the parent, but the mapped computation has no value
-        return false;
-      }
+      final option = keyOptionComputation.use;
+      if (!option._is)
+        return false; // The key does not exist in the parent or the mapped computations has no value yet
+      // The key exists in the parent and the mapped computation has a value
+      return true;
     });
 
     return resultComputation;

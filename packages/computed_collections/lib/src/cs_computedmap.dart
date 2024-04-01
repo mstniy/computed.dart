@@ -81,12 +81,14 @@ class ChangeStreamComputedMap<K, V>
         }
       }, (e) {
         _curRes = _ValueOrException.exc(e);
-        Zone.current.parent!.scheduleMicrotask(_notifyAllKeyStreams);
+        // Escape the Computed zone
+        Zone.current.parent!.run(_notifyAllKeyStreams);
         throw e;
       });
 
       if (notifier != null) {
-        notifier!();
+        // Escape the Computed zone
+        Zone.current.parent!.run(notifier!);
       }
 
       return prev;
@@ -164,31 +166,27 @@ class ChangeStreamComputedMap<K, V>
     // Otherwise, create a new stream-computation pair and subscribe to the user computation
     late final ValueStream<V?> stream;
     final computation = $(() => stream.use);
-    stream = ValueStream<V?>(
-        sync: true, // TODO: Audit the sync stream
-        onListen: () {
-          final streams = _keyValueStreams.putIfAbsent(
-              key, () => <ValueStream<V?>, Computed<V?>>{});
-          streams[stream] = computation;
-          _cSub ??= _c.listen((e) {}, null);
-        },
-        onCancel: () {
-          final streams = _keyValueStreams[key]!;
-          streams.remove(stream);
-          if (streams.isEmpty) {
-            _keyValueStreams.remove(key);
-          }
-          if (_keyValueStreams.isEmpty) {
-            _cSub!.cancel();
-            _cSub = null;
-          }
-        });
+    stream = ValueStream<V?>(onListen: () {
+      final streams = _keyValueStreams.putIfAbsent(
+          key, () => <ValueStream<V?>, Computed<V?>>{});
+      streams[stream] = computation;
+      _cSub ??= _c.listen((e) {}, null);
+    }, onCancel: () {
+      final streams = _keyValueStreams[key]!;
+      streams.remove(stream);
+      if (streams.isEmpty) {
+        _keyValueStreams.remove(key);
+      }
+      if (_keyValueStreams.isEmpty) {
+        _cSub!.cancel();
+        _cSub = null;
+      }
+    });
 
     // Seed the stream
     if (_curRes != null) {
       if (_curRes!._isValue) {
-        stream.add(_curRes!
-            .value[key]); // TODO: sync stream might call arbitrary code here
+        stream.add(_curRes!.value[key]);
       } else {
         stream.addError(_curRes!._exc!);
       }

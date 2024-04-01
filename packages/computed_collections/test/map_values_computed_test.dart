@@ -72,11 +72,13 @@ void main() {
   test('operator[] works', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
     final s2 = ValueStream<int>.seeded(5, sync: true);
+    final s3 = ValueStream<int>(sync: true);
+    var useS2 = true;
     final m1 = IComputedMap.fromChangeStream(s);
     var cCnt = 0;
     final m2 = m1.mapValuesComputed((k, v) => $(() {
           cCnt++;
-          return v + s2.use;
+          return v + (useS2 ? s2.use : s3.use);
         }));
 
     var callCnt1 = 0;
@@ -104,21 +106,28 @@ void main() {
     expect(callCnt1, 2);
     expect(lastRes1, 6);
 
-    s2.add(0);
+    useS2 = false; // Note that s3 has no value at this point
+    s.add(KeyChanges({0: ChangeRecordValue(2)}.lock));
+    await Future.value();
     expect(cCnt, 6);
     expect(callCnt1, 3);
-    expect(lastRes1, 1);
+    expect(lastRes1, null);
+
+    s3.add(0);
+    expect(cCnt, 8);
+    expect(callCnt1, 4);
+    expect(lastRes1, 2);
 
     sub1.cancel();
 
-    s2.add(1);
-    expect(cCnt, 8);
-    expect(callCnt1, 3);
+    s3.add(1);
+    expect(cCnt, 10);
+    expect(callCnt1, 4);
 
     sub2.cancel();
-    s2.add(2);
-    expect(cCnt, 8);
-    expect(callCnt1, 3);
+    s3.add(2);
+    expect(cCnt, 10);
+    expect(callCnt1, 4);
   });
 
   test('propagates the change stream', () async {
