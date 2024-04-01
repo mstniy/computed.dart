@@ -9,15 +9,15 @@ class ConstComputedMap<K, V>
     with OperatorsMixin<K, V>
     implements IComputedMap<K, V> {
   final Computed<IMap<K, V>> snapshot;
-  late final Computed<bool> isEmpty;
-  late final Computed<bool> isNotEmpty;
-  late final Computed<int> length;
+  final Computed<bool> isEmpty;
+  final Computed<bool> isNotEmpty;
+  final Computed<int> length;
 
-  ConstComputedMap(IMap<K, V> m) : snapshot = $(() => m) {
-    isEmpty = $(() => snapshot.use.isEmpty);
-    isNotEmpty = $(() => snapshot.use.isNotEmpty);
-    length = $(() => snapshot.use.length);
-  }
+  ConstComputedMap(IMap<K, V> m)
+      : snapshot = $(() => m),
+        isEmpty = $(() => m.isEmpty),
+        isNotEmpty = $(() => m.isNotEmpty),
+        length = $(() => m.length);
 
   @override
   Computed<V?> operator [](K key) => $(() => snapshot.use[key]);
@@ -36,6 +36,12 @@ class ConstComputedMap<K, V>
     // ignore: invalid_use_of_visible_for_testing_member
     snapshot.fix(m);
     // ignore: invalid_use_of_visible_for_testing_member
+    isEmpty.fix(m.isEmpty);
+    // ignore: invalid_use_of_visible_for_testing_member
+    isNotEmpty.fix(m.isNotEmpty);
+    // ignore: invalid_use_of_visible_for_testing_member
+    length.fix(m.length);
+    // ignore: invalid_use_of_visible_for_testing_member
     changes.fix(ChangeEventReplace(m));
   }
 
@@ -43,6 +49,12 @@ class ConstComputedMap<K, V>
   void fixThrow(Object e) {
     // ignore: invalid_use_of_visible_for_testing_member
     snapshot.fixThrow(e);
+    // ignore: invalid_use_of_visible_for_testing_member
+    isEmpty.fixThrow(e);
+    // ignore: invalid_use_of_visible_for_testing_member
+    isNotEmpty.fixThrow(e);
+    // ignore: invalid_use_of_visible_for_testing_member
+    length.fixThrow(e);
     // ignore: invalid_use_of_visible_for_testing_member
     changes.fixThrow(e);
   }
@@ -52,6 +64,12 @@ class ConstComputedMap<K, V>
     // ignore: invalid_use_of_visible_for_testing_member
     snapshot.mock(() => mock.snapshot.use);
     // ignore: invalid_use_of_visible_for_testing_member
+    isEmpty.mock(() => mock.isEmpty.use);
+    // ignore: invalid_use_of_visible_for_testing_member
+    isNotEmpty.mock(() => mock.isNotEmpty.use);
+    // ignore: invalid_use_of_visible_for_testing_member
+    length.mock(() => mock.length.use);
+    // ignore: invalid_use_of_visible_for_testing_member
     changes.mock(() => ChangeEventReplace(mock.snapshot.use));
   }
 
@@ -59,6 +77,12 @@ class ConstComputedMap<K, V>
   void unmock() {
     // ignore: invalid_use_of_visible_for_testing_member
     snapshot.unmock();
+    // ignore: invalid_use_of_visible_for_testing_member
+    isEmpty.unmock();
+    // ignore: invalid_use_of_visible_for_testing_member
+    isNotEmpty.unmock();
+    // ignore: invalid_use_of_visible_for_testing_member
+    length.unmock();
     // ignore: invalid_use_of_visible_for_testing_member
     changes.unmock();
   }
