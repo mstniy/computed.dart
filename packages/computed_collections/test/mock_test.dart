@@ -2,7 +2,6 @@ import 'package:computed/computed.dart';
 import 'package:computed/utils/streams.dart';
 import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/icomputedmap.dart';
-import 'package:computed_collections/src/const_computedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:test/test.dart';
 
@@ -66,11 +65,14 @@ Future<void> testFixUnmock(IComputedMap<int, int> map) async {
   expect(await getValue(isNotEmpty), false);
   expect(await getValue(length), 0);
 
+  map.fix(myMap);
+  expect(await getValue(changes), ChangeEventReplace(myMap));
   map.unmock();
 
   await testCoherence(map, original);
 
-  // TODO: Also test that `unmock` has unmocked the change stream
+  // Make sure the change stream is unmocked
+  expect(await getValues(changes), isNot(contains(ChangeEventReplace(myMap))));
 }
 
 void main() {
