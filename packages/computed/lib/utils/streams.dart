@@ -65,19 +65,21 @@ class ValueStream<T> extends Stream<T> {
     }
   }
 
-  /// If this ValueStream is sync, adds [t] to the stream and notifies listeners.
+  /// Adds [t] to this stream.
   ///
-  /// If this ValueStream is not sync, Schedules [t] to be added to the
-  /// stream in the next microtask. Further calls to [add] or [addError] within
-  /// a single microtask will override previous calls.
-  /// In the next microtask, the last-added value is added to the stream,
-  /// unless if it compares `==` to the value last added to the stream.
+  /// If this ValueStream is sync, notifies listeners before returning,
+  /// unless if [t] compares `==` to the value last used to notify the listeners.
+  /// If this ValueStream is not sync, notifies listeners in the next microtask.
+  /// Further calls to [add] or [addError] within a single microtask will
+  /// override previous calls.
+  /// In the next microtask, the listeners are notified with the last-added
+  /// value, unless if it compares `==` to the value last used to notify them.
   ///
   /// If there are no listeners, buffers [t] and drops any previusly
   /// buffered values/errors.
   void add(T t) {
     _lastAddedValue = _ValueOrException.value(t);
-    if (!_sync) {
+    if (!_sync && _controller.hasListener) {
       if (_controllerAddScheduled) return;
       _controllerAddScheduled = true;
       scheduleMicrotask(_controllerAddMicrotask);
@@ -89,7 +91,7 @@ class ValueStream<T> extends Stream<T> {
   /// As with [add], but for adding errors.
   void addError(Object o) {
     _lastAddedValue = _ValueOrException.exc(o);
-    if (!_sync) {
+    if (!_sync && _controller.hasListener) {
       if (_controllerAddScheduled) return;
       _controllerAddScheduled = true;
       scheduleMicrotask(_controllerAddMicrotask);
