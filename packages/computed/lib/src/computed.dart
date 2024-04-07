@@ -69,19 +69,24 @@ class _ComputedSubscriptionImpl<T> implements ComputedSubscription<T> {
   }
 }
 
-class _MemoizedValueOrException<T> {
+class _WeakMemoizedValueOrException<T> {
+  final bool _weak;
   final bool _memoized;
   final _ValueOrException<T>? _voe;
 
-  _MemoizedValueOrException(this._memoized, this._voe);
+  _WeakMemoizedValueOrException(this._weak, this._memoized, this._voe);
 }
+
+const _NoReactivityInsideReact =
+    "`use`, `useWeak` and `react` not allowed inside react callbacks.";
+const _NoReactivityOutsideComputations =
+    "`use`, `useWeak`, `react` and `prev` are only allowed inside computations.";
 
 class GlobalCtx {
   static ComputedImpl? _currentComputation;
   static ComputedImpl get currentComputation {
     if (_currentComputation == null) {
-      throw StateError(
-          "`use` and `prev` are only allowed inside computations.");
+      throw StateError(_NoReactivityOutsideComputations);
     }
     return _currentComputation!;
   }
@@ -147,15 +152,18 @@ class ComputedImpl<T> {
   _ValueOrException<T>? _lastResult;
   _ValueOrException<T>? _prevResult;
   T? _initialPrev;
-  var _lastUpstreamComputations = <ComputedImpl, _MemoizedValueOrException>{};
+  var _lastUpstreamComputations =
+      <ComputedImpl, _WeakMemoizedValueOrException>{};
 
   bool get _computing => _curUpstreamComputations != null;
   Object? _reactSuppressedException;
   StackTrace? _reactSuppressedExceptionStackTrace;
-  Map<ComputedImpl, _MemoizedValueOrException>? _curUpstreamComputations;
+  Map<ComputedImpl, _WeakMemoizedValueOrException>? _curUpstreamComputations;
 
   final _memoizedDownstreamComputations = <ComputedImpl>{};
   final _nonMemoizedDownstreamComputations = <ComputedImpl>{};
+  final _weakDownstreamComputations =
+      <ComputedImpl>{}; // Note that these are always memoized
 
   // If mapped to false -> not notified yet
   final _listeners = <_ComputedSubscriptionImpl<T>, bool>{};
@@ -168,26 +176,46 @@ class ComputedImpl<T> {
 
   var _dirty = false;
 
-  T get use {
+  void _use(bool weak) {
     if (_computing) throw CyclicUseException();
 
     final caller = GlobalCtx.currentComputation;
     if (GlobalCtx._reacting) {
-      throw StateError("`use` and `react` not allowed inside react callbacks.");
+      throw StateError(_NoReactivityInsideReact);
     }
-    // Make sure the caller is subscribed
-    caller._curUpstreamComputations!.update(this, (v) => v, ifAbsent: () {
+    // Make sure the caller is subscribed, upgrade to non-weak if needed
+    caller._curUpstreamComputations!.update(
+        this,
+        (v) =>
+            _WeakMemoizedValueOrException(weak && v._weak, true, _lastResult),
+        ifAbsent: () {
       // Check for cycles
       _checkCycle(caller);
-      return _MemoizedValueOrException(true, _lastResult);
+      return _WeakMemoizedValueOrException(weak, true, _lastResult);
     });
+  }
 
+  T get use {
+    _use(false);
     if (_lastUpdate != GlobalCtx._currentUpdate && _lastResult == null) {
       _evalF();
     }
 
     if (_lastResult == null) throw NoValueException();
 
+    return _lastResult!.value;
+  }
+
+  T get useWeak {
+    _use(true);
+    if (_lastResult == null) {
+      if (_memoizedDownstreamComputations.isEmpty &&
+          _nonMemoizedDownstreamComputations.isEmpty &&
+          _listeners.isEmpty) {
+        throw NoStrongUserException();
+      } else
+        throw NoValueException();
+    }
     return _lastResult!.value;
   }
 
@@ -277,8 +305,10 @@ class ComputedImpl<T> {
     if (!_novalue) {
       if (!_lastResult!._isValue &&
           onError == null &&
+          _weakDownstreamComputations.isEmpty &&
           _memoizedDownstreamComputations.isEmpty &&
           _nonMemoizedDownstreamComputations.isEmpty) {
+        // TODO: Only do this if this is the first listener
         Zone.current.handleUncaughtError(_lastResult!._exc!, _lastResult!._st!);
       }
       scheduleMicrotask(() {
@@ -401,6 +431,7 @@ class ComputedImpl<T> {
           }
         }
         for (var down in [
+          ...cur._weakDownstreamComputations,
           ...cur._memoizedDownstreamComputations,
           ...cur._nonMemoizedDownstreamComputations
         ]) {
@@ -507,7 +538,7 @@ class ComputedImpl<T> {
       // Commit the changes to the DAG
       for (var e in _curUpstreamComputations!.entries) {
         final up = e.key;
-        up._addDownstreamComputation(this, e.value._memoized);
+        up._addDownstreamComputation(this, e.value._memoized, e.value._weak);
       }
       final oldDiffNew = _lastUpstreamComputations.keys
           .toSet()
@@ -532,7 +563,10 @@ class ComputedImpl<T> {
           if (!down._computing) down._dirty = true;
         }
         if (shouldNotify) {
-          for (var down in _memoizedDownstreamComputations) {
+          for (var down in [
+            ..._memoizedDownstreamComputations,
+            ..._weakDownstreamComputations
+          ]) {
             if (!down._computing) down._dirty = true;
           }
         }
@@ -561,6 +595,9 @@ class ComputedImpl<T> {
       if (_listeners
               .isNotEmpty && // As then we must have been called from an initial listen(), and it will handle this itself
           !onErrorNotified &&
+          // Note that there is no need to check for lazy listeners here,
+          // because even if we do have any, there must also be some non-lazy
+          // downstream computation to trigger this.
           _memoizedDownstreamComputations.isEmpty &&
           _nonMemoizedDownstreamComputations.isEmpty) {
         // Propagate to the Zone
@@ -576,19 +613,26 @@ class ComputedImpl<T> {
     }
   }
 
-  void _addDownstreamComputation(ComputedImpl down, bool memoized) {
+  void _addDownstreamComputation(ComputedImpl down, bool memoized, bool weak) {
     if (memoized) {
-      // Only routers can have non-memoized downstream computations
       if (_dss != null) {
         // Make sure a downstream computation cannot be subscribed as both memoizing and non-memoizing
         if (!_nonMemoizedDownstreamComputations.contains(down)) {
-          _memoizedDownstreamComputations.add(down);
+          (weak ? _weakDownstreamComputations : _memoizedDownstreamComputations)
+              .add(down);
         }
       } else {
-        this._memoizedDownstreamComputations.add(down);
+        // No need to check non-memoized computations here, only routers can have them
+        (weak ? _weakDownstreamComputations : _memoizedDownstreamComputations)
+            .add(down);
       }
     } else {
+      assert(_dss !=
+          null); // Only routers can have non-memoized downstream computations
+      assert(!weak); // There is no weak .react
       // Make sure a downstream computation cannot be subscribed as both memoizing and non-memoizing
+      // or weak and strong
+      _weakDownstreamComputations.remove(down);
       _memoizedDownstreamComputations.remove(down);
       _nonMemoizedDownstreamComputations.add(down);
     }
@@ -628,7 +672,8 @@ class ComputedImpl<T> {
 
   void _removeDownstreamComputation(ComputedImpl c) {
     bool removed = _memoizedDownstreamComputations.remove(c) ||
-        _nonMemoizedDownstreamComputations.remove(c);
+        _nonMemoizedDownstreamComputations.remove(c) ||
+        _weakDownstreamComputations.remove(c);
     assert(removed, "Corrupted internal state");
     if (_memoizedDownstreamComputations.isEmpty &&
         _nonMemoizedDownstreamComputations.isEmpty &&
@@ -652,11 +697,11 @@ class ComputedImpl<T> {
     assert(_dss != null);
     final caller = GlobalCtx.currentComputation;
     if (GlobalCtx._reacting) {
-      throw StateError("`use` and `react` not allowed inside react callbacks.");
+      throw StateError(_NoReactivityInsideReact);
     }
     // Make sure the caller is subscribed
     caller._curUpstreamComputations![this] =
-        _MemoizedValueOrException(false, _lastResult);
+        _WeakMemoizedValueOrException(false, false, _lastResult);
 
     if (_dss!._lastEmit != GlobalCtx._currentUpdate) {
       // Don't call the functions

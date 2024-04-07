@@ -1262,16 +1262,16 @@ void main() {
       s.use;
       fail("Should have thrown");
     } on StateError catch (e) {
-      expect(
-          e.message, "`use` and `prev` are only allowed inside computations.");
+      expect(e.message,
+          "`use`, `useWeak`, `react` and `prev` are only allowed inside computations.");
     }
 
     try {
       s.prev;
       fail("Should have thrown");
     } on StateError catch (e) {
-      expect(
-          e.message, "`use` and `prev` are only allowed inside computations.");
+      expect(e.message,
+          "`use`, `useWeak`, `react` and `prev` are only allowed inside computations.");
     }
   });
 
@@ -1294,6 +1294,114 @@ void main() {
     expect(flag, true);
 
     sub.cancel();
+  });
+
+  group('useWeak', () {
+    test('does not trigger computation', () async {
+      final c = $(() => fail('must not be called'));
+      var flag = false;
+      final sub = $(() => c.useWeak)
+          .listen((e) => fail('must not call the listener'), (e) {
+        expect(flag, false);
+        expect(e, isA<NoStrongUserException>());
+        flag = true;
+      });
+
+      expect(flag, false);
+      await Future.value();
+      expect(flag, true);
+
+      sub.cancel();
+    });
+    test('subscribes to the result of the computation', () async {
+      final s = StreamController(sync: true);
+      final stream = s.stream;
+      final c = $(() => stream.use);
+      final c2 = $(() => c.useWeak);
+
+      final sub1 = c.listen(null, null);
+      var lCnt = 0;
+      final sub2 = c2.listen((event) {
+        lCnt++;
+      }, null);
+
+      expect(lCnt, 0);
+      s.add(0);
+      expect(lCnt, 1);
+      s.add(1);
+      expect(lCnt, 2);
+
+      sub1.cancel();
+      sub2.cancel();
+    });
+    test('cannot be used outside a computation', () {
+      try {
+        $(() {}).useWeak;
+        fail("Should have thrown");
+      } on StateError catch (e) {
+        expect(e.message,
+            "`use`, `useWeak`, `react` and `prev` are only allowed inside computations.");
+      }
+    });
+    test('does not override use', () async {
+      final s = ValueStream.seeded(42, sync: true);
+      final c = $(() => s.use);
+      final c2 = $(() {
+        try {
+          c.useWeak;
+        } on NoStrongUserException {}
+        return c.use;
+      });
+      var lCnt = 0;
+      int? lastValue;
+      var sub = c2.listen((event) {
+        lCnt++;
+        lastValue = event;
+      }, null);
+
+      expect(lCnt, 0);
+      await Future.value();
+      expect(lCnt, 1);
+      expect(lastValue, 42);
+
+      sub.cancel();
+
+      final c3 = $(() {
+        c.use;
+        return c.useWeak;
+      });
+      sub = c3.listen((event) {
+        lCnt++;
+        lastValue = event;
+      }, null);
+
+      expect(lCnt, 1);
+      await Future.value();
+      expect(lCnt, 2);
+      expect(lastValue, 42);
+
+      s.add(43);
+      expect(lCnt, 3);
+      expect(lastValue, 43);
+
+      sub.cancel();
+    });
+    test('propagates exceptions', () {
+      final c = $(() => throw FormatException());
+      final c2 = $(() {
+        try {
+          c.useWeak;
+        } on FormatException {
+          // pass
+        } on NoStrongUserException {
+          // pass
+        }
+      });
+      final sub1 = c2.listen(null, null);
+      final sub2 = c.listen(null, null); // Must not report an uncaught error
+      sub1.cancel();
+      sub2.cancel();
+    });
   });
 
   group('react', () {
@@ -1371,7 +1479,7 @@ void main() {
                   isA<StateError>(),
                   (StateError e) =>
                       e.message ==
-                      "`use` and `react` not allowed inside react callbacks."));
+                      "`use`, `useWeak` and `react` not allowed inside react callbacks."));
         });
 
         await Future.value();
@@ -1777,7 +1885,7 @@ void main() {
       } catch (e) {
         expect(e, isA<StateError>());
         expect((e as StateError).message,
-            "`use` and `prev` are only allowed inside computations.");
+            "`use`, `useWeak`, `react` and `prev` are only allowed inside computations.");
         flag = true;
       }
     }, (e) => fail(e.toString()));

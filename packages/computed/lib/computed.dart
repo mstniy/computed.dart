@@ -111,6 +111,12 @@ class Computed<T> {
   /// Throws [CyclicUseException] if this usage would cause a cyclic dependency.
   T get use => _impl.use;
 
+  /// Weakly uses this computation.
+  ///
+  /// Like [use], but throws [NoStrongUserException] instead of running the computation if
+  /// there are no non-weak downstream computations or listeners.
+  T get useWeak => _impl.useWeak;
+
   /// As [use], but returns [value] instead of throwing [NoValueException].
   T useOr(T value) {
     try {
@@ -148,6 +154,10 @@ abstract class ComputedSubscription<T> {
 /// Thrown when a data source [use]d by a computation
 /// has not produced a value yet.
 class NoValueException implements Exception {}
+
+/// Thrown when [useWeak] is called on a computation which
+/// has no non-weak downstream computations or listeners.
+class NoStrongUserException implements Exception {}
 
 /// Thrown by [Computed.use] if this usage
 /// would cause a cyclic dependency.
