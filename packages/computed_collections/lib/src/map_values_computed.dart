@@ -149,7 +149,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
   @override
   Computed<ChangeEvent<K, V>> get changes => _changesComputed;
 
-  Computed<_Option<V?>> _getKeyOptionComputation(K key) {
+  Computed<_Option<V>> _getKeyOptionComputation(K key) {
     // This logic is extracted to a separate cache so that the mapped computations'
     // results are shared between `operator[]` and `containsKey`.
     final computationComputation = Computed(() {
