@@ -231,4 +231,74 @@ void main() {
 
     sub.cancel();
   });
+
+  test('operator[] and containsKey opportunistically use the snapshot',
+      () async {
+    final s = ValueStream<ChangeEvent<int, int>>(sync: true);
+    final m = IComputedMap.fromChangeStream(s);
+
+    var cCnt = 0;
+
+    final m2 = m.mapValuesComputed((key, value) => $(() {
+          cCnt++;
+          return value;
+        }));
+
+    final sub1 = m2.snapshot.listen(null, null);
+
+    List<int?> resCache2 = [];
+    final sub2 = m2[0].listen((e) {
+      resCache2.add(e);
+    }, null);
+
+    List<bool> resCache3 = [];
+    final sub3 = m2.containsKey(0).listen((e) {
+      resCache3.add(e);
+    }, null);
+
+    s.add(ChangeEventReplace({0: 1}.lock));
+    await Future.value();
+    expect(cCnt, 2); // And not 4 or 6
+    expect(resCache2, [null, 1]);
+    expect(resCache3, [false, true]);
+
+    sub1.cancel();
+    sub2.cancel();
+    sub3.cancel();
+  });
+
+  test('operator[] and containsKey are key-local', () async {
+    final s = ValueStream<ChangeEvent<int, int>>(sync: true);
+    final m = IComputedMap.fromChangeStream(s);
+
+    var cCnt = 0;
+
+    final m2 = m.mapValuesComputed((key, value) => $(() {
+          if (key == 0) {
+            cCnt++;
+            return value;
+          } else {
+            fail('must not compute any key other then 0');
+          }
+        }));
+
+    List<int?> resCache1 = [];
+    final sub1 = m2[0].listen((e) {
+      resCache1.add(e);
+    }, null);
+
+    List<bool> resCache2 = [];
+    final sub2 = m2.containsKey(0).listen((e) {
+      resCache2.add(e);
+    }, null);
+
+    s.add(ChangeEventReplace({0: 1, 1: 2}.lock));
+    await Future.value();
+    expect(cCnt, 2);
+    expect(resCache1, [null, 1]);
+    expect(resCache2, [false, true]);
+
+    sub1.cancel();
+    sub2.cancel();
+  });
 }

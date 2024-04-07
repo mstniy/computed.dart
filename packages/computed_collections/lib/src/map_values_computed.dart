@@ -162,6 +162,14 @@ class MapValuesComputedComputedMap<K, V, VParent>
     // So `operator[]` and `containsKey` further wraps it to separate caches and let
     // the [MockMixin] handle it.
     return keyOptionComputations.wrap(key, () {
+      try {
+        final s = snapshot.useWeak;
+        // useWeak returned - means there is an existing non-weak listener on the snapshot
+        if (s.containsKey(key)) return _Option.some(s[key]);
+        return _Option.none();
+      } on NoStrongUserException {
+        // Pass
+      }
       final c = computationComputation.use;
       if (c == null) {
         // The key does not exist in the parent
