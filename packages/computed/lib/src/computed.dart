@@ -175,15 +175,12 @@ class ComputedImpl<T> {
     if (GlobalCtx._reacting) {
       throw StateError("`use` and `react` not allowed inside react callbacks.");
     }
-    if (caller._curUpstreamComputations![this] == null) {
+    // Make sure the caller is subscribed
+    caller._curUpstreamComputations!.update(this, (v) => v, ifAbsent: () {
       // Check for cycles
       _checkCycle(caller);
-      // Make sure the caller is subscribed
-      caller._curUpstreamComputations![this] = _MemoizedValueOrException(
-          // If the caller is subscribed in a non-memoizing way, keep it.
-          caller._curUpstreamComputations![this]?._memoized ?? true,
-          _lastResult);
-    }
+      return _MemoizedValueOrException(true, _lastResult);
+    });
 
     if (_lastUpdate != GlobalCtx._currentUpdate && _lastResult == null) {
       _evalF();
