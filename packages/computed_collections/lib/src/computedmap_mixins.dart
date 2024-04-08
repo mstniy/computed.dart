@@ -1,5 +1,6 @@
 import 'package:computed/computed.dart';
 import 'package:computed/utils/computation_cache.dart';
+import 'package:computed_collections/src/group_by.dart';
 import 'package:computed_collections/src/map_values.dart';
 import 'package:computed_collections/src/map_values_computed.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
@@ -9,7 +10,7 @@ import '../change_event.dart';
 import '../icomputedmap.dart';
 import 'add_computedmap.dart';
 
-mixin class OperatorsMixin<K, V> {
+mixin OperatorsMixin<K, V> {
   IComputedMap<K, V> add(K key, V value) =>
       AddComputedMap(this as IComputedMap<K, V>, key, value);
 
@@ -82,6 +83,15 @@ mixin class OperatorsMixin<K, V> {
   IComputedMap<K, V> updateAllComputed(
       Computed<V> Function(K key, V value) update) {
     // TODO: implement updateAllComputed
+    throw UnimplementedError();
+  }
+
+  IComputedMap<K2, IComputedMap<K, V>> groupBy<K2>(K2 Function(K, V) key) =>
+      GroupByComputedMap(this as IComputedMap<K, V>, key);
+
+  IComputedMap<K2, IComputedMap<K, V>> groupByComputed<K2>(
+      Computed<K2> Function(K, V) key) {
+    // TODO: implement groupByComputed
     throw UnimplementedError();
   }
 }
