@@ -29,8 +29,6 @@ class GroupByComputedMap<K, V, KParent>
       ComputationCache<IComputedMap<KParent, V>, bool>();
 
   var _mappedKeys = <KParent, K>{};
-  final _mappedKeysReverse = <K,
-      Set<KParent>>{}; // So that we know when to emit deletion events for the collection
   var _streams =
       <K, (MergingChangeStream<KParent, V>, ValueStream<IMap<KParent, V>>)>{};
   var _m = <K, IMap<KParent, V>>{};
@@ -40,13 +38,6 @@ class GroupByComputedMap<K, V, KParent>
 
     _m = grouped.map((k, v) => MapEntry(k, v.lock));
     _mappedKeys = mappedKeys;
-    _mappedKeysReverse.clear();
-    for (var e in _mappedKeys.entries) {
-      _mappedKeysReverse.update(e.value, (s) {
-        s.add(e.key);
-        return s;
-      }, ifAbsent: () => {e.key});
-    }
 
     _streams = _m.map(
         (k, v) => MapEntry(k, (MergingChangeStream(), ValueStream.seeded(v))));
@@ -87,16 +78,12 @@ class GroupByComputedMap<K, V, KParent>
             if (!_mappedKeys.containsKey(deletedKey))
               continue; // Extraneous deletion from upstream?
             final oldGroup = _mappedKeys[deletedKey] as K;
-            final newReverseKeys = _mappedKeysReverse.update(oldGroup, (s) {
-              s.remove(deletedKey);
-              return s;
-            });
             _mappedKeys.remove(deletedKey);
             final groupMap = _m.update(
                 oldGroup,
                 (m) => m.remove(
                     deletedKey)); // Not passing `ifAbsent` as the key has to be present (ow/ we have a corrupt internal state)
-            if (newReverseKeys.isEmpty) {
+            if (groupMap.isEmpty) {
               extinctKeys.add(oldGroup);
             } else {
               final streams = _streams[oldGroup]!;
@@ -113,33 +100,25 @@ class GroupByComputedMap<K, V, KParent>
             final value = e.value.$2;
             late final IMap<KParent, V> groupMap;
             late final bool groupIsNew;
-            _mappedKeysReverse.update(groupKey, (s) {
-              groupIsNew = false;
-              s.add(parentKey);
-              groupMap = _m.update(
-                  groupKey,
-                  (m) => m.add(parentKey,
-                      value)); // Not passing `ifAbsent` as the key has to be present (ow/ we have a corrupt internal state)
-              return s;
-            }, ifAbsent: () {
-              groupIsNew = true;
-              newKeys.add(groupKey);
-              groupMap = {parentKey: value}.lock;
-              _m[groupKey] = groupMap;
-              return {parentKey};
-            });
+            groupMap = _m.update(
+              groupKey,
+              (m) {
+                groupIsNew = false;
+                return m.add(parentKey, value);
+              },
+              ifAbsent: () {
+                groupIsNew = true;
+                newKeys.add(groupKey);
+                return {parentKey: value}.lock;
+              },
+            );
             final oldGroupKey = _mappedKeys[parentKey];
             _mappedKeys[parentKey] = groupKey;
             if (oldGroupKey != null) {
               if (oldGroupKey != groupKey) {
-                final newReverseKeys =
-                    _mappedKeysReverse.update(oldGroupKey, (s) {
-                  s.remove(parentKey);
-                  return s;
-                }); // Not passing `ifAbsent` as the key has to be present (ow/ we have a corrupt internal state)
                 final oldGroupMap =
                     _m.update(oldGroupKey, (m) => m.remove(parentKey));
-                if (newReverseKeys.isEmpty) {
+                if (oldGroupMap.isEmpty) {
                   extinctKeys.add(oldGroupKey);
                   _m.remove(oldGroupKey);
                 } else {
@@ -188,7 +167,6 @@ class GroupByComputedMap<K, V, KParent>
 
   void _onDispose() {
     _mappedKeys = {};
-    _mappedKeysReverse.clear();
     _streams = {};
     _m = {};
   }
