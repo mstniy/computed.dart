@@ -201,12 +201,15 @@ class ChangeStreamComputedMap<K, V>
   Computed<ChangeEvent<K, V>> get changes => _changes;
 
   @override
+  // TODO: Cache this
   Computed<bool> containsKey(K key) => $(() => _c.use.containsKey(key));
 
   @override
+  // TODO: Cache this
   Computed<bool> containsValue(V value) => $(() => _c.use.containsValue(value));
 
   @override
+  // TODO: Make these late-initialied final fields to unify computations across all calls
   Computed<bool> get isEmpty => $(() => _c.use.isEmpty);
 
   @override
