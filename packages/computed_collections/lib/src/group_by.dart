@@ -3,7 +3,6 @@ import 'package:computed/utils/computation_cache.dart';
 import 'package:computed/utils/streams.dart';
 import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/icomputedmap.dart';
-import 'package:computed_collections/src/scs_computedmap.dart';
 import 'package:computed_collections/src/utils/merging_change_stream.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
@@ -47,7 +46,7 @@ class GroupByComputedMap<K, V, KParent>
     _mappedKeys = mappedKeys;
 
     return _m.map((k, v) {
-      return MapEntry(k, SnapshotChangeStreamComputedMap(v.$1, v.$2));
+      return MapEntry(k, ChangeStreamComputedMap(v.$1, () => v.$2.use));
     }).lock;
   }
 
@@ -91,7 +90,7 @@ class GroupByComputedMap<K, V, KParent>
                   {parentKey: value}.lock
                 );
                 keyChanges[groupKey] = ChangeRecordValue(
-                    SnapshotChangeStreamComputedMap(group.$1, group.$2));
+                    ChangeStreamComputedMap(group.$1, () => group.$2.use));
                 return group;
               },
             );
