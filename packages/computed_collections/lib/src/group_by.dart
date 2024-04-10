@@ -29,23 +29,25 @@ class GroupByComputedMap<K, V, KParent>
       ComputationCache<IComputedMap<KParent, V>, bool>();
 
   var _mappedKeys = <KParent, K>{};
-  var _streams =
-      <K, (MergingChangeStream<KParent, V>, ValueStream<IMap<KParent, V>>)>{};
-  var _m = <K, IMap<KParent, V>>{};
+  var _m = <K,
+      (
+    MergingChangeStream<KParent, V>,
+    ValueStream<IMap<KParent, V>>,
+    IMap<KParent, V>
+  )>{};
 
   IMap<K, IComputedMap<KParent, V>> _setM(IMap<KParent, V> m) {
     final (grouped, mappedKeys) = m.groupBy(_convert);
 
-    _m = grouped.map((k, v) => MapEntry(k, v.lock));
+    _m = grouped.map((k, v) {
+      final vlocked = v.lock;
+      return MapEntry(
+          k, (MergingChangeStream(), ValueStream.seeded(vlocked), vlocked));
+    });
     _mappedKeys = mappedKeys;
 
-    _streams = _m.map(
-        (k, v) => MapEntry(k, (MergingChangeStream(), ValueStream.seeded(v))));
-
-    return grouped.map((k, v) {
-      final streams = _streams[k]!;
-      return MapEntry(
-          k, SnapshotChangeStreamComputedMap(streams.$1, streams.$2));
+    return _m.map((k, v) {
+      return MapEntry(k, SnapshotChangeStreamComputedMap(v.$1, v.$2));
     }).lock;
   }
 
@@ -79,18 +81,17 @@ class GroupByComputedMap<K, V, KParent>
               continue; // Extraneous deletion from upstream?
             final oldGroup = _mappedKeys[deletedKey] as K;
             _mappedKeys.remove(deletedKey);
-            final groupMap = _m.update(
-                oldGroup,
-                (m) => m.remove(
-                    deletedKey)); // Not passing `ifAbsent` as the key has to be present (ow/ we have a corrupt internal state)
-            if (groupMap.isEmpty) {
-              extinctKeys.add(oldGroup);
-            } else {
-              final streams = _streams[oldGroup]!;
-              streams.$1
-                  .add(KeyChanges({deletedKey: ChangeRecordDelete<V>()}.lock));
-              streams.$2.add(groupMap);
-            }
+            _m.update(oldGroup, (group) {
+              group = (group.$1, group.$2, group.$3.remove(deletedKey));
+              if (group.$3.isEmpty) {
+                extinctKeys.add(oldGroup);
+              } else {
+                group.$1.add(
+                    KeyChanges({deletedKey: ChangeRecordDelete<V>()}.lock));
+                group.$2.add(group.$3);
+              }
+              return group;
+            }); // Not passing `ifAbsent` as the key has to be present (ow/ we have a corrupt internal state)
           }
 
           final newKeys = <K>{};
@@ -98,61 +99,49 @@ class GroupByComputedMap<K, V, KParent>
             final groupKey = e.value.$1;
             final parentKey = e.key;
             final value = e.value.$2;
-            late final IMap<KParent, V> groupMap;
-            late final bool groupIsNew;
-            groupMap = _m.update(
+            final group = _m.update(
               groupKey,
-              (m) {
-                groupIsNew = false;
-                return m.add(parentKey, value);
-              },
+              (group) => (group.$1, group.$2, group.$3.add(parentKey, value)),
               ifAbsent: () {
-                groupIsNew = true;
                 newKeys.add(groupKey);
-                return {parentKey: value}.lock;
+                return (
+                  MergingChangeStream(),
+                  ValueStream(),
+                  {parentKey: value}.lock
+                );
               },
             );
+            group.$1
+                .add(KeyChanges({parentKey: ChangeRecordValue<V>(value)}.lock));
+            group.$2.add(group.$3);
             final oldGroupKey = _mappedKeys[parentKey];
             _mappedKeys[parentKey] = groupKey;
             if (oldGroupKey != null) {
               if (oldGroupKey != groupKey) {
-                final oldGroupMap =
-                    _m.update(oldGroupKey, (m) => m.remove(parentKey));
-                if (oldGroupMap.isEmpty) {
+                final oldGroup = _m.update(
+                    oldGroupKey, (g) => (g.$1, g.$2, g.$3.remove(parentKey)));
+                if (oldGroup.$3.isEmpty) {
                   extinctKeys.add(oldGroupKey);
                   _m.remove(oldGroupKey);
                 } else {
-                  final streams = _streams[oldGroupKey]!;
-                  streams.$1.add(
+                  oldGroup.$1.add(
                       KeyChanges({parentKey: ChangeRecordDelete<V>()}.lock));
-                  streams.$2.add(oldGroupMap);
+                  oldGroup.$2.add(oldGroup.$3);
                 }
               }
-            } else {}
-            late final (
-              MergingChangeStream<KParent, V>,
-              ValueStream<IMap<KParent, V>>
-            ) streams;
-            if (groupIsNew) {
-              streams = (MergingChangeStream(), ValueStream());
-              _streams[groupKey] = streams;
-            } else {
-              streams = _streams[groupKey]!;
             }
-            streams.$1
-                .add(KeyChanges({parentKey: ChangeRecordValue<V>(value)}.lock));
-            streams.$2.add(groupMap);
           }
 
           return KeyChanges(IMap.fromEntries([
             ...extinctKeys.map((k) =>
                 MapEntry(k, ChangeRecordDelete<IComputedMap<KParent, V>>())),
             ...newKeys.map((k) {
-              final streams = _streams[k]!;
+              // TODO: Instead of doing new lookups here, aggregate them above and simply return the result here
+              final group = _m[k]!;
               return MapEntry(
                   k,
                   ChangeRecordValue(
-                      SnapshotChangeStreamComputedMap(streams.$1, streams.$2)));
+                      SnapshotChangeStreamComputedMap(group.$1, group.$2)));
             })
           ]));
       }
@@ -167,7 +156,6 @@ class GroupByComputedMap<K, V, KParent>
 
   void _onDispose() {
     _mappedKeys = {};
-    _streams = {};
     _m = {};
   }
 
