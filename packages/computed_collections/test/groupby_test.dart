@@ -60,7 +60,7 @@ void main() {
     expect(lastRes3, null);
     expect(lastRes4, null);
     // Add a value to an existing group
-    s.add(KeyChanges({0: ChangeRecordValue<int>(0)}.lock));
+    s.add(KeyChanges({0: ChangeRecordValue(0)}.lock));
     await Future.value();
     expect(lastRes1!.keys, containsAll([0]));
     await Future.value();
@@ -84,12 +84,21 @@ void main() {
     expect(lastRes3, {1: 1}.lock);
     expect(lastRes4, null);
     // Change the group of an item, changing its group, but keeping its former group populated
-    s.add(KeyChanges({0: ChangeRecordValue<int>(1)}.lock));
+    s.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
     await Future.value();
     expect(lastRes1!.keys, containsAll([0, 1]));
     await Future.value();
     expect(lastRes2, {2: 3}.lock);
     expect(lastRes3, {0: 1, 1: 1}.lock);
+    expect(lastRes4, null);
+    // Delete a key, removing a group, but a new key immediately re-creates it
+    s.add(KeyChanges(
+        {0: ChangeRecordValue(3), 2: ChangeRecordDelete<int>()}.lock));
+    await Future.value();
+    expect(lastRes1!.keys, containsAll([0, 1]));
+    await Future.value();
+    expect(lastRes2, {0: 3}.lock);
+    expect(lastRes3, {1: 1}.lock);
     expect(lastRes4, null);
 
     sub1.cancel();

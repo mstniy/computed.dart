@@ -76,23 +76,6 @@ class GroupByComputedMap<K, V, KParent>
                   <KParent, (K, V)>{};
 
           final keyChanges = <K, ChangeRecord<IComputedMap<KParent, V>>>{};
-          for (var deletedKey in deletedKeys) {
-            if (!_mappedKeys.containsKey(deletedKey))
-              continue; // Extraneous deletion from upstream?
-            final oldGroup = _mappedKeys[deletedKey] as K;
-            _mappedKeys.remove(deletedKey);
-            _m.update(oldGroup, (group) {
-              group = (group.$1, group.$2, group.$3.remove(deletedKey));
-              if (group.$3.isEmpty) {
-                keyChanges[oldGroup] = ChangeRecordDelete();
-              } else {
-                group.$1.add(
-                    KeyChanges({deletedKey: ChangeRecordDelete<V>()}.lock));
-                group.$2.add(group.$3);
-              }
-              return group;
-            }); // Not passing `ifAbsent` as the key has to be present (ow/ we have a corrupt internal state)
-          }
 
           for (var e in valueKeysAndGroups.entries) {
             final groupKey = e.value.$1;
@@ -112,8 +95,9 @@ class GroupByComputedMap<K, V, KParent>
                 return group;
               },
             );
-            group.$1
-                .add(KeyChanges({parentKey: ChangeRecordValue<V>(value)}.lock));
+            group.$1.add(KeyChanges(<KParent, ChangeRecord<V>>{
+              parentKey: ChangeRecordValue<V>(value)
+            }.lock));
             group.$2.add(group.$3);
             final oldGroupKey = _mappedKeys[parentKey];
             _mappedKeys[parentKey] = groupKey;
@@ -125,12 +109,31 @@ class GroupByComputedMap<K, V, KParent>
                   keyChanges[oldGroupKey] = ChangeRecordDelete();
                   _m.remove(oldGroupKey);
                 } else {
-                  oldGroup.$1.add(
-                      KeyChanges({parentKey: ChangeRecordDelete<V>()}.lock));
+                  oldGroup.$1.add(KeyChanges(<KParent, ChangeRecord<V>>{
+                    parentKey: ChangeRecordDelete<V>()
+                  }.lock));
                   oldGroup.$2.add(oldGroup.$3);
                 }
               }
             }
+          }
+
+          for (var deletedKey in deletedKeys) {
+            if (!_mappedKeys.containsKey(deletedKey))
+              continue; // Extraneous deletion from upstream?
+            final oldGroup = _mappedKeys.remove(deletedKey) as K;
+            _m.update(oldGroup, (group) {
+              group = (group.$1, group.$2, group.$3.remove(deletedKey));
+              if (group.$3.isEmpty) {
+                keyChanges[oldGroup] = ChangeRecordDelete();
+              } else {
+                group.$1.add(KeyChanges(<KParent, ChangeRecord<V>>{
+                  deletedKey: ChangeRecordDelete<V>()
+                }.lock));
+                group.$2.add(group.$3);
+              }
+              return group;
+            }); // Not passing `ifAbsent` as the key has to be present (ow/ we have a corrupt internal state)
           }
 
           return KeyChanges(keyChanges.lock);
