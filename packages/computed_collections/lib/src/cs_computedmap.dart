@@ -93,6 +93,10 @@ class ChangeStreamComputedMap<K, V>
 
       return prev;
     }, async: true, initialPrev: firstReactToken);
+
+    isEmpty = $(() => _c.use.isEmpty);
+    isNotEmpty = $(() => _c.use.isNotEmpty);
+    length = $(() => _c.use.length);
   }
 
   @visibleForTesting
@@ -209,14 +213,13 @@ class ChangeStreamComputedMap<K, V>
   Computed<bool> containsValue(V value) => $(() => _c.use.containsValue(value));
 
   @override
-  // TODO: Make these late-initialied final fields to unify computations across all calls
-  Computed<bool> get isEmpty => $(() => _c.use.isEmpty);
+  late final Computed<bool> isEmpty;
 
   @override
-  Computed<bool> get isNotEmpty => $(() => _c.use.isNotEmpty);
+  late final Computed<bool> isNotEmpty;
 
   @override
-  Computed<int> get length => $(() => _c.use.length);
+  late final Computed<int> length;
 
   @override
   Computed<IMap<K, V>> get snapshot => _c;
