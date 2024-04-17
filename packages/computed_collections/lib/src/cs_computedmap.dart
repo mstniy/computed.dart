@@ -3,12 +3,13 @@ import 'dart:async';
 import 'package:computed/computed.dart';
 import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/icomputedmap.dart';
+import 'package:computed_collections/src/utils/pubsub.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
-import 'package:computed/utils/streams.dart';
 import 'package:meta/meta.dart';
 
 import 'computedmap_mixins.dart';
+import 'utils/option.dart';
 
 class _ValueOrException<T> {
   final bool _isValue;
@@ -33,9 +34,22 @@ class ChangeStreamComputedMap<K, V>
   late final Computed<IMap<K, V>> _c;
   // The "keep-alive" subscription used by key streams, as we explicitly break the dependency DAG of Computed.
   ComputedSubscription<IMap<K, V>>? _cSub;
-  final _keyValueStreams = <K, Map<ValueStream<V?>, Computed<V?>>>{};
+  late final PubSub<K, Option<V>> _keyPubSub;
   _ValueOrException<IMap<K, V>>? _curRes;
   ChangeStreamComputedMap(this._stream, [this._initialValueComputer]) {
+    _keyPubSub = PubSub<K, Option<V>>((k) {
+      if (_curRes == null) {
+        // First subscriber - kickstart the keepalive subscription
+        assert(_cSub == null);
+        _cSub = _c.listen((e) {},
+            null); //////////////////////////////////////// todo: we need to cancel this onDispose
+        return Option
+            .none(); // No value yet - we just subscribed to the upstream
+      }
+      final m = _curRes!.value; // Throws if it is an exception
+      if (m.containsKey(k)) return Option.some(m[k]);
+      return Option.none();
+    });
     _changes = $(() => _stream.use);
     final firstReactToken = IMap<K,
         V>(); // TODO: This is obviously ugly. Make Computed.withPrev support null instead
@@ -140,76 +154,50 @@ class ChangeStreamComputedMap<K, V>
   }
 
   void _notifyAllKeyStreams() {
-    for (var entry in _keyValueStreams.entries) {
-      final value = _curRes!._isValue ? _curRes!.value[entry.key] : null;
-      for (var stream in entry.value.keys) {
-        if (_curRes!._isValue) {
-          stream.add(value);
-        } else {
-          stream.addError(_curRes!._exc!);
-        }
+    if (_curRes!._isValue) {
+      final m = _curRes!._value!;
+      for (var key in _keyPubSub.subbedKeys) {
+        // TODO: This is inefficient, as subbedKeys is already an iterator over the internal pubsub map,
+        //  but .pub will do a new search on it.
+        //  Also if there are a lot of keys but few subscribers, we do an O(n) loop for nothing. Set intersection might be faster.
+        _keyPubSub.pub(
+            key, m.containsKey(key) ? Option.some(m[key]) : Option.none());
+      }
+    } else {
+      final e = _curRes!._exc!;
+      for (var key in _keyPubSub.subbedKeys) {
+        _keyPubSub.pubError(key, e);
       }
     }
   }
 
   void _notifyKeyStreams(Iterable<K> keys) {
     assert(_curRes!._isValue);
+    final m = _curRes!._value!;
     for (var key in keys) {
-      final value = _curRes!._value![key];
-      for (var stream in _keyValueStreams[key]?.keys ?? <ValueStream<V?>>[]) {
-        stream.add(value);
-      }
+      // Note that this is a no-op if the key is not subscribed to
+      _keyPubSub.pub(
+          key, m.containsKey(key) ? Option.some(m[key]) : Option.none());
     }
   }
 
-  Computed<V?> operator [](K key) {
-    // If there is an existing (cached) computation, return it
-    final streams = _keyValueStreams[key];
-    if (streams != null) return streams.values.first;
-
-    // Otherwise, create a new stream-computation pair and subscribe to the user computation
-    late final ValueStream<V?> stream;
-    final computation = $(() => stream.use);
-    stream = ValueStream<V?>(onListen: () {
-      final streams = _keyValueStreams.putIfAbsent(
-          key, () => <ValueStream<V?>, Computed<V?>>{});
-      streams[stream] = computation;
-      _cSub ??= _c.listen((e) {}, null);
-    }, onCancel: () {
-      final streams = _keyValueStreams[key]!;
-      streams.remove(stream);
-      if (streams.isEmpty) {
-        _keyValueStreams.remove(key);
-      }
-      if (_keyValueStreams.isEmpty) {
-        _cSub!.cancel();
-        _cSub = null;
-      }
-    });
-
-    // Seed the stream
-    if (_curRes != null) {
-      if (_curRes!._isValue) {
-        stream.add(_curRes!.value[key]);
-      } else {
-        stream.addError(_curRes!._exc!);
-      }
-    } else {
-      stream.add(null);
-    }
-
-    return computation;
-  }
+  Computed<V?> operator [](K key) => $(() {
+        final keyOption = _keyPubSub.sub(key).use;
+        if (keyOption.is_) return keyOption.value;
+        return null;
+      });
 
   @override
   Computed<ChangeEvent<K, V>> get changes => _changes;
 
   @override
-  // TODO: Cache this
-  Computed<bool> containsKey(K key) => $(() => _c.use.containsKey(key));
+  Computed<bool> containsKey(K key) => $(() {
+        final keyOption = _keyPubSub.sub(key).use;
+        return keyOption.is_;
+      });
 
   @override
-  // TODO: Cache this
+  // TODO: Cache this with ComputationCache
   Computed<bool> containsValue(V value) => $(() => _c.use.containsValue(value));
 
   @override

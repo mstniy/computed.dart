@@ -4,28 +4,10 @@ import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/icomputedmap.dart';
 import 'package:computed_collections/src/utils/merging_change_stream.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
-import 'package:meta/meta.dart';
 
 import 'computedmap_mixins.dart';
 import 'cs_computedmap.dart';
-
-@immutable
-class _Option<T> {
-  final bool _is;
-  final T? _value;
-
-  _Option.some(this._value) : _is = true;
-  _Option.none()
-      : _is = false,
-        _value = null;
-
-  bool operator ==(Object other) =>
-      other is _Option &&
-      ((_is && other._is && _value == other._value) || (!_is && !other._is));
-
-  @override
-  String toString() => _is ? '_Option.some($_value)' : '_Option.none()';
-}
+import 'utils/option.dart';
 
 class MapValuesComputedComputedMap<K, V, VParent>
     with OperatorsMixin<K, V>, MockMixin<K, V>
@@ -41,7 +23,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
   late final Computed<IMap<K, V>> snapshot;
 
   final keyComputations = ComputationCache<K, V?>();
-  final keyOptionComputations = ComputationCache<K, _Option<V>>();
+  final keyOptionComputations = ComputationCache<K, Option<V>>();
   final containsKeyComputations = ComputationCache<K, bool>();
   final containsValueComputations = ComputationCache<V, bool>();
 
@@ -149,7 +131,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
   @override
   Computed<ChangeEvent<K, V>> get changes => _changesComputed;
 
-  Computed<_Option<V>> _getKeyOptionComputation(K key) {
+  Computed<Option<V>> _getKeyOptionComputation(K key) {
     // This logic is extracted to a separate cache so that the mapped computations'
     // results are shared between `operator[]` and `containsKey`.
     final computationComputation = Computed(() {
@@ -165,20 +147,20 @@ class MapValuesComputedComputedMap<K, V, VParent>
       try {
         final s = snapshot.useWeak;
         // useWeak returned - means there is an existing non-weak listener on the snapshot
-        if (s.containsKey(key)) return _Option.some(s[key]);
-        return _Option.none();
+        if (s.containsKey(key)) return Option.some(s[key]);
+        return Option.none();
       } on NoStrongUserException {
         // Pass
       }
       final c = computationComputation.use;
       if (c == null) {
         // The key does not exist in the parent
-        return _Option.none();
+        return Option.none();
       }
       try {
-        return _Option.some(c.use);
+        return Option.some(c.use);
       } on NoValueException {
-        return _Option.none();
+        return Option.none();
       }
     });
   }
@@ -188,10 +170,10 @@ class MapValuesComputedComputedMap<K, V, VParent>
     final keyOptionComputation = _getKeyOptionComputation(key);
     final resultComputation = keyComputations.wrap(key, () {
       final option = keyOptionComputation.use;
-      if (!option._is)
+      if (!option.is_)
         return null; // The key does not exist in the parent or the mapped computations has no value yet
       // The key exists in the parent and the mapped computation has a value
-      return option._value;
+      return option.value;
     });
 
     return resultComputation;
@@ -202,7 +184,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
     final keyOptionComputation = _getKeyOptionComputation(key);
     final resultComputation = containsKeyComputations.wrap(key, () {
       final option = keyOptionComputation.use;
-      if (!option._is)
+      if (!option.is_)
         return false; // The key does not exist in the parent or the mapped computations has no value yet
       // The key exists in the parent and the mapped computation has a value
       return true;
