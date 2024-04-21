@@ -38,17 +38,20 @@ class ChangeStreamComputedMap<K, V>
   _ValueOrException<IMap<K, V>>? _curRes;
   ChangeStreamComputedMap(this._stream, [this._initialValueComputer]) {
     _keyPubSub = PubSub<K, Option<V>>((k) {
+      // TODO: This never returns Option.none. Maybe remove that functionality from Pubsub again?
       if (_curRes == null) {
         // First subscriber - kickstart the keepalive subscription
         assert(_cSub == null);
-        _cSub = _c.listen((e) {},
-            null); //////////////////////////////////////// todo: we need to cancel this onDispose
-        return Option
-            .none(); // No value yet - we just subscribed to the upstream
+        // Escape the Computed zone
+        Zone.current.parent!.run(() {
+          _cSub = _c.listen((e) {},
+              null); //////////////////////////////////////// todo: we need to cancel this onDispose
+        });
       }
       final m = _curRes!.value; // Throws if it is an exception
-      if (m.containsKey(k)) return Option.some(m[k]);
-      return Option.none();
+      if (m.containsKey(k))
+        return Option.some(Option.some(m[k])); // There is a value
+      return Option.some(Option.none()); // We know that there is no value
     });
     _changes = $(() => _stream.use);
     final firstReactToken = IMap<K,
@@ -181,20 +184,26 @@ class ChangeStreamComputedMap<K, V>
     }
   }
 
-  Computed<V?> operator [](K key) => $(() {
-        final keyOption = _keyPubSub.sub(key).use;
-        if (keyOption.is_) return keyOption.value;
-        return null;
-      });
+  Computed<V?> operator [](K key) {
+    final keySub = _keyPubSub.sub(key);
+    return $(() {
+      final keyOption = keySub.use;
+      if (keyOption.is_) return keyOption.value;
+      return null;
+    });
+  }
 
   @override
   Computed<ChangeEvent<K, V>> get changes => _changes;
 
   @override
-  Computed<bool> containsKey(K key) => $(() {
-        final keyOption = _keyPubSub.sub(key).use;
-        return keyOption.is_;
-      });
+  Computed<bool> containsKey(K key) {
+    final keySub = _keyPubSub.sub(key);
+    return $(() {
+      final keyOption = keySub.use;
+      return keyOption.is_;
+    });
+  }
 
   @override
   // TODO: Cache this with ComputationCache

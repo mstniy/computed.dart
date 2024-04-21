@@ -15,9 +15,13 @@ final computedZone = ZoneSpecification(
       throw ComputedAsyncError(),
   fork: (self, parent, zone, specification, zoneValues) =>
       throw ComputedAsyncError(),
-  registerBinaryCallback: <R, T1, T2>(self, parent, zone, f) =>
-      throw ComputedAsyncError(),
-  registerCallback: <R>(self, parent, zone, f) => throw ComputedAsyncError(),
-  registerUnaryCallback: <R, T>(self, parent, zone, f) =>
-      throw ComputedAsyncError(),
+  registerBinaryCallback: <R, T1, T2>(self, parent, zone, f) {
+    throw ComputedAsyncError();
+  },
+  registerCallback: <R>(self, parent, zone, f) {
+    throw ComputedAsyncError();
+  },
+  registerUnaryCallback: <R, T>(self, parent, zone, f) {
+    throw ComputedAsyncError();
+  },
 );

@@ -2,10 +2,12 @@ import 'dart:async';
 
 import 'package:computed/computed.dart';
 
+import 'option.dart';
+
 class PubSub<K, V> {
   // Note that this is NOT run as part of a Computed computation.
   // It is just a regular function
-  final V Function(K key) computeKey;
+  final Option<V> Function(K key) computeKey;
 
   PubSub(this.computeKey);
 
@@ -26,7 +28,8 @@ class PubSub<K, V> {
     late final Computed<V> computation;
 
     void maybeStepDown() {
-      if (identical(_keyValueStreams[key]!.$1, computation)) {
+      // _keyValueStreams[key] might be null because the leader's onDispose is called before the followers'
+      if (identical(_keyValueStreams[key]?.$1, computation)) {
         // We are the leader
         _keyValueStreams.remove(key);
       }
@@ -41,7 +44,9 @@ class PubSub<K, V> {
         try {
           return leaderS.$2.stream.use;
         } catch (NoValueException) {
-          return computeKey(key);
+          final res = computeKey(key);
+          if (res.is_) return res.value as V;
+          throw NoValueException;
         }
       } else {
         return leaderS.$1.use; // Otherwise, use the leader
