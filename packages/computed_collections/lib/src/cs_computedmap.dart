@@ -219,5 +219,6 @@ class ChangeStreamComputedMap<K, V>
   late final Computed<int> length;
 
   @override
+  // TODO: Do not directly expose this. If mocked, the internal bookeeping will be messed up.
   Computed<IMap<K, V>> get snapshot => _c;
 }
