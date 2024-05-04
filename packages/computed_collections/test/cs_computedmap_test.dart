@@ -48,7 +48,7 @@ void main() {
     expect(callCnt1, 1);
     expect(lastRes1, null);
 
-    s.add(KeyChanges({0: ChangeRecordValue(01)}.lock));
+    s.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
     await Future.value();
     expect(callCnt1, 2);
     expect(lastRes1, 1);

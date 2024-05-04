@@ -43,12 +43,15 @@ class AddComputedMap<K, V>
     });
   }
 
-  Computed<V?> operator [](K key) => keyComputations.wrap(key, () {
-        // We make this decision inside the computation as opposed to directly inside `operator[]`
-        // so that even mocks changing the value of `key` are possible.
-        if (key == _key) return _value;
-        return _parent[key].use;
-      });
+  Computed<V?> operator [](K key) {
+    final parentKey = _parent[key];
+    return keyComputations.wrap(key, () {
+      // We make this decision inside the computation as opposed to directly inside `operator[]`
+      // so that even mocks changing the value of `key` are possible.
+      if (key == _key) return _value;
+      return parentKey.use;
+    });
+  }
 
   @override
   IComputedMap<K, V> add(K key, V value) {
@@ -60,15 +63,20 @@ class AddComputedMap<K, V>
   }
 
   @override
-  Computed<bool> containsKey(K key) => containsKeyComputations.wrap(key, () {
-        if (key == _key) return true;
-        return _parent.containsKey(key).use;
-      });
+  Computed<bool> containsKey(K key) {
+    final parentContainsKey = _parent.containsKey(key);
+    return containsKeyComputations.wrap(key, () {
+      if (key == _key) return true;
+      return parentContainsKey.use;
+    });
+  }
 
   @override
-  Computed<bool> containsValue(V value) =>
-      containsValueComputations.wrap(value, () {
-        if (value == _value) return true;
-        return _parent.containsValue(value).use;
-      });
+  Computed<bool> containsValue(V value) {
+    final parentContainsValue = _parent.containsValue(value);
+    return containsValueComputations.wrap(value, () {
+      if (value == _value) return true;
+      return parentContainsValue.use;
+    });
+  }
 }

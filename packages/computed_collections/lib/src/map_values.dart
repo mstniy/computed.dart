@@ -57,16 +57,23 @@ class MapValuesComputedMap<K, V, VParent>
   }
 
   @override
-  Computed<bool> containsKey(K key) =>
-      containsKeyComputations.wrap(key, () => _parent.containsKey(key).use);
+  Computed<bool> containsKey(K key) {
+    final parentContainsKey = _parent.containsKey(key);
+    // TODO: This is inefficient. Make the computation map take computations as parameter?
+    return containsKeyComputations.wrap(key, () => parentContainsKey.use);
+  }
 
   @override
-  Computed<V?> operator [](K key) => keyComputations.wrap(key, () {
-        if (_parent.containsKey(key).use) {
-          return _convert(key, _parent[key].use as VParent);
-        }
-        return null;
-      });
+  Computed<V?> operator [](K key) {
+    final parentContainsKey = _parent.containsKey(key);
+    final parentKey = _parent[key];
+    return keyComputations.wrap(key, () {
+      if (parentContainsKey.use) {
+        return _convert(key, parentKey.use as VParent);
+      }
+      return null;
+    });
+  }
 
   @override
   Computed<bool> containsValue(V value) => containsValueComputations.wrap(
