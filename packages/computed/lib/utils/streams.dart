@@ -55,8 +55,8 @@ class ValueStream<T> extends Stream<T> {
         _lastAddedValue!._isValue &&
         _lastNotifiedValue!._value == _lastAddedValue!._value) return;
     if (_controller.hasListener) {
-      _lastNotifiedValue = _lastAddedValue;
       // Otherwise the controller will buffer
+      _lastNotifiedValue = _lastAddedValue;
       if (_lastAddedValue!._isValue) {
         _controller.add(_lastAddedValue!._value as T);
       } else {

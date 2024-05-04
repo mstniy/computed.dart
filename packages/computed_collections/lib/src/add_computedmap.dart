@@ -19,10 +19,10 @@ class AddComputedMap<K, V>
   final containsValueComputations = ComputationCache<V, bool>();
   final isEmpty = $(() => false);
   final isNotEmpty = $(() => true);
-  final Computed<int> length;
-  AddComputedMap(this._parent, this._key, this._value)
-      : length = $(() =>
-            _parent.length.use + (_parent.containsKey(_key).use ? 0 : 1)) {
+  late final Computed<int> length;
+  AddComputedMap(this._parent, this._key, this._value) {
+    final parentContainsKey = _parent.containsKey(_key);
+    length = $(() => _parent.length.use + (parentContainsKey.use ? 0 : 1));
     snapshot = $(() => _parent.snapshot.use.add(this._key, this._value));
     changes = Computed(() {
       final changeEvent = _parent.changes.use;

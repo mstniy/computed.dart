@@ -39,19 +39,20 @@ class ChangeStreamComputedMap<K, V>
   ChangeStreamComputedMap(this._stream, [this._initialValueComputer]) {
     _keyPubSub = PubSub<K, Option<V>>((k) {
       // TODO: This never returns Option.none. Maybe remove that functionality from Pubsub again?
-      if (_curRes == null) {
-        // First subscriber - kickstart the keepalive subscription
-        assert(_cSub == null);
-        // Escape the Computed zone
-        Zone.current.parent!.run(() {
-          _cSub = _c.listen((e) {},
-              null); //////////////////////////////////////// todo: we need to cancel this onDispose
-        });
-      }
+      // Kickstart the keepalive subscription, if there isn't one
+      // Escape the Computed zone
+      Zone.current.parent!.run(() {
+        _cSub ??= _c.listen((e) {}, null);
+      });
       final m = _curRes!.value; // Throws if it is an exception
       if (m.containsKey(k))
         return Option.some(Option.some(m[k])); // There is a value
       return Option.some(Option.none()); // We know that there is no value
+    }, (_) {
+      if (_keyPubSub.subbedKeys.isEmpty) {
+        _cSub!.cancel();
+        _cSub = null;
+      }
     });
     _changes = $(() => _stream.use);
     final firstReactToken = IMap<K,
@@ -152,8 +153,7 @@ class ChangeStreamComputedMap<K, V>
   @visibleForTesting
   void unmock() {
     // ignore: invalid_use_of_visible_for_testing_member
-    _c.unmock(); // Note that this won't notify key streams
-    _notifyAllKeyStreams();
+    _c.unmock(); // Note that this will notify key streams
   }
 
   void _notifyAllKeyStreams() {

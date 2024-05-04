@@ -97,6 +97,7 @@ void main() {
 
     s.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
     await Future.value();
+    await Future.value();
     expect(cCnt, 2);
     expect(callCnt1, 1);
     expect(lastRes1, null);
@@ -274,12 +275,9 @@ void main() {
     var cCnt = 0;
 
     final m2 = m.mapValuesComputed((key, value) => $(() {
-          if (key == 0) {
-            cCnt++;
-            return value;
-          } else {
-            fail('must not compute any key other then 0');
-          }
+          expect(key, 0);
+          cCnt++;
+          return value;
         }));
 
     List<int?> resCache1 = [];
@@ -294,6 +292,9 @@ void main() {
 
     s.add(ChangeEventReplace({0: 1, 1: 2}.lock));
     await Future.value();
+    await Future.value();
+    await Future.value();
+    await Future.value(); // TODO: Ridiculous microtask lag
     expect(cCnt, 2);
     expect(resCache1, [null, 1]);
     expect(resCache2, [false, true]);
