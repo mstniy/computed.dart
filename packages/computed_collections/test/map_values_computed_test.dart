@@ -97,7 +97,6 @@ void main() {
 
     s.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
     await Future.value();
-    await Future.value();
     expect(cCnt, 2);
     expect(callCnt1, 1);
     expect(lastRes1, null);
@@ -292,12 +291,9 @@ void main() {
 
     s.add(ChangeEventReplace({0: 1, 1: 2}.lock));
     await Future.value();
-    await Future.value();
-    await Future.value();
-    await Future.value(); // TODO: Ridiculous microtask lag
     expect(cCnt, 2);
-    expect(resCache1, [null, 1]);
-    expect(resCache2, [false, true]);
+    expect(resCache1, [1]);
+    expect(resCache2, [true]);
 
     sub1.cancel();
     sub2.cancel();

@@ -1,7 +1,5 @@
-import 'dart:async';
-
+import 'package:computed/computed.dart';
 import 'package:computed/utils/streams.dart';
-import 'package:rxdart/rxdart.dart' show BehaviorSubject;
 
 import 'option.dart';
 
@@ -26,60 +24,38 @@ class PubSub<K, V> {
     s.addError(error);
   }
 
-  ValueStream<V> sub(K key) {
-    StreamSubscription<V>? sub;
-    late ValueStream<V> self;
+  Computed<V> sub(K key) {
+    final myStream = ValueStream<V>();
+    ValueStream<V>? leaderStream;
 
-    void leaderOnCancel() {
-      final removed = _keyValueStreams.remove(key);
-      assert(removed != null);
-      onKeyCancel(key);
+    void onCancel() {
+      if (!leaderStream!.hasListener) {
+        final removed = _keyValueStreams.remove(key);
+        assert(removed != null);
+        leaderStream = null;
+        onKeyCancel(key);
+      } else {
+        leaderStream = null;
+      }
     }
 
-    void followerOnCancel() {
-      sub!.cancel();
-      sub = null;
-    }
-
-    void onListen() {
-      var newLeader = false;
-      final leaderS = _keyValueStreams.putIfAbsent(key, () {
-        newLeader = true;
-        // Leaders are sync because the only listeners are followers,
-        // which themselves do not run arbitrary code and are not sync.
-        return BehaviorSubject(
-            onCancel: leaderOnCancel,
-            sync: true); // TODO: Does BehaviourSubject have == dedup?
-      });
-
-      if (newLeader) {
-        () {
-          Option<V> res;
-          try {
-            res = computeKey(key);
-          } catch (e) {
-            leaderS.addError(e);
-            return; // Why does Dart not have try-catch-else :(
-          }
+    V f() {
+      if (leaderStream == null) {
+        leaderStream = _keyValueStreams.putIfAbsent(key, () => myStream);
+        if (identical(leaderStream, myStream)) {
+          // This key gained its first listener - try computing it with the provided key computer
+          final res = computeKey(key);
           if (res.is_) {
-            leaderS.add(res.value as V);
+            myStream.add(res.value as V);
           }
-        }();
+        }
       }
-
-      // Follow the leader
-      sub = leaderS.listen(self.add, onError: self.addError);
-      // Sure, the leader will tell this to us, but in a separate microtask
-      if (leaderS.hasError) {
-        self.addError(leaderS.error);
-      } else if (leaderS.hasValue) {
-        self.add(leaderS.value);
-      }
+      return leaderStream!.use;
     }
 
-    self = ValueStream<V>(onListen: onListen, onCancel: followerOnCancel);
-    return self;
+    return Computed<V>(f,
+        onDispose: (_) => onCancel(), onDisposeError: (_) => onCancel());
   }
 
-  final _keyValueStreams = <K, BehaviorSubject<V>>{};
+  final _keyValueStreams = <K, ValueStream<V>>{};
 }

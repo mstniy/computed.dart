@@ -138,9 +138,6 @@ class MapValuesComputedComputedMap<K, V, VParent>
     final parentKey = _parent[key];
     final computationComputation = Computed(() {
       if (parentContainsKey.use) {
-        // TODO: This sequential dependency (containsKey -> key) causes an extra microtask delay
-        //  Can we make even the followers in PubSub sync? The downstream listeners are computations, anyway
-        //  Idea: make PubSub::sub's return value computation, so that the followers can be safely made sync
         return _convert(key, parentKey.use as VParent);
       }
       return null;

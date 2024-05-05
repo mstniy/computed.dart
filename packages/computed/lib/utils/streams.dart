@@ -107,6 +107,8 @@ class ValueStream<T> extends Stream<T> {
         onError: onError, onDone: onDone, cancelOnError: cancelOnError);
   }
 
+  bool get hasListener => _controller.hasListener; // TODO: Test this
+
   void _setController() {
     _controller =
         StreamController(sync: true, onListen: _onListen, onCancel: _onCancel);
