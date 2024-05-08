@@ -110,7 +110,5 @@ void main() {
   test('initial computation works', () async {});
   test('operator[] works', () async {});
 
-  test('propagates the change stream', () async {});
-
   test('mock works', () async {});
 }

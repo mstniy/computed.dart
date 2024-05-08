@@ -1,9 +1,10 @@
+import 'dart:async';
+
 import 'package:computed/computed.dart';
 import 'package:computed/utils/computation_cache.dart';
 import 'package:computed/utils/streams.dart';
 import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/icomputedmap.dart';
-import 'package:computed_collections/src/utils/merging_change_stream.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import 'computedmap_mixins.dart';
@@ -30,8 +31,10 @@ class GroupByComputedMap<K, V, KParent>
   var _mappedKeys = <KParent, K>{};
   var _m = <K,
       (
-    MergingChangeStream<KParent, V>,
-    ValueStream<IMap<KParent, V>>,
+    StreamController<ChangeEvent<KParent, V>>,
+    ValueStream<
+        IMap<KParent,
+            V>>, // TODO: Do we actually need this? The only use case seems to be in the initial value computer of the groups' CSCM, but couldn't that just do a lookup on _m and fetch the snapshot from there?
     IMap<KParent, V>
   )>{};
 
@@ -40,13 +43,13 @@ class GroupByComputedMap<K, V, KParent>
 
     _m = grouped.map((k, v) {
       final vlocked = v.lock;
-      return MapEntry(
-          k, (MergingChangeStream(), ValueStream.seeded(vlocked), vlocked));
+      return MapEntry(k,
+          (StreamController.broadcast(), ValueStream.seeded(vlocked), vlocked));
     });
     _mappedKeys = mappedKeys;
 
     return _m.map((k, v) {
-      return MapEntry(k, ChangeStreamComputedMap(v.$1, () => v.$2.use));
+      return MapEntry(k, ChangeStreamComputedMap(v.$1.stream, () => v.$2.use));
     }).lock;
   }
 
@@ -66,38 +69,43 @@ class GroupByComputedMap<K, V, KParent>
               change.changes.groupBy((_, e) => e is ChangeRecordDelete);
           final deletedKeys =
               groupedByIsDelete[true]?.keys.toSet() ?? <KParent>{};
-          final valueKeysAndGroups =
-              groupedByIsDelete[false]?.map((k, v) => MapEntry(k, (
-                        // TODO: Can we idempotency-check the user-supplied key?
-                        _convert(k, (v as ChangeRecordValue<V>).value),
-                        v.value
-                      ))) ??
-                  <KParent, (K, V)>{};
+          final valueKeysAndGroups = groupedByIsDelete[false]?.map((k, v) =>
+                  MapEntry(k, (
+                    _convert(k, (v as ChangeRecordValue<V>).value),
+                    v.value
+                  ))) ??
+              <KParent, (K, V)>{};
 
           final keyChanges = <K, ChangeRecord<IComputedMap<KParent, V>>>{};
+
+          final batchedChanges = <K, KeyChanges<KParent, V>>{};
 
           for (var e in valueKeysAndGroups.entries) {
             final groupKey = e.value.$1;
             final parentKey = e.key;
             final value = e.value.$2;
-            final group = _m.update(
+            _m.update(
               groupKey,
               (group) => (group.$1, group.$2, group.$3.add(parentKey, value)),
               ifAbsent: () {
                 final group = (
-                  MergingChangeStream<KParent, V>(),
+                  StreamController<ChangeEvent<KParent, V>>.broadcast(),
                   ValueStream<IMap<KParent, V>>(),
                   {parentKey: value}.lock
                 );
                 keyChanges[groupKey] = ChangeRecordValue(
-                    ChangeStreamComputedMap(group.$1, () => group.$2.use));
+                    ChangeStreamComputedMap(
+                        group.$1.stream, () => group.$2.use));
                 return group;
               },
             );
-            group.$1.add(KeyChanges(<KParent, ChangeRecord<V>>{
-              parentKey: ChangeRecordValue<V>(value)
-            }.lock));
-            group.$2.add(group.$3);
+            batchedChanges.update(
+                groupKey,
+                (changes) => KeyChanges(
+                    changes.changes.add(e.key, ChangeRecordValue(e.value.$2))),
+                ifAbsent: () => KeyChanges(<KParent, ChangeRecord<V>>{
+                      e.key: ChangeRecordValue(e.value.$2)
+                    }.lock));
             final oldGroupKey = _mappedKeys[parentKey];
             _mappedKeys[parentKey] = groupKey;
             if (oldGroupKey != null) {
@@ -107,11 +115,15 @@ class GroupByComputedMap<K, V, KParent>
                 if (oldGroup.$3.isEmpty) {
                   keyChanges[oldGroupKey] = ChangeRecordDelete();
                   _m.remove(oldGroupKey);
+                  batchedChanges.remove(oldGroupKey);
                 } else {
-                  oldGroup.$1.add(KeyChanges(<KParent, ChangeRecord<V>>{
-                    parentKey: ChangeRecordDelete<V>()
-                  }.lock));
-                  oldGroup.$2.add(oldGroup.$3);
+                  batchedChanges.update(
+                      oldGroupKey,
+                      (changes) => KeyChanges(
+                          changes.changes.add(e.key, ChangeRecordDelete<V>())),
+                      ifAbsent: () => KeyChanges(<KParent, ChangeRecord<V>>{
+                            e.key: ChangeRecordDelete<V>()
+                          }.lock));
                 }
               }
             }
@@ -125,7 +137,15 @@ class GroupByComputedMap<K, V, KParent>
               group = (group.$1, group.$2, group.$3.remove(deletedKey));
               if (group.$3.isEmpty) {
                 keyChanges[oldGroup] = ChangeRecordDelete();
+                batchedChanges.remove(oldGroup);
               } else {
+                batchedChanges.update(
+                    oldGroup,
+                    (changes) => KeyChanges(changes.changes
+                        .add(deletedKey, ChangeRecordDelete<V>())),
+                    ifAbsent: () => KeyChanges(<KParent, ChangeRecord<V>>{
+                          deletedKey: ChangeRecordDelete<V>()
+                        }.lock));
                 group.$1.add(KeyChanges(<KParent, ChangeRecord<V>>{
                   deletedKey: ChangeRecordDelete<V>()
                 }.lock));
@@ -133,6 +153,12 @@ class GroupByComputedMap<K, V, KParent>
               }
               return group;
             }); // Not passing `ifAbsent` as the key has to be present (ow/ we have a corrupt internal state)
+          }
+
+          for (var e in batchedChanges.entries) {
+            final group = _m[e.key]!;
+            group.$1.add(e.value);
+            group.$2.add(group.$3);
           }
 
           return KeyChanges(keyChanges.lock);
