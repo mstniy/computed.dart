@@ -260,5 +260,14 @@ void main() {
 
       expect(lCnt, 1);
     });
+
+    test('hasListener works', () async {
+      final s = ValueStream();
+      expect(s.hasListener, false);
+      final sub = s.listen((event) {});
+      expect(s.hasListener, true);
+      sub.cancel();
+      expect(s.hasListener, false);
+    });
   });
 }
