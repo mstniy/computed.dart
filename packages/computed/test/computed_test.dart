@@ -704,12 +704,14 @@ void main() {
     expect(ueCount, 3);
     expect(lastError, 1);
 
-    final sub2 = zone.run(() => c.listen((event) {}, (err) {}));
+    final sub2 = zone.run(() => c.listen((event) {}, null));
+
+    final sub3 = zone.run(() => c.listen((event) {}, (err) {}));
 
     s.add(2);
     expect(ueCount, 3);
 
-    sub2.cancel();
+    sub3.cancel();
 
     s.add(3);
     expect(ueCount, 4);

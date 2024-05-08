@@ -307,8 +307,8 @@ class ComputedImpl<T> {
           onError == null &&
           _weakDownstreamComputations.isEmpty &&
           _memoizedDownstreamComputations.isEmpty &&
-          _nonMemoizedDownstreamComputations.isEmpty) {
-        // TODO: Only do this if this is the first listener
+          _nonMemoizedDownstreamComputations.isEmpty &&
+          _listeners.length == 1) {
         Zone.current.handleUncaughtError(_lastResult!._exc!, _lastResult!._st!);
       }
       scheduleMicrotask(() {
