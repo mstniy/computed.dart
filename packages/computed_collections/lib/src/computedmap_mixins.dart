@@ -1,5 +1,6 @@
 import 'package:computed/computed.dart';
 import 'package:computed/utils/computation_cache.dart';
+import 'package:computed_collections/src/const_computedmap.dart';
 import 'package:computed_collections/src/group_by.dart';
 import 'package:computed_collections/src/map_values.dart';
 import 'package:computed_collections/src/map_values_computed.dart';
@@ -107,26 +108,7 @@ mixin MockMixin<K, V> {
   ComputationCache<V, bool> get containsValueComputations;
 
   @visibleForTesting
-  void fix(IMap<K, V> value) {
-    // TODO: Replace this function body with a mock to a constant computed map on [value] once we implement that
-
-    // ignore: invalid_use_of_visible_for_testing_member
-    changes.fix(ChangeEventReplace(value));
-    // ignore: invalid_use_of_visible_for_testing_member
-    snapshot.fix(value);
-    // ignore: invalid_use_of_visible_for_testing_member
-    keyComputations.mock((key) => value[key]);
-    // ignore: invalid_use_of_visible_for_testing_member
-    containsKeyComputations.mock((key) => value.containsKey(key));
-    // ignore: invalid_use_of_visible_for_testing_member
-    containsValueComputations.mock((v) => value.containsValue(v));
-    // ignore: invalid_use_of_visible_for_testing_member
-    isEmpty.fix(value.isEmpty);
-    // ignore: invalid_use_of_visible_for_testing_member
-    isNotEmpty.fix(value.isNotEmpty);
-    // ignore: invalid_use_of_visible_for_testing_member
-    length.fix(value.length);
-  }
+  void fix(IMap<K, V> value) => mock(ConstComputedMap(value));
 
   @visibleForTesting
   void fixThrow(Object e) {
@@ -146,8 +128,9 @@ mixin MockMixin<K, V> {
 
   @visibleForTesting
   void mock(IComputedMap<K, V> mock) {
-    // ignore: invalid_use_of_visible_for_testing_member
-    changes.mock(() => mock.changes.use);
+    changes
+        // ignore: invalid_use_of_visible_for_testing_member
+        .mock(() => mock.changes.useOr(ChangeEventReplace(mock.snapshot.use)));
     // ignore: invalid_use_of_visible_for_testing_member
     snapshot.mock(() => mock.snapshot.use);
     // ignore: invalid_use_of_visible_for_testing_member
