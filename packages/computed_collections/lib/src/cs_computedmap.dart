@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:computed/computed.dart';
+import 'package:computed/utils/computation_cache.dart';
 import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/icomputedmap.dart';
 import 'package:computed_collections/src/utils/pubsub.dart';
@@ -186,9 +187,11 @@ class ChangeStreamComputedMap<K, V>
     });
   }
 
+  final _containsValueCache = ComputationCache<V, bool>();
+
   @override
-  // TODO: Cache this with ComputationCache
-  Computed<bool> containsValue(V value) => $(() => _c.use.containsValue(value));
+  Computed<bool> containsValue(V value) =>
+      _containsValueCache.wrap(value, () => _c.use.containsValue(value));
 
   @override
   late final Computed<bool> isEmpty;
