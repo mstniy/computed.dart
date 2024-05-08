@@ -1,16 +1,14 @@
-import 'dart:async';
-
 import 'package:computed/computed.dart';
 import 'package:computed/utils/streams.dart';
 
 class PubSub<K, V> {
   // Note that this is NOT run as part of a Computed computation.
   // It is just a regular function
-  final V Function(K key) computeKey;
+  final V Function(K key) computeValue;
   final void Function() onListen;
   final void Function() onCancel;
 
-  PubSub(this.computeKey, this.onListen, this.onCancel);
+  PubSub(this.computeValue, this.onListen, this.onCancel);
 
   // This is a no-op on the keys which have no subscribers
   void recomputeKeys(Set<K> keysToRecompute) {
@@ -18,13 +16,13 @@ class PubSub<K, V> {
         keysToRecompute.intersection(_keyValueStreams.keys.toSet());
 
     for (var key in intersection) {
-      _keyValueStreams[key]!.add(computeKey(key));
+      _keyValueStreams[key]!.add(computeValue(key));
     }
   }
 
   void recomputeAllKeys() {
     for (var e in _keyValueStreams.entries) {
-      e.value.add(computeKey(e.key));
+      e.value.add(computeValue(e.key));
     }
   }
 
@@ -63,7 +61,7 @@ class PubSub<K, V> {
           () {
             final V value;
             try {
-              value = computeKey(key);
+              value = computeValue(key);
             } catch (e) {
               myStream.addError(e);
               return; // Note that this only exits the lambda
