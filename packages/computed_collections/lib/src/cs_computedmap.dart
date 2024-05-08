@@ -38,19 +38,19 @@ class ChangeStreamComputedMap<K, V>
   _ValueOrException<IMap<K, V>>? _curRes;
   ChangeStreamComputedMap(this._stream, [this._initialValueComputer]) {
     _keyPubSub = PubSub<K, Option<V>>((k) {
-      // Kickstart the keepalive subscription, if there isn't one
-      // Escape the Computed zone
-      Zone.current.parent!.run(() {
-        _cSub ??= _c.listen((e) {}, null);
-      });
-      final m = _curRes!.value; // Throws if it is an exception
+      final m = _curRes!.value; // Throws if there is an exception
       if (m.containsKey(k)) return Option.some(m[k]); // There is a value
       return Option.none(); // There is no value
-    }, (_) {
-      if (_keyPubSub.subbedKeys.isEmpty) {
-        _cSub!.cancel();
-        _cSub = null;
-      }
+    }, () {
+      assert(_cSub == null);
+      // Kickstart the keepalive subscription
+      // Escape the Computed zone
+      Zone.current.parent!.run(() {
+        _cSub = _c.listen((e) {}, null);
+      });
+    }, () {
+      _cSub!.cancel();
+      _cSub = null;
     });
     _changes = $(() => _stream.use);
     final firstReactToken = IMap<K,
@@ -97,14 +97,12 @@ class ChangeStreamComputedMap<K, V>
         }
       }, (e) {
         _curRes = _ValueOrException.exc(e);
-        // Escape the Computed zone
-        Zone.current.parent!.run(_notifyAllKeyStreams);
+        _notifyAllKeyStreams();
         throw e;
       });
 
       if (notifier != null) {
-        // Escape the Computed zone
-        Zone.current.parent!.run(notifier!);
+        notifier!();
       }
 
       return prev;
@@ -156,30 +154,15 @@ class ChangeStreamComputedMap<K, V>
 
   void _notifyAllKeyStreams() {
     if (_curRes!._isValue) {
-      final m = _curRes!._value!;
-      for (var key in _keyPubSub.subbedKeys) {
-        // TODO: This is inefficient, as subbedKeys is already an iterator over the internal pubsub map,
-        //  but .pub will do a new search on it.
-        //  Also if there are a lot of keys but few subscribers, we do an O(n) loop for nothing. Set intersection might be faster.
-        _keyPubSub.pub(
-            key, m.containsKey(key) ? Option.some(m[key]) : Option.none());
-      }
+      _keyPubSub.recomputeAllKeys();
     } else {
-      final e = _curRes!._exc!;
-      for (var key in _keyPubSub.subbedKeys) {
-        _keyPubSub.pubError(key, e);
-      }
+      _keyPubSub.pubError(_curRes!._exc!);
     }
   }
 
-  void _notifyKeyStreams(Iterable<K> keys) {
+  void _notifyKeyStreams(Set<K> keys) {
     assert(_curRes!._isValue);
-    final m = _curRes!._value!;
-    for (var key in keys) {
-      // Note that this is a no-op if the key is not subscribed to
-      _keyPubSub.pub(
-          key, m.containsKey(key) ? Option.some(m[key]) : Option.none());
-    }
+    _keyPubSub.recomputeKeys(keys);
   }
 
   Computed<V?> operator [](K key) {
