@@ -38,16 +38,14 @@ class ChangeStreamComputedMap<K, V>
   _ValueOrException<IMap<K, V>>? _curRes;
   ChangeStreamComputedMap(this._stream, [this._initialValueComputer]) {
     _keyPubSub = PubSub<K, Option<V>>((k) {
-      // TODO: This never returns Option.none. Maybe remove that functionality from Pubsub again?
       // Kickstart the keepalive subscription, if there isn't one
       // Escape the Computed zone
       Zone.current.parent!.run(() {
         _cSub ??= _c.listen((e) {}, null);
       });
       final m = _curRes!.value; // Throws if it is an exception
-      if (m.containsKey(k))
-        return Option.some(Option.some(m[k])); // There is a value
-      return Option.some(Option.none()); // We know that there is no value
+      if (m.containsKey(k)) return Option.some(m[k]); // There is a value
+      return Option.none(); // There is no value
     }, (_) {
       if (_keyPubSub.subbedKeys.isEmpty) {
         _cSub!.cancel();

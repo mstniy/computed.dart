@@ -1,12 +1,10 @@
 import 'package:computed/computed.dart';
 import 'package:computed/utils/streams.dart';
 
-import 'option.dart';
-
 class PubSub<K, V> {
   // Note that this is NOT run as part of a Computed computation.
   // It is just a regular function
-  final Option<V> Function(K key) computeKey;
+  final V Function(K key) computeKey;
   final void Function(K key) onKeyCancel;
 
   PubSub(this.computeKey, this.onKeyCancel);
@@ -43,11 +41,8 @@ class PubSub<K, V> {
       if (leaderStream == null) {
         leaderStream = _keyValueStreams.putIfAbsent(key, () => myStream);
         if (identical(leaderStream, myStream)) {
-          // This key gained its first listener - try computing it with the provided key computer
-          final res = computeKey(key);
-          if (res.is_) {
-            myStream.add(res.value as V);
-          }
+          // This key gained its first listener - computed its value with the provided key computer
+          myStream.add(computeKey(key));
         }
       }
       return leaderStream!.use;
