@@ -109,6 +109,9 @@ class ChangeStreamComputedMap<K, V>
       return prev;
     }, async: true, initialPrev: firstReactToken);
 
+    // We do not directly expose _c because it also does bookkeeping, and
+    // that would get messes up if it gets mocked.
+    snapshot = $(() => _c.use);
     isEmpty = $(() => _c.use.isEmpty);
     isNotEmpty = $(() => _c.use.isNotEmpty);
     length = $(() => _c.use.length);
@@ -203,6 +206,5 @@ class ChangeStreamComputedMap<K, V>
   late final Computed<int> length;
 
   @override
-  // TODO: Do not directly expose this. If mocked, the internal bookeeping will be messed up.
-  Computed<IMap<K, V>> get snapshot => _c;
+  late final Computed<IMap<K, V>> snapshot;
 }
