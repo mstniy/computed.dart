@@ -96,12 +96,24 @@ void main() {
     expect(lastRes4, null);
     // Delete a key, removing a group, but a new key immediately re-creates it
     s.add(KeyChanges(
-        {0: ChangeRecordValue(3), 2: ChangeRecordDelete<int>()}.lock));
+        {2: ChangeRecordDelete<int>(), 0: ChangeRecordValue(3)}.lock));
     await Future.value();
     expect(lastRes1!.keys, containsAll([0, 1]));
     await Future.value();
     expect(lastRes2, {0: 3}.lock);
     expect(lastRes3, {1: 1}.lock);
+    expect(lastRes4, null);
+    // Make multiple changes to groups in one upstream change
+    s.add(KeyChanges({
+      2: ChangeRecordValue(1),
+      1: ChangeRecordValue(3),
+      0: ChangeRecordValue(1),
+    }.lock));
+    await Future.value();
+    expect(lastRes1!.keys, containsAll([0, 1]));
+    await Future.value();
+    expect(lastRes2, {1: 3}.lock);
+    expect(lastRes3, {0: 1, 2: 1}.lock);
     expect(lastRes4, null);
 
     sub1.cancel();
@@ -125,6 +137,32 @@ void main() {
     expect((await getValue($(() => group0.use!.snapshot.use))), {0: 1}.lock);
     m1.mock(ConstComputedMap({1: 2, 2: 3}.lock));
     expect((await getValue($(() => group0.use))), null);
+  });
+
+  test('containsKey works', () async {
+    final m1 = ConstComputedMap({0: 1, 1: 2}.lock);
+    final m2 = m1.groupBy((key, value) => key % 3);
+    expect(await getValue(m2.containsKey(0)), true);
+    expect(await getValue(m2.containsKey(1)), true);
+    expect(await getValue(m2.containsKey(2)), false);
+  });
+
+  test('containsValue works', () async {
+    // The semantics here are admittedly somehow unintuitive
+    // It is worth nothing that a "value" from the perspective of the groupBy collection
+    // is itself a collection representing the group.
+    final m1 = ConstComputedMap({0: 1, 1: 2}.lock);
+    final m2 = m1.groupBy((key, value) => key % 3);
+    // We have to maintain a listener on m2 - otherwise it creates new group collections with each getValue call
+    final sub = m2.snapshot.listen((event) {}, null);
+    final group = (await getValue(m2[0]))!;
+    expect(await getValue(m2.containsValue(group)), true);
+    expect(
+        await getValue(
+            m2.containsValue(IComputedMap.fromChangeStream(Stream.empty()))),
+        false);
+
+    sub.cancel();
   });
 
   test('mock works', () async {
