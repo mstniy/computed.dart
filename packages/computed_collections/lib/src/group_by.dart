@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:computed/computed.dart';
 import 'package:computed/utils/computation_cache.dart';
-import 'package:computed/utils/streams.dart';
 import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/icomputedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';

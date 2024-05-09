@@ -2,8 +2,11 @@ import 'package:computed/computed.dart';
 import 'package:computed/utils/streams.dart';
 import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/icomputedmap.dart';
+import 'package:computed_collections/src/const_computedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:test/test.dart';
+
+import 'helpers.dart';
 
 void main() {
   test('incremental update works', () async {
@@ -107,8 +110,24 @@ void main() {
     sub4.cancel();
   });
 
-  test('initial computation works', () async {});
-  test('operator[] works', () async {});
+  test('initial computation works', () async {
+    final m1 = ConstComputedMap({0: 1, 1: 2, 2: 3, 3: 4}.lock);
+    final m2 = m1.groupBy((key, value) => key % 3);
+    expect((await getValue(m2.snapshot)).keys, [0, 1, 2]);
+  });
+  test('operator[] works', () async {
+    final m1 = ConstComputedMap({0: 1, 1: 2, 2: 3, 3: 4}.lock);
+    final m2 = m1.groupBy((key, value) => key % 3);
+    final group0 = m2[0];
+    expect(
+        (await getValue($(() => group0.use!.snapshot.use))), {0: 1, 3: 4}.lock);
+    m1.mock(ConstComputedMap({0: 1, 1: 2, 2: 3}.lock));
+    expect((await getValue($(() => group0.use!.snapshot.use))), {0: 1}.lock);
+    m1.mock(ConstComputedMap({1: 2, 2: 3}.lock));
+    expect((await getValue($(() => group0.use))), null);
+  });
 
-  test('mock works', () async {});
+  test('mock works', () async {
+    // TODO: How to test this without duplicating code from the other mock tests?
+  }, skip: true);
 }

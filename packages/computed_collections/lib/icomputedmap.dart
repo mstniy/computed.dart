@@ -72,7 +72,8 @@ abstract class IComputedMap<K, V> {
       Computed<V> Function(K key, V value) update);
   IComputedMap<K, V> updateAll(V Function(K key, V value) update);
 
-  IComputedMap<K2, IComputedMap<K, V>> groupBy<K2>(K2 Function(K, V) key);
+  IComputedMap<K2, IComputedMap<K, V>> groupBy<K2>(
+      K2 Function(K key, V value) key);
   IComputedMap<K2, IComputedMap<K, V>> groupByComputed<K2>(
-      Computed<K2> Function(K, V) key);
+      Computed<K2> Function(K key, V value) key);
 }
