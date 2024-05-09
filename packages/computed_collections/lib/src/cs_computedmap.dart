@@ -30,8 +30,8 @@ class ChangeStreamComputedMap<K, V>
     with OperatorsMixin<K, V>
     implements IComputedMap<K, V> {
   final IMap<K, V> Function()? _initialValueComputer;
+  // TODO: We can probably change this to be a computation once we have .react on computations
   final Stream<ChangeEvent<K, V>> _stream;
-  late final Computed<ChangeEvent<K, V>> _changes;
   late final Computed<IMap<K, V>> _c;
   // The "keep-alive" subscription used by key streams, as we explicitly break the dependency DAG of Computed.
   ComputedSubscription<IMap<K, V>>? _cSub;
@@ -53,7 +53,7 @@ class ChangeStreamComputedMap<K, V>
       _cSub!.cancel();
       _cSub = null;
     });
-    _changes = $(() => _stream.use);
+    changes = $(() => _stream.use);
     final firstReactToken = IMap<K,
         V>(); // TODO: This is obviously ugly. Make Computed.withPrev support null instead
     _c = Computed.withPrev((prev) {
@@ -179,9 +179,6 @@ class ChangeStreamComputedMap<K, V>
   }
 
   @override
-  Computed<ChangeEvent<K, V>> get changes => _changes;
-
-  @override
   Computed<bool> containsKey(K key) {
     final keySub = _keyPubSub.sub(key);
     return $(() {
@@ -195,6 +192,9 @@ class ChangeStreamComputedMap<K, V>
   @override
   Computed<bool> containsValue(V value) =>
       _containsValueCache.wrap(value, () => _c.use.containsValue(value));
+
+  @override
+  late final Computed<ChangeEvent<K, V>> changes;
 
   @override
   late final Computed<bool> isEmpty;

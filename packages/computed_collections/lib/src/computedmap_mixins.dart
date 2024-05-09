@@ -129,11 +129,9 @@ mixin MockMixin<K, V> {
 
   @visibleForTesting
   void mock(IComputedMap<K, V> mock) {
-    // TODO: The changes should always initially emit a replacement to the upstream snapshot, even if the upstream already has a change
-    //  This is better expressed through .react-ing to computations, which we do not have yet.
     changes
         // ignore: invalid_use_of_visible_for_testing_member
-        .mock(() => mock.changes.useOr(ChangeEventReplace(mock.snapshot.use)));
+        .mock(() => mock.changes.use);
     // ignore: invalid_use_of_visible_for_testing_member
     snapshot.mock(() => mock.snapshot.use);
     // ignore: invalid_use_of_visible_for_testing_member
