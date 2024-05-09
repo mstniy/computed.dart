@@ -29,27 +29,28 @@ class GroupByComputedMap<K, V, KParent>
       ComputationCache<IComputedMap<KParent, V>, bool>();
 
   var _mappedKeys = <KParent, K>{};
+  // TODO: GroupByComputedMap keeps its own snapshots (in `_m`), so do the groups' ChangeStreamComputedMap-s.
+  //  Can we de-dup this replicated effort?
   var _m = <K,
       (
     StreamController<ChangeEvent<KParent, V>>,
-    ValueStream<
-        IMap<KParent,
-            V>>, // TODO: Do we actually need this? The only use case seems to be in the initial value computer of the groups' CSCM, but couldn't that just do a lookup on _m and fetch the snapshot from there?
     IMap<KParent, V>
-  )>{};
+  )>{}; // group key -> (change stream, group snapshot)
 
   IMap<K, IComputedMap<KParent, V>> _setM(IMap<KParent, V> m) {
     final (grouped, mappedKeys) = m.groupBy(_convert);
 
     _m = grouped.map((k, v) {
       final vlocked = v.lock;
-      return MapEntry(k,
-          (StreamController.broadcast(), ValueStream.seeded(vlocked), vlocked));
+      return MapEntry(k, (StreamController.broadcast(), vlocked));
     });
     _mappedKeys = mappedKeys;
 
     return _m.map((k, v) {
-      return MapEntry(k, ChangeStreamComputedMap(v.$1.stream, () => v.$2.use));
+      return MapEntry(
+          k,
+          ChangeStreamComputedMap(
+              v.$1.stream, () => _m[k]?.$2 ?? <KParent, V>{}.lock));
     }).lock;
   }
 
@@ -86,16 +87,15 @@ class GroupByComputedMap<K, V, KParent>
             final value = e.value.$2;
             _m.update(
               groupKey,
-              (group) => (group.$1, group.$2, group.$3.add(parentKey, value)),
+              (group) => (group.$1, group.$2.add(parentKey, value)),
               ifAbsent: () {
                 final group = (
                   StreamController<ChangeEvent<KParent, V>>.broadcast(),
-                  ValueStream<IMap<KParent, V>>(),
                   {parentKey: value}.lock
                 );
                 keyChanges[groupKey] = ChangeRecordValue(
-                    ChangeStreamComputedMap(
-                        group.$1.stream, () => group.$2.use));
+                    ChangeStreamComputedMap(group.$1.stream,
+                        () => _m[groupKey]?.$2 ?? <KParent, V>{}.lock));
                 return group;
               },
             );
@@ -111,8 +111,8 @@ class GroupByComputedMap<K, V, KParent>
             if (oldGroupKey != null) {
               if (oldGroupKey != groupKey) {
                 final oldGroup = _m.update(
-                    oldGroupKey, (g) => (g.$1, g.$2, g.$3.remove(parentKey)));
-                if (oldGroup.$3.isEmpty) {
+                    oldGroupKey, (g) => (g.$1, g.$2.remove(parentKey)));
+                if (oldGroup.$2.isEmpty) {
                   keyChanges[oldGroupKey] = ChangeRecordDelete();
                   _m.remove(oldGroupKey);
                   batchedChanges.remove(oldGroupKey);
@@ -134,8 +134,8 @@ class GroupByComputedMap<K, V, KParent>
               continue; // Extraneous deletion from upstream?
             final oldGroup = _mappedKeys.remove(deletedKey) as K;
             _m.update(oldGroup, (group) {
-              group = (group.$1, group.$2, group.$3.remove(deletedKey));
-              if (group.$3.isEmpty) {
+              group = (group.$1, group.$2.remove(deletedKey));
+              if (group.$2.isEmpty) {
                 keyChanges[oldGroup] = ChangeRecordDelete();
                 batchedChanges.remove(oldGroup);
               } else {
@@ -149,7 +149,6 @@ class GroupByComputedMap<K, V, KParent>
                 group.$1.add(KeyChanges(<KParent, ChangeRecord<V>>{
                   deletedKey: ChangeRecordDelete<V>()
                 }.lock));
-                group.$2.add(group.$3);
               }
               return group;
             }); // Not passing `ifAbsent` as the key has to be present (ow/ we have a corrupt internal state)
@@ -158,7 +157,6 @@ class GroupByComputedMap<K, V, KParent>
           for (var e in batchedChanges.entries) {
             final group = _m[e.key]!;
             group.$1.add(e.value);
-            group.$2.add(group.$3);
           }
 
           return KeyChanges(keyChanges.lock);
