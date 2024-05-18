@@ -13,9 +13,9 @@ import 'src/cs_computedmap.dart';
 /// - Supports immutable snapshots (using fast_immutable_collections)
 abstract class IComputedMap<K, V> {
   factory IComputedMap(IMap<K, V> m) => ConstComputedMap(m);
-  factory IComputedMap.fromChangeStream(Stream<ChangeEvent<K, V>> stream) {
-    return ChangeStreamComputedMap(stream);
-  }
+  // TODO: Make this take a computation as the argument
+  factory IComputedMap.fromChangeStream(Stream<ChangeEvent<K, V>> stream) =>
+      ChangeStreamComputedMap(stream);
   Computed<ChangeEvent<K, V>> get changes;
 
   @visibleForTesting

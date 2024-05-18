@@ -20,7 +20,7 @@ Future<void> testFixUnmock(IComputedMap<int, int> map) async {
 
   // Unlike `testCoherence`, these test that computations created before fixing
   // the map also behave properly
-  final changes = map.changes;
+  final cscm = IComputedMap.fromChangeStream(map.changes.asBroadcastStream);
   final snapshot = map.snapshot;
   final key1 = map[nonExistentKey];
   final key2 = map[myKey];
@@ -33,10 +33,10 @@ Future<void> testFixUnmock(IComputedMap<int, int> map) async {
   final length = map.length;
 
   map.fix(myMap);
-
   await testCoherence(map, myMap);
+  // The change stream should also be consistent, evidenced by the coherence of the cscm tracking the change strean
+  await testCoherence(cscm, myMap);
 
-  expect(await getValue(changes), ChangeEventReplace(myMap));
   expect(await getValue(snapshot), myMap);
   expect(await getValue(key1), null);
   expect(await getValue(key2), myValue);
@@ -50,10 +50,9 @@ Future<void> testFixUnmock(IComputedMap<int, int> map) async {
 
   // Mock to an empty map
   map.fix(<int, int>{}.lock);
-
   await testCoherence(map, <int, int>{}.lock);
+  await testCoherence(cscm, <int, int>{}.lock);
 
-  expect(await getValue(changes), ChangeEventReplace({}.lock));
   expect(await getValue(snapshot), {}.lock);
   expect(await getValue(key1), null);
   expect(await getValue(key2), null);
@@ -66,13 +65,12 @@ Future<void> testFixUnmock(IComputedMap<int, int> map) async {
   expect(await getValue(length), 0);
 
   map.fix(myMap);
-  expect(await getValue(changes), ChangeEventReplace(myMap));
+  await testCoherence(map, myMap); // Yes, this is also checked above
+  await testCoherence(cscm, myMap);
+
   map.unmock();
-
   await testCoherence(map, original);
-
-  // Make sure the change stream is unmocked
-  expect(await getValues(changes), isNot(contains(ChangeEventReplace(myMap))));
+  await testCoherence(cscm, original);
 }
 
 void main() {

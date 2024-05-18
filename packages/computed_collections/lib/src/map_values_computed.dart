@@ -10,8 +10,9 @@ import 'cs_computedmap.dart';
 import 'utils/option.dart';
 
 class MapValuesComputedComputedMap<K, V, VParent>
-    with OperatorsMixin<K, V>, MockMixin<K, V>
+    with OperatorsMixin<K, V>
     implements IComputedMap<K, V> {
+  late final MockManager<K, V> _mm;
   final IComputedMap<K, VParent> _parent;
   final Computed<V> Function(K key, VParent value) _convert;
   late final Computed<bool> isEmpty;
@@ -126,10 +127,13 @@ class MapValuesComputedComputedMap<K, V, VParent>
     //  one of them gains a value. Cannot think of an easy way to implement this, though.
     isEmpty = $(() => length.use == 0);
     isNotEmpty = $(() => length.use > 0);
+
+    _mm = MockManager(_changesComputed, snapshot, length, isEmpty, isNotEmpty,
+        keyComputations, containsKeyComputations, containsValueComputations);
   }
 
   @override
-  Computed<ChangeEvent<K, V>> get changes => _changesComputed;
+  Computed<ChangeEvent<K, V>> get changes => _mm.changes;
 
   Computed<Option<V>> _getKeyOptionComputation(K key) {
     // This logic is extracted to a separate cache so that the mapped computations'
@@ -198,4 +202,16 @@ class MapValuesComputedComputedMap<K, V, VParent>
   @override
   Computed<bool> containsValue(V value) => containsValueComputations.wrap(
       value, () => snapshot.use.containsValue(value));
+
+  @override
+  void fix(IMap<K, V> value) => _mm.fix(value);
+
+  @override
+  void fixThrow(Object e) => _mm.fixThrow(e);
+
+  @override
+  void mock(IComputedMap<K, V> mock) => _mm.mock(mock);
+
+  @override
+  void unmock() => _mm.unmock();
 }

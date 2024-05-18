@@ -11,20 +11,7 @@ import 'package:meta/meta.dart';
 
 import 'computedmap_mixins.dart';
 import 'utils/option.dart';
-
-class _ValueOrException<T> {
-  final bool _isValue;
-  Object? _exc;
-  T? _value;
-
-  _ValueOrException.value(this._value) : _isValue = true;
-  _ValueOrException.exc(this._exc) : _isValue = false;
-
-  T get value {
-    if (_isValue) return _value as T;
-    throw _exc!;
-  }
-}
+import 'utils/value_or_exception.dart';
 
 class ChangeStreamComputedMap<K, V>
     with OperatorsMixin<K, V>
@@ -36,7 +23,7 @@ class ChangeStreamComputedMap<K, V>
   // The "keep-alive" subscription used by key streams, as we explicitly break the dependency DAG of Computed.
   ComputedSubscription<IMap<K, V>>? _cSub;
   late final PubSub<K, Option<V>> _keyPubSub;
-  _ValueOrException<IMap<K, V>>? _curRes;
+  ValueOrException<IMap<K, V>>? _curRes;
   ChangeStreamComputedMap(this._stream, [this._initialValueComputer]) {
     _keyPubSub = PubSub<K, Option<V>>((k) {
       final m = _curRes!.value; // Throws if there is an exception
@@ -65,7 +52,7 @@ class ChangeStreamComputedMap<K, V>
           prev = <K, V>{}.lock;
         }
 
-        _curRes = _ValueOrException.value(prev);
+        _curRes = ValueOrException.value(prev);
         notifier = _notifyAllKeyStreams;
       }
       _stream.react((change) {
@@ -87,7 +74,7 @@ class ChangeStreamComputedMap<K, V>
           }
         }
 
-        _curRes = _ValueOrException.value(prev);
+        _curRes = ValueOrException.value(prev);
 
         if (keysToNotify == null) {
           // Computed doesn't like it when a computation adds things to a stream,
@@ -97,7 +84,7 @@ class ChangeStreamComputedMap<K, V>
           notifier ??= () => _notifyKeyStreams(keysToNotify!);
         }
       }, (e) {
-        _curRes = _ValueOrException.exc(e);
+        _curRes = ValueOrException.exc(e);
         _notifyAllKeyStreams();
         throw e;
       });
@@ -121,7 +108,7 @@ class ChangeStreamComputedMap<K, V>
   void fix(IMap<K, V> value) {
     // ignore: invalid_use_of_visible_for_testing_member
     _c.fix(value);
-    _curRes = _ValueOrException.value(value);
+    _curRes = ValueOrException.value(value);
     _notifyAllKeyStreams();
   }
 
@@ -130,7 +117,7 @@ class ChangeStreamComputedMap<K, V>
     // ignore: invalid_use_of_visible_for_testing_member
     _c.fixThrow(e);
     // TODO: Maybe refactor this logic out? Currently it is duplicated here and in the original computation
-    _curRes = _ValueOrException.exc(e);
+    _curRes = ValueOrException.exc(e);
     _notifyAllKeyStreams();
   }
 
@@ -139,11 +126,11 @@ class ChangeStreamComputedMap<K, V>
   void mock(IComputedMap<K, V> mock) => _c.mock(() {
         try {
           final mockRes = mock.snapshot.use;
-          _curRes = _ValueOrException.value(mockRes);
+          _curRes = ValueOrException.value(mockRes);
         } on NoValueException {
           rethrow; // Propagate
         } catch (e) {
-          _curRes = _ValueOrException.exc(e);
+          _curRes = ValueOrException.exc(e);
         }
         _notifyAllKeyStreams();
         return _curRes!
@@ -157,15 +144,15 @@ class ChangeStreamComputedMap<K, V>
   }
 
   void _notifyAllKeyStreams() {
-    if (_curRes!._isValue) {
+    if (_curRes!.isValue) {
       _keyPubSub.recomputeAllKeys();
     } else {
-      _keyPubSub.pubError(_curRes!._exc!);
+      _keyPubSub.pubError(_curRes!.exc_!);
     }
   }
 
   void _notifyKeyStreams(Set<K> keys) {
-    assert(_curRes!._isValue);
+    assert(_curRes!.isValue);
     _keyPubSub.recomputeKeys(keys);
   }
 

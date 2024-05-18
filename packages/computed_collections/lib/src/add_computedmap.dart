@@ -7,12 +7,14 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'computedmap_mixins.dart';
 
 class AddComputedMap<K, V>
-    with OperatorsMixin<K, V>, MockMixin<K, V>
+    with OperatorsMixin<K, V>
     implements IComputedMap<K, V> {
   K _key;
   V _value;
+  late final MockManager<K, V> _mm;
   final IComputedMap<K, V> _parent;
-  late final Computed<ChangeEvent<K, V>> changes;
+  late final Computed<ChangeEvent<K, V>> _changes;
+  Computed<ChangeEvent<K, V>> get changes => _mm.changes;
   late final Computed<IMap<K, V>> snapshot;
   final keyComputations = ComputationCache<K, V?>();
   final containsKeyComputations = ComputationCache<K, bool>();
@@ -24,7 +26,7 @@ class AddComputedMap<K, V>
     final parentContainsKey = _parent.containsKey(_key);
     length = $(() => _parent.length.use + (parentContainsKey.use ? 0 : 1));
     snapshot = $(() => _parent.snapshot.use.add(this._key, this._value));
-    changes = Computed(() {
+    _changes = Computed(() {
       final changeEvent = _parent.changes.use;
       switch (changeEvent) {
         case ChangeEventReplace<K, V>():
@@ -41,6 +43,8 @@ class AddComputedMap<K, V>
           return KeyChanges(IMap.fromEntries(changes));
       }
     });
+    _mm = MockManager(_changes, snapshot, length, isEmpty, isNotEmpty,
+        keyComputations, containsKeyComputations, containsValueComputations);
   }
 
   Computed<V?> operator [](K key) {
@@ -79,4 +83,16 @@ class AddComputedMap<K, V>
       return parentContainsValue.use;
     });
   }
+
+  @override
+  void fix(IMap<K, V> value) => _mm.fix(value);
+
+  @override
+  void fixThrow(Object e) => _mm.fixThrow(e);
+
+  @override
+  void mock(IComputedMap<K, V> mock) => _mm.mock(mock);
+
+  @override
+  void unmock() => _mm.unmock();
 }

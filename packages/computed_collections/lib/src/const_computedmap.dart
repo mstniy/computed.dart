@@ -8,12 +8,13 @@ import 'computedmap_mixins.dart';
 class ConstComputedMap<K, V>
     with OperatorsMixin<K, V>
     implements IComputedMap<K, V> {
+  final IMap<K, V> m;
   final Computed<IMap<K, V>> snapshot;
   final Computed<bool> isEmpty;
   final Computed<bool> isNotEmpty;
   final Computed<int> length;
 
-  ConstComputedMap(IMap<K, V> m)
+  ConstComputedMap(this.m)
       : snapshot = $(() => m),
         isEmpty = $(() => m.isEmpty),
         isNotEmpty = $(() => m.isNotEmpty),
@@ -84,6 +85,6 @@ class ConstComputedMap<K, V>
     // ignore: invalid_use_of_visible_for_testing_member
     length.unmock();
     // ignore: invalid_use_of_visible_for_testing_member
-    changes.unmock();
+    changes.mock(() => ChangeEventReplace(m));
   }
 }

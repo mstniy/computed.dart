@@ -5,7 +5,6 @@ import 'package:computed_collections/src/group_by.dart';
 import 'package:computed_collections/src/map_values.dart';
 import 'package:computed_collections/src/map_values_computed.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
-import 'package:meta/meta.dart';
 
 import '../change_event.dart';
 import '../icomputedmap.dart';
@@ -98,72 +97,119 @@ mixin OperatorsMixin<K, V> {
   }
 }
 
-mixin MockMixin<K, V> {
-  Computed<ChangeEvent<K, V>> get changes;
-  Computed<IMap<K, V>> get snapshot;
-  Computed<int> get length;
-  Computed<bool> get isEmpty;
-  Computed<bool> get isNotEmpty;
-  ComputationCache<K, V?> get keyComputations;
-  ComputationCache<K, bool> get containsKeyComputations;
-  ComputationCache<V, bool> get containsValueComputations;
+class MockManager<K, V> {
+  final Computed<ChangeEvent<K, V>> _changes;
+  late final Computed<ChangeEvent<K, V>> _changes_wrapped;
+  final Computed<IMap<K, V>> _snapshot;
+  final Computed<int> _length;
+  final Computed<bool> _isEmpty;
+  final Computed<bool> _isNotEmpty;
+  final ComputationCache<K, V?> _keyComputations;
+  final ComputationCache<K, bool> _containsKeyComputations;
+  final ComputationCache<V, bool> _containsValueComputations;
 
-  @visibleForTesting
+  MockManager(
+      this._changes,
+      this._snapshot,
+      this._length,
+      this._isEmpty,
+      this._isNotEmpty,
+      this._keyComputations,
+      this._containsKeyComputations,
+      this._containsValueComputations) {
+    _changes_wrapped = $(() => _changes.use);
+  }
+
   void fix(IMap<K, V> value) => mock(ConstComputedMap(value));
 
-  @visibleForTesting
   void fixThrow(Object e) {
-    for (var c in [changes, snapshot, isEmpty, isNotEmpty, length]) {
+    for (var c in [_changes, _snapshot, _isEmpty, _isNotEmpty, _length]) {
       // ignore: invalid_use_of_visible_for_testing_member
       c.fixThrow(e);
     }
     for (var cc in [
-      keyComputations,
-      containsKeyComputations,
-      containsValueComputations
+      _keyComputations,
+      _containsKeyComputations,
+      _containsValueComputations
     ]) {
       // ignore: invalid_use_of_visible_for_testing_member
       cc.mock((key) => throw e);
     }
   }
 
-  @visibleForTesting
+  ChangeEvent<K, V> Function() _getReplacementChangeStream(
+      Computed<IMap<K, V>> snapshot, Computed<ChangeEvent<K, V>> changeStream) {
+    final changeAggregator = Computed.withPrev(
+        (prev) => prev.add(changeStream.use),
+        initialPrev: <ChangeEvent<K, V>>[].lock);
+    final initialValue = $(() {
+      // Subscribe to the change stream first
+      final IList<ChangeEvent<K, V>> changes;
+      try {
+        changes = changeAggregator.use;
+      } on NoValueException {
+        // No changes yet - that is fine, but make sure to subscribe to the snapshot also
+        return snapshot
+            .use; // If there is a snapshot but no change, return the initial value
+        // The side effect is that if there is no snapshot also,
+        // we subscribe to it, which is desired, and throw NoValueException ourselves, also desired.
+      }
+      // There are changes
+      return changes.fold(
+          // This will throw if there is no snapshot, but we will still be subscribed to the change stream and keep buffering the events
+          snapshot.use,
+          (col, chng) => col.withChange(chng));
+    });
+    final csFirstEmitToken =
+        ChangeEventReplace(<K, V>{}.lock); // Could be really any ChangeEvent
+    final cs = Computed<ChangeEvent<K, V>>.withPrev(
+        (prev) => identical(prev, csFirstEmitToken)
+            ? ChangeEventReplace(initialValue
+                .use) // First emit the initial value (as computed above)
+            : changeStream.use, // Then delegate to the change stream
+        initialPrev: csFirstEmitToken);
+    return () => cs.use;
+  }
+
   void mock(IComputedMap<K, V> mock) {
-    changes
+    _changes_wrapped
         // ignore: invalid_use_of_visible_for_testing_member
-        .mock(() => mock.changes.use);
+        .mock(_getReplacementChangeStream(mock.snapshot, mock.changes));
     // ignore: invalid_use_of_visible_for_testing_member
-    snapshot.mock(() => mock.snapshot.use);
+    _snapshot.mock(() => mock.snapshot.use);
     // ignore: invalid_use_of_visible_for_testing_member
-    keyComputations.mock((key) => mock[key].use);
+    _keyComputations.mock((key) => mock[key].use);
     // Note that this pattern (of calling functions that return computations and `use`ing their results)
     // inside another computation) assumes that they will always return the exact same computation
     // for long as there is a listener (note that `ComputationCache` satisfies this).
     // ignore: invalid_use_of_visible_for_testing_member
-    containsKeyComputations.mock((key) => mock.containsKey(key).use);
+    _containsKeyComputations.mock((key) => mock.containsKey(key).use);
     // ignore: invalid_use_of_visible_for_testing_member
-    containsValueComputations.mock((v) => mock.containsValue(v).use);
+    _containsValueComputations.mock((v) => mock.containsValue(v).use);
     // ignore: invalid_use_of_visible_for_testing_member
-    isEmpty.mock(() => mock.isEmpty.use);
+    _isEmpty.mock(() => mock.isEmpty.use);
     // ignore: invalid_use_of_visible_for_testing_member
-    isNotEmpty.mock(() => mock.isNotEmpty.use);
+    _isNotEmpty.mock(() => mock.isNotEmpty.use);
     // ignore: invalid_use_of_visible_for_testing_member
-    length.mock(() => mock.length.use);
+    _length.mock(() => mock.length.use);
   }
 
-  @visibleForTesting
   void unmock() {
-    for (var c in [changes, snapshot, isEmpty, isNotEmpty, length]) {
+    for (var c in [_snapshot, _isEmpty, _isNotEmpty, _length]) {
       // ignore: invalid_use_of_visible_for_testing_member
       c.unmock();
     }
     for (var cc in [
-      keyComputations,
-      containsKeyComputations,
-      containsValueComputations
+      _keyComputations,
+      _containsKeyComputations,
+      _containsValueComputations
     ]) {
       // ignore: invalid_use_of_visible_for_testing_member
       cc.unmock();
     }
+    // ignore: invalid_use_of_visible_for_testing_member
+    _changes_wrapped.mock(_getReplacementChangeStream(_snapshot, _changes));
   }
+
+  Computed<ChangeEvent<K, V>> get changes => _changes_wrapped;
 }

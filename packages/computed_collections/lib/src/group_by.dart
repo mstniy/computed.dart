@@ -10,16 +10,16 @@ import 'computedmap_mixins.dart';
 import 'cs_computedmap.dart';
 
 class GroupByComputedMap<K, V, KParent>
-    with
-        OperatorsMixin<K, IComputedMap<KParent, V>>,
-        MockMixin<K, IComputedMap<KParent, V>>
+    with OperatorsMixin<K, IComputedMap<KParent, V>>
     implements IComputedMap<K, IComputedMap<KParent, V>> {
+  late final MockManager<K, IComputedMap<KParent, V>> _mm;
   final IComputedMap<KParent, V> _parent;
   final K Function(KParent key, V value) _convert;
   final Computed<bool> isEmpty;
   final Computed<bool> isNotEmpty;
   late final Computed<int> length;
-  late final Computed<ChangeEvent<K, IComputedMap<KParent, V>>> changes;
+  late final Computed<ChangeEvent<K, IComputedMap<KParent, V>>> _changes;
+  Computed<ChangeEvent<K, IComputedMap<KParent, V>>> get changes => _mm.changes;
   late final Computed<IMap<K, IComputedMap<KParent, V>>> snapshot;
 
   final keyComputations = ComputationCache<K, IComputedMap<KParent, V>?>();
@@ -58,7 +58,7 @@ class GroupByComputedMap<K, V, KParent>
       // so that they are independently mockable
       : isEmpty = $(() => _parent.isEmpty.use),
         isNotEmpty = $(() => _parent.isNotEmpty.use) {
-    changes = Computed.async(() {
+    _changes = Computed.async(() {
       final change = _parent.changes.use;
 
       switch (change) {
@@ -161,12 +161,14 @@ class GroupByComputedMap<K, V, KParent>
           return KeyChanges(keyChanges.lock);
       }
     }, onDispose: (e) => _onDispose(), onDisposeError: (o) => _onDispose());
-    snapshot = ChangeStreamComputedMap(changes.asBroadcastStream, () {
+    snapshot = ChangeStreamComputedMap(_changes.asBroadcastStream, () {
       final s = _parent.snapshot.use;
       return _setM(s);
     }).snapshot;
 
     length = $(() => snapshot.use.length);
+    _mm = MockManager(_changes, snapshot, length, isEmpty, isNotEmpty,
+        keyComputations, containsKeyComputations, containsValueComputations);
   }
 
   void _onDispose() {
@@ -186,6 +188,18 @@ class GroupByComputedMap<K, V, KParent>
   Computed<bool> containsValue(IComputedMap<KParent, V> value) =>
       containsValueComputations.wrap(
           value, () => snapshot.use.containsValue(value));
+
+  @override
+  void fix(IMap<K, IComputedMap<KParent, V>> value) => _mm.fix(value);
+
+  @override
+  void fixThrow(Object e) => _mm.fixThrow(e);
+
+  @override
+  void mock(IComputedMap<K, IComputedMap<KParent, V>> mock) => _mm.mock(mock);
+
+  @override
+  void unmock() => _mm.unmock();
 }
 
 extension<K, V> on IMap<K, V> {

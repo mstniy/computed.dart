@@ -8,14 +8,16 @@ import 'computedmap_mixins.dart';
 import 'cs_computedmap.dart';
 
 class MapValuesComputedMap<K, V, VParent>
-    with OperatorsMixin<K, V>, MockMixin<K, V>
+    with OperatorsMixin<K, V>
     implements IComputedMap<K, V> {
+  late final MockManager<K, V> _mm;
   final IComputedMap<K, VParent> _parent;
   final V Function(K key, VParent value) _convert;
   final Computed<bool> isEmpty;
   final Computed<bool> isNotEmpty;
   final Computed<int> length;
-  late final Computed<ChangeEvent<K, V>> changes;
+  late final Computed<ChangeEvent<K, V>> _changes;
+  Computed<ChangeEvent<K, V>> get changes => _mm.changes;
   late final Computed<IMap<K, V>> snapshot;
 
   final keyComputations = ComputationCache<K, V?>();
@@ -28,7 +30,7 @@ class MapValuesComputedMap<K, V, VParent>
       : isEmpty = $(() => _parent.isEmpty.use),
         isNotEmpty = $(() => _parent.isNotEmpty.use),
         length = $(() => _parent.length.use) {
-    changes = Computed(() {
+    _changes = Computed(() {
       // TODO: make this a stream map instead? does it have laziness?
       final change = _parent.changes.use;
       return switch (change) {
@@ -50,10 +52,13 @@ class MapValuesComputedMap<K, V, VParent>
     // TODO: asStream introduces a lag of one microtask here
     //  Can we change it to make the api more uniform?
     snapshot = ChangeStreamComputedMap(
-            changes.asBroadcastStream,
+            _changes.asBroadcastStream,
             () => _parent.snapshot.use
                 .map(((key, value) => MapEntry(key, _convert(key, value)))))
         .snapshot;
+
+    _mm = MockManager(_changes, snapshot, length, isEmpty, isNotEmpty,
+        keyComputations, containsKeyComputations, containsValueComputations);
   }
 
   @override
@@ -78,4 +83,16 @@ class MapValuesComputedMap<K, V, VParent>
   @override
   Computed<bool> containsValue(V value) => containsValueComputations.wrap(
       value, () => snapshot.use.containsValue(value));
+
+  @override
+  void fix(IMap<K, V> value) => _mm.fix(value);
+
+  @override
+  void fixThrow(Object e) => _mm.fixThrow(e);
+
+  @override
+  void mock(IComputedMap<K, V> mock) => _mm.mock(mock);
+
+  @override
+  void unmock() => _mm.unmock();
 }
