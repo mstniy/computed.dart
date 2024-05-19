@@ -17,8 +17,7 @@ class ChangeStreamComputedMap<K, V>
     with OperatorsMixin<K, V>
     implements IComputedMap<K, V> {
   final IMap<K, V> Function()? _initialValueComputer;
-  // TODO: We can probably change this to be a computation once we have .react on computations
-  final Stream<ChangeEvent<K, V>> _stream;
+  final Computed<ChangeEvent<K, V>> _stream;
   late final Computed<IMap<K, V>> _c;
   // The "keep-alive" subscription used by key streams, as we explicitly break the dependency DAG of Computed.
   ComputedSubscription<IMap<K, V>>? _cSub;

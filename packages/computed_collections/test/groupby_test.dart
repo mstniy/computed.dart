@@ -11,7 +11,7 @@ import 'helpers.dart';
 void main() {
   test('incremental update works', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final m1 = IComputedMap.fromChangeStream(s);
+    final m1 = IComputedMap.fromChangeStream($(() => s.use));
     final m2 = m1.groupBy((_, v) => v % 3); // Divide into three groups
     IMap<int, IComputedMap<int, int>>? lastRes1;
     final sub1 = m2.snapshot.listen((event) {
@@ -158,8 +158,8 @@ void main() {
     final group = (await getValue(m2[0]))!;
     expect(await getValue(m2.containsValue(group)), true);
     expect(
-        await getValue(
-            m2.containsValue(IComputedMap.fromChangeStream(Stream.empty()))),
+        await getValue(m2.containsValue(
+            IComputedMap.fromChangeStream($(() => throw NoValueException())))),
         false);
 
     sub.cancel();

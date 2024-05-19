@@ -31,7 +31,6 @@ class MapValuesComputedMap<K, V, VParent>
         isNotEmpty = $(() => _parent.isNotEmpty.use),
         length = $(() => _parent.length.use) {
     _changes = Computed(() {
-      // TODO: make this a stream map instead? does it have laziness?
       final change = _parent.changes.use;
       return switch (change) {
         ChangeEventReplace<K, VParent>() => ChangeEventReplace(change
@@ -49,10 +48,8 @@ class MapValuesComputedMap<K, V, VParent>
           }))),
       };
     });
-    // TODO: asStream introduces a lag of one microtask here
-    //  Can we change it to make the api more uniform?
     snapshot = ChangeStreamComputedMap(
-            _changes.asBroadcastStream,
+            _changes,
             () => _parent.snapshot.use
                 .map(((key, value) => MapEntry(key, _convert(key, value)))))
         .snapshot;

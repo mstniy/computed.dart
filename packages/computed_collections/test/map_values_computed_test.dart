@@ -9,7 +9,7 @@ void main() {
   test('incremental update works', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
     final s2 = ValueStream<int>.seeded(0, sync: true);
-    final m1 = IComputedMap.fromChangeStream(s);
+    final m1 = IComputedMap.fromChangeStream($(() => s.use));
     final m2 = m1.mapValuesComputed((k, v) => $(() => v + s2.use));
     IMap<int, int?>? lastRes;
     final sub = m2.snapshot.listen((event) {
@@ -54,7 +54,7 @@ void main() {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
     final s2 = ValueStream<int>.seeded(5, sync: true);
     s.add(ChangeEventReplace({0: 1, 2: 3}.lock));
-    final m1 = IComputedMap.fromChangeStream(s);
+    final m1 = IComputedMap.fromChangeStream($(() => s.use));
     final sub1 = m1.snapshot.listen(null, null); // Force m1 to be computed
     await Future.value();
 
@@ -74,7 +74,7 @@ void main() {
     final s2 = ValueStream<int>.seeded(5, sync: true);
     final s3 = ValueStream<int>(sync: true);
     var useS2 = true;
-    final m1 = IComputedMap.fromChangeStream(s);
+    final m1 = IComputedMap.fromChangeStream($(() => s.use));
     var cCnt = 0;
     final m2 = m1.mapValuesComputed((k, v) => $(() {
           cCnt++;
@@ -134,7 +134,7 @@ void main() {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
     final s2 = ValueStream<int>.seeded(5, sync: true);
     final s3 = ValueStream<int>(sync: true);
-    final m1 = IComputedMap.fromChangeStream(s);
+    final m1 = IComputedMap.fromChangeStream($(() => s.use));
     var useS2 = true;
     final m2 = m1.mapValuesComputed(
         (key, value) => $(() => value + (useS2 ? s2.use : s3.use)));
@@ -235,7 +235,7 @@ void main() {
   test('operator[] and containsKey opportunistically use the snapshot',
       () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final m = IComputedMap.fromChangeStream(s);
+    final m = IComputedMap.fromChangeStream($(() => s.use));
 
     var cCnt = 0;
 
@@ -269,7 +269,7 @@ void main() {
 
   test('operator[] and containsKey are key-local', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final m = IComputedMap.fromChangeStream(s);
+    final m = IComputedMap.fromChangeStream($(() => s.use));
 
     var cCnt = 0;
 

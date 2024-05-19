@@ -1,3 +1,4 @@
+import 'package:computed/computed.dart';
 import 'package:computed/utils/streams.dart';
 import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/icomputedmap.dart';
@@ -7,7 +8,7 @@ import 'package:test/test.dart';
 void main() {
   test('incremental update works', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final m1 = IComputedMap.fromChangeStream(s);
+    final m1 = IComputedMap.fromChangeStream($(() => s.use));
     final m2 = m1.mapValues((k, v) => v + 1);
     IMap<int, int>? lastRes;
     final sub = m2.snapshot.listen((event) {
@@ -37,7 +38,7 @@ void main() {
   test('initial computation works', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
     s.add(ChangeEventReplace({0: 1, 2: 3}.lock));
-    final m1 = IComputedMap.fromChangeStream(s);
+    final m1 = IComputedMap.fromChangeStream($(() => s.use));
     final sub1 = m1.snapshot.listen(null, null); // Force m1 to be computed
     await Future.value();
 
@@ -56,7 +57,7 @@ void main() {
   });
   test('operator[] works', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final m1 = IComputedMap.fromChangeStream(s);
+    final m1 = IComputedMap.fromChangeStream($(() => s.use));
     var cCnt = 0;
     final m2 = m1.mapValues((k, v) {
       cCnt++;
@@ -98,7 +99,7 @@ void main() {
 
   test('propagates the change stream', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final m1 = IComputedMap.fromChangeStream(s);
+    final m1 = IComputedMap.fromChangeStream($(() => s.use));
     final m2 = m1.mapValues((key, value) => value + 1);
     ChangeEvent<int, int>? lastRes;
     var callCnt = 0;

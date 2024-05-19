@@ -1,3 +1,4 @@
+import 'package:computed/computed.dart';
 import 'package:computed/utils/streams.dart';
 import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/icomputedmap.dart';
@@ -7,7 +8,7 @@ import 'package:test/test.dart';
 void main() {
   test('snapshot works', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final m1 = IComputedMap.fromChangeStream(s);
+    final m1 = IComputedMap.fromChangeStream($(() => s.use));
     // Test both .add on a fromChangeStream map as well as on an added map
     for (var getM2 in [() => m1.add(0, 1), () => m1.add(0, 2).add(0, 1)]) {
       final m2 = getM2();
@@ -37,7 +38,7 @@ void main() {
 
   test('add on different key works', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final m1 = IComputedMap.fromChangeStream(s);
+    final m1 = IComputedMap.fromChangeStream($(() => s.use));
     final m2 = m1.add(0, 1).add(2, 3);
 
     IMap<int, int>? lastRes;
@@ -62,7 +63,7 @@ void main() {
 
   test('operator[] works', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final m1 = IComputedMap.fromChangeStream(s);
+    final m1 = IComputedMap.fromChangeStream($(() => s.use));
     final m2 = m1.add(0, 1);
 
     var callCnt1 = 0;
@@ -137,7 +138,7 @@ void main() {
 
   test('propagates the change stream', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final m1 = IComputedMap.fromChangeStream(s);
+    final m1 = IComputedMap.fromChangeStream($(() => s.use));
     final m2 = m1.add(0, 1);
     ChangeEvent<int, int>? lastRes;
     var callCnt = 0;

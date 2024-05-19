@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:computed/computed.dart';
 import 'package:computed/utils/streams.dart';
 import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/icomputedmap.dart';
@@ -11,7 +12,7 @@ import 'helpers.dart';
 void main() {
   test('snapshot works', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final m = IComputedMap.fromChangeStream(s);
+    final m = IComputedMap.fromChangeStream($(() => s.use));
     IMap<int, int>? lastRes;
     final sub = m.snapshot.listen((event) {
       lastRes = event;
@@ -34,7 +35,7 @@ void main() {
 
   test('operator[] works', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final m = IComputedMap.fromChangeStream(s);
+    final m = IComputedMap.fromChangeStream($(() => s.use));
 
     var callCnt1 = 0;
     int? lastRes1;
@@ -143,7 +144,7 @@ void main() {
 
   test('propagates exceptions', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final m = IComputedMap.fromChangeStream(s);
+    final m = IComputedMap.fromChangeStream($(() => s.use));
     IMap<int, int>? lastRes1;
     Object? lastExc1;
     var callCnt1 = 0;
@@ -178,7 +179,7 @@ void main() {
     s.addError(42);
     expect(callCnt1, 2);
     expect(lastExc1, 42);
-    await Future.value(); // TODO: why do we need that?
+    await Future.value(); // Await the microtask lag of PubSub
     expect(callCnt2, 2);
     expect(lastExc2, 42);
     s.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
@@ -212,7 +213,7 @@ void main() {
 
   test('propagates the change stream', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final m = IComputedMap.fromChangeStream(s);
+    final m = IComputedMap.fromChangeStream($(() => s.use));
     ChangeEvent<int, int>? lastRes;
     var callCnt = 0;
     final sub = m.changes.listen((event) {
@@ -232,7 +233,7 @@ void main() {
   test('disposes of the old value upon cancellation', () async {
     final s = StreamController<ChangeEvent<int, int>>.broadcast(sync: true);
     final stream = s.stream;
-    final m = IComputedMap.fromChangeStream(stream);
+    final m = IComputedMap.fromChangeStream($(() => stream.use));
     var lCnt = 0;
     int? lastRes;
     var sub = m[0].listen((event) {
@@ -256,7 +257,7 @@ void main() {
   group('mocks', () {
     test('can use fix/fixError', () async {
       final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-      final m = IComputedMap.fromChangeStream(s);
+      final m = IComputedMap.fromChangeStream($(() => s.use));
       IMap<int, int>? lastRes1;
       Object? lastExc1;
       var callCnt1 = 0;
@@ -338,7 +339,7 @@ void main() {
     test('can use mock', () async {
       final s = ValueStream<ChangeEvent<int, int>>(sync: true);
       final s2 = ValueStream<IMap<int, int>>(sync: true);
-      final m = IComputedMap.fromChangeStream(s);
+      final m = IComputedMap.fromChangeStream($(() => s.use));
       IMap<int, int>? lastRes1;
       Object? lastExc1;
       var callCnt1 = 0;
@@ -372,8 +373,8 @@ void main() {
 
       s2.add({0: 1}.lock);
 
-      m.mock(IComputedMap.fromChangeStream(
-          s2.map((coll) => ChangeEventReplace(coll))));
+      m.mock(
+          IComputedMap.fromChangeStream($(() => ChangeEventReplace(s2.use))));
       expect(callCnt1, 1);
       expect(callCnt2, 1);
       await Future.value(); // Wait for Computed to subscribe to `s2`
@@ -382,12 +383,12 @@ void main() {
       expect(lastRes1, {0: 1}.lock);
       expect(lastRes2, 1);
 
-      m.mock(IComputedMap.fromChangeStream(Stream.error(42)));
+      m.mock(IComputedMap.fromChangeStream($(() => throw 42)));
       expect(callCnt1, 3);
-      expect(lastRes1, {}.lock);
-      await Future.value();
-      expect(callCnt1, 4);
       expect(lastExc1, 42);
+      expect(callCnt2, 2);
+      await Future.value(); // Await the microtask lag of PubSub
+      expect(callCnt1, 3);
       expect(callCnt2, 3);
       expect(lastExc2, 42);
 

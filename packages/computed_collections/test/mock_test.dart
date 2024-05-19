@@ -19,7 +19,7 @@ Future<void> testFixUnmock_(
 
   // Unlike `testCoherence`, these test that computations created before fixing
   // the map also behave properly
-  final cscm = IComputedMap.fromChangeStream(map.changes.asBroadcastStream);
+  final cscm = IComputedMap.fromChangeStream(map.changes);
   if (trackChangeStream) {
     cscm.snapshot.listen(null,
         null); // Make sure the cscm has listeners throughout the mock/unmock cycle

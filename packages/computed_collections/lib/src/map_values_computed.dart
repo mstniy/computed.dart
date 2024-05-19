@@ -100,7 +100,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
       _computedChangesSubscription = null;
     });
     _changesComputed = $(() => _changes.use);
-    snapshot = ChangeStreamComputedMap(_changes, () {
+    snapshot = ChangeStreamComputedMap(_changesComputed, () {
       final entries = _parent.snapshot.use
           .map(((key, value) => MapEntry(key, _convert(key, value))));
       var gotNVE = false;
