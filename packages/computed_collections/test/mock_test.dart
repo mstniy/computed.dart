@@ -76,10 +76,7 @@ Future<void> testFixUnmock(IComputedMap<int, int> map) async {
 }
 
 void main() {
-  // We use a `ValueStream` here instead of a raw `StreamController`
-  // so that the maps can re-subscribe to it
-  final cs = ValueStream.seeded(ChangeEventReplace({0: 1}.lock));
-  final m = IComputedMap.fromChangeStream(cs);
+  final m = IComputedMap({0: 1}.lock);
   test('add', () async {
     final a = m.add(1, 2);
     await testFixUnmock(a);
