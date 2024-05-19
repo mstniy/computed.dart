@@ -121,4 +121,31 @@ void main() {
 
     sub.cancel();
   });
+
+  test('operator[] opportunistically uses the snapshot', () async {
+    final s = ValueStream<ChangeEvent<int, int>>(sync: true);
+    final m = IComputedMap.fromChangeStream($(() => s.use));
+
+    var cCnt = 0;
+
+    final m2 = m.mapValues((key, value) {
+      cCnt++;
+      return value + 1;
+    });
+
+    final sub1 = m2.snapshot.listen(null, null);
+
+    List<int?> resCache2 = [];
+    final sub2 = m2[0].listen((e) {
+      resCache2.add(e);
+    }, null);
+
+    s.add(ChangeEventReplace({0: 1}.lock));
+    await Future.value();
+    expect(cCnt, 2); // And not 4 or 6
+    expect(resCache2, [2]);
+
+    sub1.cancel();
+    sub2.cancel();
+  });
 }

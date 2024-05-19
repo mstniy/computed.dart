@@ -70,10 +70,17 @@ class MapValuesComputedMap<K, V, VParent>
     final parentContainsKey = _parent.containsKey(key);
     final parentKey = _parent[key];
     return keyComputations.wrap(key, () {
-      if (parentContainsKey.use) {
-        return _convert(key, parentKey.use as VParent);
+      try {
+        final s = snapshot.useWeak;
+        // If there is a snapshot, use the value from there
+        return s[key];
+      } on NoStrongUserException {
+        // We compute the value ourselves
+        if (parentContainsKey.use) {
+          return _convert(key, parentKey.use as VParent);
+        }
+        return null;
       }
-      return null;
     });
   }
 
