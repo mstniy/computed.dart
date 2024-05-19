@@ -5,6 +5,8 @@ import 'package:computed_collections/icomputedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:test/test.dart';
 
+import 'helpers.dart';
+
 void main() {
   test('incremental update works', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
@@ -17,43 +19,27 @@ void main() {
     await Future.value();
     expect(lastRes, {}.lock);
     s.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
-    await Future.value();
     expect(lastRes, {0: 2}.lock);
     s.add(KeyChanges({0: ChangeRecordValue(2)}.lock));
-    await Future.value();
     expect(lastRes, {0: 3}.lock);
     s.add(KeyChanges({1: ChangeRecordValue(1)}.lock));
-    await Future.value();
     expect(lastRes, {0: 3, 1: 2}.lock);
     s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
-    await Future.value();
     expect(lastRes, {1: 2}.lock);
     s.add(ChangeEventReplace({4: 5}.lock));
-    await Future.value();
     expect(lastRes, {4: 6}.lock);
 
     sub.cancel();
   });
 
   test('initial computation works', () async {
-    final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    s.add(ChangeEventReplace({0: 1, 2: 3}.lock));
-    final m1 = IComputedMap.fromChangeStream($(() => s.use));
-    final sub1 = m1.snapshot.listen(null, null); // Force m1 to be computed
-    await Future.value();
+    final m1 = IComputedMap({0: 1, 2: 3}.lock);
 
     final m2 = m1.mapValues((k, v) {
       return v + 1;
     });
-    IMap<int, int>? lastRes;
-    final sub2 = m2.snapshot.listen((event) {
-      lastRes = event;
-    }, (e) => fail(e.toString()));
-    await Future.value();
-    expect(lastRes, {0: 2, 2: 4}.lock);
 
-    sub1.cancel();
-    sub2.cancel();
+    expect(await getValue(m2.snapshot), {0: 2, 2: 4}.lock);
   });
   test('operator[] works', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
@@ -86,7 +72,7 @@ void main() {
     expect(lastRes2, null);
 
     s.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
-    await Future.value();
+    await Future.value(); // Await the PubSub delay
     expect(cCnt, 2);
     expect(callCnt1, 2);
     expect(lastRes1, 2);

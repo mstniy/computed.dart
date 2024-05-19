@@ -20,7 +20,6 @@ void main() {
     s.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
     expect(lastRes, {}.lock);
     await Future.value();
-    await Future.value();
     expect(lastRes, {0: 1}.lock);
     s2.add(1);
     await Future.value();
@@ -28,13 +27,11 @@ void main() {
 
     s.add(KeyChanges({0: ChangeRecordValue(2)}.lock));
     await Future.value();
-    await Future.value();
     expect(lastRes, {0: 3}.lock);
     s2.add(2);
     await Future.value();
     expect(lastRes, {0: 4}.lock);
     s.add(KeyChanges({1: ChangeRecordValue(1)}.lock));
-    await Future.value();
     await Future.value();
     expect(lastRes, {0: 4, 1: 3}.lock);
     s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));

@@ -31,24 +31,21 @@ void main() {
     }, null);
     await Future.value();
     expect(lastRes1, {}.lock);
-    await Future.value();
-    await Future.value();
+    for (var i = 0; i < 5; i++) {
+      await Future.value();
+    }
     expect(lastRes2, null);
     expect(lastRes3, null);
     expect(lastRes4, null);
     s.add(KeyChanges({0: ChangeRecordValue(1)}.lock)); // Add a new group
-    await Future.value();
     expect(lastRes1!.keys, [1]);
-    await Future.value();
     expect(lastRes2, null);
     expect(lastRes3, {0: 1}.lock);
     expect(lastRes4, null);
     // Change the value of an existing item, removing a group
     // + add a new group
     s.add(KeyChanges({0: ChangeRecordValue(2), 1: ChangeRecordValue(0)}.lock));
-    await Future.value();
     expect(lastRes1!.keys, containsAll([0, 2]));
-    await Future.value(); // TODO: can we get rid of this extra lag?
     expect(lastRes2, {1: 0}.lock);
     expect(lastRes3, null);
     expect(lastRes4, {0: 2}.lock);
@@ -56,15 +53,14 @@ void main() {
     // + Remove a group by removing an item
     s.add(KeyChanges(
         {0: ChangeRecordDelete<int>(), 1: ChangeRecordValue(3)}.lock));
-    await Future.value();
     expect(lastRes1!.keys, containsAll([0]));
-    await Future.value();
+    await Future
+        .value(); // Wait for the microtask delay of the internal StreamController
     expect(lastRes2, {1: 3}.lock);
     expect(lastRes3, null);
     expect(lastRes4, null);
     // Add a value to an existing group
     s.add(KeyChanges({0: ChangeRecordValue(0)}.lock));
-    await Future.value();
     expect(lastRes1!.keys, containsAll([0]));
     await Future.value();
     expect(lastRes2, {0: 0, 1: 3}.lock);
@@ -72,7 +68,6 @@ void main() {
     expect(lastRes4, null);
     // Remove a value from an existing group, which has other elements
     s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
-    await Future.value();
     expect(lastRes1!.keys, containsAll([0]));
     await Future.value();
     expect(lastRes2, {1: 3}.lock);
@@ -80,15 +75,12 @@ void main() {
     expect(lastRes4, null);
     // Upstream replacement
     s.add(ChangeEventReplace({0: 0, 1: 1, 2: 3}.lock));
-    await Future.value();
     expect(lastRes1!.keys, containsAll([0, 1]));
-    await Future.value();
     expect(lastRes2, {0: 0, 2: 3}.lock);
     expect(lastRes3, {1: 1}.lock);
     expect(lastRes4, null);
     // Change the group of an item, changing its group, but keeping its former group populated
     s.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
-    await Future.value();
     expect(lastRes1!.keys, containsAll([0, 1]));
     await Future.value();
     expect(lastRes2, {2: 3}.lock);
@@ -97,8 +89,8 @@ void main() {
     // Delete a key, removing a group, but a new key immediately re-creates it
     s.add(KeyChanges(
         {2: ChangeRecordDelete<int>(), 0: ChangeRecordValue(3)}.lock));
-    await Future.value();
     expect(lastRes1!.keys, containsAll([0, 1]));
+    await Future.value();
     await Future.value();
     expect(lastRes2, {0: 3}.lock);
     expect(lastRes3, {1: 1}.lock);
@@ -109,7 +101,6 @@ void main() {
       1: ChangeRecordValue(3),
       0: ChangeRecordValue(1),
     }.lock));
-    await Future.value();
     expect(lastRes1!.keys, containsAll([0, 1]));
     await Future.value();
     expect(lastRes2, {1: 3}.lock);
