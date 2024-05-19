@@ -172,9 +172,17 @@ class MockManager<K, V> {
   }
 
   void mock(IComputedMap<K, V> mock) {
-    _changes_wrapped
-        // ignore: invalid_use_of_visible_for_testing_member
-        .mock(_getReplacementChangeStream(mock.snapshot, mock.changes));
+    if (_changesHasListeners()) {
+      // We have to mock to a "replacement stream" that emits
+      // a replacement event to keep the existing listeners in sync
+      _changes_wrapped
+          // ignore: invalid_use_of_visible_for_testing_member
+          .mock(_getReplacementChangeStream(mock.snapshot, mock.changes));
+    } else {
+      // If there are no existing listeners, we can be naive
+      // ignore: invalid_use_of_visible_for_testing_member
+      _changes_wrapped.mock(() => mock.changes.use);
+    }
     // ignore: invalid_use_of_visible_for_testing_member
     _snapshot.mock(() => mock.snapshot.use);
     // ignore: invalid_use_of_visible_for_testing_member
@@ -207,8 +215,26 @@ class MockManager<K, V> {
       // ignore: invalid_use_of_visible_for_testing_member
       cc.unmock();
     }
+
+    // See the corresponding part in [mock]
+    if (_changesHasListeners()) {
+      // ignore: invalid_use_of_visible_for_testing_member
+      _changes_wrapped.mock(_getReplacementChangeStream(_snapshot, _changes));
+    } else {
+      // ignore: invalid_use_of_visible_for_testing_member
+      _changes_wrapped.unmock();
+    }
+  }
+
+  bool _changesHasListeners() {
+    var hasListeners = false;
     // ignore: invalid_use_of_visible_for_testing_member
-    _changes_wrapped.mock(_getReplacementChangeStream(_snapshot, _changes));
+    _changes_wrapped.mock(() {
+      hasListeners = true;
+      // This is fine because we throw NoValueException
+      throw NoValueException();
+    });
+    return hasListeners;
   }
 
   Computed<ChangeEvent<K, V>> get changes => _changes_wrapped;
