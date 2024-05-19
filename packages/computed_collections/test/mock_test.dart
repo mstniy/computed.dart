@@ -1,13 +1,12 @@
 import 'package:computed/computed.dart';
-import 'package:computed/utils/streams.dart';
-import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/icomputedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:test/test.dart';
 
 import 'helpers.dart';
 
-Future<void> testFixUnmock(IComputedMap<int, int> map) async {
+Future<void> testFixUnmock_(
+    IComputedMap<int, int> map, bool trackChangeStream) async {
   // A randomly chosen "sentinel" key/value pairs
   // that we assume does not exist in `map`.
   const myKey = 58930586;
@@ -21,8 +20,10 @@ Future<void> testFixUnmock(IComputedMap<int, int> map) async {
   // Unlike `testCoherence`, these test that computations created before fixing
   // the map also behave properly
   final cscm = IComputedMap.fromChangeStream(map.changes.asBroadcastStream);
-  cscm.snapshot.listen(null,
-      null); // Make sure the cscm has listeners throughout the mock/unmock cycle
+  if (trackChangeStream) {
+    cscm.snapshot.listen(null,
+        null); // Make sure the cscm has listeners throughout the mock/unmock cycle
+  }
   final snapshot = map.snapshot;
   final key1 = map[nonExistentKey];
   final key2 = map[myKey];
@@ -36,8 +37,10 @@ Future<void> testFixUnmock(IComputedMap<int, int> map) async {
 
   map.fix(myMap);
   await testCoherence(map, myMap);
-  // The change stream should also be consistent, evidenced by the coherence of the cscm tracking the change strean
-  await testCoherence(cscm, myMap);
+  if (trackChangeStream) {
+    // The change stream should also be consistent, evidenced by the coherence of the cscm tracking the change strean
+    await testCoherence(cscm, myMap);
+  }
 
   expect(await getValue(snapshot), myMap);
   expect(await getValue(key1), null);
@@ -53,7 +56,9 @@ Future<void> testFixUnmock(IComputedMap<int, int> map) async {
   // Mock to an empty map
   map.fix(<int, int>{}.lock);
   await testCoherence(map, <int, int>{}.lock);
-  await testCoherence(cscm, <int, int>{}.lock);
+  if (trackChangeStream) {
+    await testCoherence(cscm, <int, int>{}.lock);
+  }
 
   expect(await getValue(snapshot), {}.lock);
   expect(await getValue(key1), null);
@@ -67,12 +72,22 @@ Future<void> testFixUnmock(IComputedMap<int, int> map) async {
   expect(await getValue(length), 0);
 
   map.fix(myMap);
-  await testCoherence(map, myMap); // Yes, this is also checked above
-  await testCoherence(cscm, myMap);
+  await testCoherence(map, myMap);
+  if (trackChangeStream) {
+    await testCoherence(cscm, myMap);
+  }
 
   map.unmock();
   await testCoherence(map, original);
-  await testCoherence(cscm, original);
+  if (trackChangeStream) {
+    await testCoherence(cscm, original);
+  }
+}
+
+Future<void> testFixUnmock(IComputedMap<int, int> map) async {
+  // Test both with and without there being a listener present on the .change stream during the mock/unmock cycle
+  await testFixUnmock_(map, false);
+  await testFixUnmock_(map, true);
 }
 
 void main() {
