@@ -21,6 +21,8 @@ Future<void> testFixUnmock(IComputedMap<int, int> map) async {
   // Unlike `testCoherence`, these test that computations created before fixing
   // the map also behave properly
   final cscm = IComputedMap.fromChangeStream(map.changes.asBroadcastStream);
+  cscm.snapshot.listen(null,
+      null); // Make sure the cscm has listeners throughout the mock/unmock cycle
   final snapshot = map.snapshot;
   final key1 = map[nonExistentKey];
   final key2 = map[myKey];

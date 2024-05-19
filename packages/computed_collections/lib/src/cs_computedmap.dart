@@ -55,7 +55,19 @@ class ChangeStreamComputedMap<K, V>
         _curRes = ValueOrException.value(prev);
         notifier = _notifyAllKeyStreams;
       }
-      _stream.react((change) {
+
+      ChangeEvent<K, V>? change;
+
+      try {
+        change = _stream.use;
+      } on NoValueException {
+      } catch (e) {
+        _curRes = ValueOrException.exc(e);
+        _notifyAllKeyStreams();
+        throw e;
+      }
+
+      if (change != null) {
         Set<K>? keysToNotify = <K>{}; // If null -> notify all keys
         if (change is ChangeEventReplace<K, V>) {
           keysToNotify = null;
@@ -83,14 +95,10 @@ class ChangeStreamComputedMap<K, V>
         } else {
           notifier ??= () => _notifyKeyStreams(keysToNotify!);
         }
-      }, (e) {
-        _curRes = ValueOrException.exc(e);
-        _notifyAllKeyStreams();
-        throw e;
-      });
+      }
 
       if (notifier != null) {
-        notifier!();
+        notifier();
       }
 
       return prev;
