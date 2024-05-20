@@ -139,35 +139,24 @@ class MockManager<K, V> {
 
   ChangeEvent<K, V> Function() _getReplacementChangeStream(
       Computed<IMap<K, V>> snapshot, Computed<ChangeEvent<K, V>> changeStream) {
-    final changeAggregator = Computed.withPrev(
-        (prev) => prev.add(changeStream.use),
-        initialPrev: <ChangeEvent<K, V>>[].lock);
-    final initialValue = $(() {
-      // Subscribe to the change stream first
-      final IList<ChangeEvent<K, V>> changes;
-      try {
-        changes = changeAggregator.use;
-      } on NoValueException {
-        // No changes yet - that is fine, but make sure to subscribe to the snapshot also
-        return snapshot
-            .use; // If there is a snapshot but no change, return the initial value
-        // The side effect is that if there is no snapshot also,
-        // we subscribe to it, which is desired, and throw NoValueException ourselves, also desired.
+    // Note that we do NOT need to aggregate the changes we receive until we receive a snapshot
+    // Because there is no computed collection that gains a snapshot after gaining a change stream.
+    var firstEmit = true;
+    final cs = Computed(() {
+      if (firstEmit) {
+        // First emit a replacement to the snapshot of the new collection
+        final s = snapshot.use;
+        try {
+          changeStream.use; // Subscribe to it
+        } on NoValueException {
+          // pass
+        }
+        firstEmit = false;
+        return ChangeEventReplace(s);
       }
-      // There are changes
-      return changes.fold(
-          // This will throw if there is no snapshot, but we will still be subscribed to the change stream and keep buffering the events
-          snapshot.use,
-          (col, chng) => col.withChange(chng));
-    });
-    final csFirstEmitToken =
-        ChangeEventReplace(<K, V>{}.lock); // Could be really any ChangeEvent
-    final cs = Computed<ChangeEvent<K, V>>.withPrev(
-        (prev) => identical(prev, csFirstEmitToken)
-            ? ChangeEventReplace(initialValue
-                .use) // First emit the initial value (as computed above)
-            : changeStream.use, // Then delegate to the change stream
-        initialPrev: csFirstEmitToken);
+      return changeStream
+          .use; // Then delegate to the change stream // TODO: How to test this?
+    }, assertIdempotent: false);
     return () => cs.use;
   }
 
