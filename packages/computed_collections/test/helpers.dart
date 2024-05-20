@@ -5,11 +5,12 @@ import 'package:computed_collections/icomputedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:test/expect.dart';
 
-Future<List<T>> getValues<T>(Computed<T> c) async {
+Future<List<T>> getValuesWhile<T>(Computed<T> c, void Function() f) async {
   final values = <T>[];
   final sub = c.listen((event) {
     values.add(event);
   }, null);
+  f();
   for (var i = 0; i < 5; i++) {
     // Wait for several microtasks to make sure the value assumes its value
     await Future.value();
@@ -18,6 +19,8 @@ Future<List<T>> getValues<T>(Computed<T> c) async {
 
   return values;
 }
+
+Future<List<T>> getValues<T>(Computed<T> c) => getValuesWhile(c, () {});
 
 Future<T> getValue<T>(Computed<T> c) async {
   final values = await getValues(c);

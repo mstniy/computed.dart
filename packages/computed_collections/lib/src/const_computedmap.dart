@@ -42,8 +42,15 @@ class ConstComputedMap<K, V>
     isNotEmpty.fix(m.isNotEmpty);
     // ignore: invalid_use_of_visible_for_testing_member
     length.fix(m.length);
-    // ignore: invalid_use_of_visible_for_testing_member
-    changes.fix(ChangeEventReplace(m));
+    if (changesHasListeners(changes)) {
+      // ignore: invalid_use_of_visible_for_testing_member
+      changes.mock(getReplacementChangeStream(
+          snapshot, $(() => throw NoValueException())));
+    } else {
+      // We might be already mocked to some other computed collection
+      // ignore: invalid_use_of_visible_for_testing_member
+      changes.mock(() => throw NoValueException());
+    }
   }
 
   @override
@@ -70,8 +77,13 @@ class ConstComputedMap<K, V>
     isNotEmpty.mock(() => mock.isNotEmpty.use);
     // ignore: invalid_use_of_visible_for_testing_member
     length.mock(() => mock.length.use);
-    // ignore: invalid_use_of_visible_for_testing_member
-    changes.mock(() => ChangeEventReplace(mock.snapshot.use));
+    if (changesHasListeners(changes)) {
+      // ignore: invalid_use_of_visible_for_testing_member
+      changes.mock(getReplacementChangeStream(mock.snapshot, mock.changes));
+    } else {
+      // ignore: invalid_use_of_visible_for_testing_member
+      changes.mock(() => mock.changes.use);
+    }
   }
 
   @override
@@ -84,7 +96,13 @@ class ConstComputedMap<K, V>
     isNotEmpty.unmock();
     // ignore: invalid_use_of_visible_for_testing_member
     length.unmock();
-    // ignore: invalid_use_of_visible_for_testing_member
-    changes.mock(() => ChangeEventReplace(m));
+    if (changesHasListeners(changes)) {
+      // ignore: invalid_use_of_visible_for_testing_member
+      changes.mock(getReplacementChangeStream(
+          snapshot, $(() => throw NoValueException())));
+    } else {
+      // ignore: invalid_use_of_visible_for_testing_member
+      changes.unmock();
+    }
   }
 }

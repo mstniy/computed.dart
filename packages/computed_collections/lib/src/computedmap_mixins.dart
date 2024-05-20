@@ -137,36 +137,13 @@ class MockManager<K, V> {
     }
   }
 
-  ChangeEvent<K, V> Function() _getReplacementChangeStream(
-      Computed<IMap<K, V>> snapshot, Computed<ChangeEvent<K, V>> changeStream) {
-    // Note that we do NOT need to aggregate the changes we receive until we receive a snapshot
-    // Because there is no computed collection that gains a snapshot after gaining a change stream.
-    var firstEmit = true;
-    final cs = Computed(() {
-      if (firstEmit) {
-        // First emit a replacement to the snapshot of the new collection
-        final s = snapshot.use;
-        try {
-          changeStream.use; // Subscribe to it
-        } on NoValueException {
-          // pass
-        }
-        firstEmit = false;
-        return ChangeEventReplace(s);
-      }
-      return changeStream
-          .use; // Then delegate to the change stream // TODO: How to test this?
-    }, assertIdempotent: false);
-    return () => cs.use;
-  }
-
   void mock(IComputedMap<K, V> mock) {
-    if (_changesHasListeners()) {
+    if (changesHasListeners(_changes_wrapped)) {
       // We have to mock to a "replacement stream" that emits
       // a replacement event to keep the existing listeners in sync
       _changes_wrapped
           // ignore: invalid_use_of_visible_for_testing_member
-          .mock(_getReplacementChangeStream(mock.snapshot, mock.changes));
+          .mock(getReplacementChangeStream(mock.snapshot, mock.changes));
     } else {
       // If there are no existing listeners, we can be naive
       // ignore: invalid_use_of_visible_for_testing_member
@@ -206,25 +183,52 @@ class MockManager<K, V> {
     }
 
     // See the corresponding part in [mock]
-    if (_changesHasListeners()) {
+    if (changesHasListeners(_changes_wrapped)) {
       // ignore: invalid_use_of_visible_for_testing_member
-      _changes_wrapped.mock(_getReplacementChangeStream(_snapshot, _changes));
+      _changes_wrapped.mock(getReplacementChangeStream(_snapshot, _changes));
     } else {
       // ignore: invalid_use_of_visible_for_testing_member
       _changes_wrapped.unmock();
     }
   }
 
-  bool _changesHasListeners() {
-    var hasListeners = false;
-    // ignore: invalid_use_of_visible_for_testing_member
-    _changes_wrapped.mock(() {
-      hasListeners = true;
-      // This is fine because we throw NoValueException
-      throw NoValueException();
-    });
-    return hasListeners;
-  }
-
   Computed<ChangeEvent<K, V>> get changes => _changes_wrapped;
+}
+
+ChangeEvent<K, V> Function() getReplacementChangeStream<K, V>(
+    Computed<IMap<K, V>> snapshot, Computed<ChangeEvent<K, V>> changeStream) {
+  // Note that we do NOT need to aggregate the changes we receive until we receive a snapshot
+  // Because there is no computed collection that gains a snapshot after gaining a change stream.
+  var firstEmit = true;
+  void _onDispose() => firstEmit =
+      false; // TODO: This can be tested by mocking a collection to another one which has no snapshot
+  final cs = Computed(() {
+    if (firstEmit) {
+      // First emit a replacement to the snapshot of the new collection
+      final s = snapshot.use;
+      try {
+        changeStream.use; // Subscribe to it
+      } on NoValueException {
+        // pass
+      }
+      firstEmit = false;
+      return ChangeEventReplace(s);
+    }
+    return changeStream.use; // Then delegate to the change stream
+  },
+      assertIdempotent: false,
+      onDispose: (_) => _onDispose,
+      onDisposeError: (_) => _onDispose);
+  return () => cs.use;
+}
+
+bool changesHasListeners<K, V>(Computed<ChangeEvent<K, V>> changes) {
+  var hasListeners = false;
+  // ignore: invalid_use_of_visible_for_testing_member
+  changes.mock(() {
+    hasListeners = true;
+    // This is fine because we throw NoValueException
+    throw NoValueException();
+  });
+  return hasListeners;
 }
