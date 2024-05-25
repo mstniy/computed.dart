@@ -33,47 +33,36 @@ class PubSub<K, V> {
   }
 
   Computed<V> sub(K key) {
-    ValueStream<V>? leaderStream;
-
     void onCancel_() {
       final removed = _keyValueStreams.remove(key);
       assert(removed != null);
-      leaderStream = null;
       if (_keyValueStreams.isEmpty) {
         onCancel();
       }
     }
 
-    V f() {
-      if (leaderStream == null) {
-        leaderStream = _keyValueStreams.putIfAbsent(key, () {
-          if (_keyValueStreams.isEmpty) {
-            onListen();
+    return Computed.async(() {
+      final leaderStream = _keyValueStreams.putIfAbsent(key, () {
+        if (_keyValueStreams.isEmpty) {
+          onListen();
+        }
+        // This key gained its first listener - compute its value with the provided key computer
+        final s = ValueStream<V>(onCancel: onCancel_);
+        // Using immediately evaluated lambdas for control flow - nasty
+        () {
+          final V value;
+          try {
+            value = computeValue(key);
+          } catch (e) {
+            s.addError(e);
+            return; // Note that this only exits the lambda
           }
-          // This key gained its first listener - compute its value with the provided key computer
-          final s = ValueStream<V>(onCancel: onCancel_);
-          // Using immediately evaluated lambdas for control flow - nasty
-          () {
-            final V value;
-            try {
-              value = computeValue(key);
-            } catch (e) {
-              s.addError(e);
-              return; // Note that this only exits the lambda
-            }
-            s.add(value);
-          }();
-          return s;
-        });
-      }
-      return leaderStream!.use;
-    }
-
-    return Computed<V>.async(f,
-        onDispose: (_) => leaderStream = null,
-        // TODO: This is not enough. leaderStream must also be set to null even if the sub got cancelled
-        //  before gaining a value
-        onDisposeError: (_) => leaderStream = null);
+          s.add(value);
+        }();
+        return s;
+      });
+      return leaderStream.use;
+    });
   }
 
   final _keyValueStreams = <K, ValueStream<V>>{};
