@@ -214,15 +214,7 @@ ChangeEvent<K, V> Function() getReplacementChangeStream<K, V>(
       return ChangeEventReplace(s);
     }
     return changeStream.use; // Then delegate to the change stream
-  },
-      assertIdempotent: false,
-      // There is no need to set [onDispose] here, as it is fired only if
-      // the computation has a value, and in this case, [firstEmit] will
-      // already have been set to [false].
-      // It would be nicer to set [firstEmit] to false even if the replacement
-      // stream has no value yet, but Computed does not support this, and
-      // we currently have no collection that may not have a snapshot.
-      onDisposeError: (_) => firstEmit = false);
+  }, assertIdempotent: false, onCancel: () => firstEmit = false);
   return () => cs.use;
 }
 

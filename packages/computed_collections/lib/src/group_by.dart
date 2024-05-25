@@ -164,7 +164,7 @@ class GroupByComputedMap<K, V, KParent>
 
           return KeyChanges(keyChanges.lock);
       }
-    }, onDispose: (e) => _onDispose(), onDisposeError: (o) => _onDispose());
+    }, onCancel: _onCancel);
     snapshot = ChangeStreamComputedMap(_changes, () {
       final s = _parent.snapshot.use;
       return _setM(s);
@@ -175,7 +175,7 @@ class GroupByComputedMap<K, V, KParent>
         keyComputations, containsKeyComputations, containsValueComputations);
   }
 
-  void _onDispose() {
+  void _onCancel() {
     _mappedKeys = {};
     _m = {};
   }
