@@ -2860,14 +2860,14 @@ void main() {
     });
   });
 
-  group('onDispose', () {
+  group('dispose', () {
     test('is called upon losing the last downstream computation', () async {
       var cCnt = 0;
       int? lastArg;
-      final c1 = Computed<int>(() => 42, onDispose: (value) {
+      final c1 = Computed<int>(() => 42, dispose: (value) {
         cCnt++;
         lastArg = value;
-      }, onDisposeError: ((error) => fail('must not call onDisposeError')));
+      });
       final c2 = $(() => c1.use);
 
       final sub =
@@ -2881,10 +2881,10 @@ void main() {
     test('is called upon losing the last listener', () async {
       var cCnt = 0;
       int? lastArg;
-      final c = Computed<int>(() => 42, onDispose: (value) {
+      final c = Computed<int>(() => 42, dispose: (value) {
         cCnt++;
         lastArg = value;
-      }, onDisposeError: ((error) => fail('must not call onDisposeError')));
+      });
 
       final sub = c.listen((val) => expect(val, 42), (e) => fail(e.toString()));
       await Future.value();
@@ -2895,8 +2895,7 @@ void main() {
     });
     test('is not called for computations without a value', () async {
       final c = Computed<int>(() => throw NoValueException(),
-          onDispose: (value) => fail('must not call onDispose'),
-          onDisposeError: ((error) => fail('must not call onDisposeError')));
+          dispose: (value) => fail('must not call onDispose'));
 
       final sub = c.listen((val) => fail('must not notify the listener'),
           (e) => fail(e.toString()));
@@ -2904,44 +2903,64 @@ void main() {
       sub.cancel();
       await Future.value();
     });
+
+    test('is not called for computations which threw an exception', () async {
+      final c = Computed<int>(() => throw 0,
+          dispose: (value) => fail('must not call onDispose'));
+
+      final sub =
+          c.listen((val) => fail('must not notify the listener'), (e) => null);
+      sub.cancel();
+    });
   });
-  group('onDisposeError', () {
+
+  group('onCancel', () {
     test('is called upon losing the last downstream computation', () async {
       var cCnt = 0;
-      int? lastArg;
-      final c1 = Computed<int>(() => throw 42,
-          onDispose: ((value) => fail('must not call onDispose')),
-          onDisposeError: (value) {
-        cCnt++;
-        lastArg = value as int;
-      });
+      final c1 = Computed<int>(() => 42, onCancel: () => cCnt++);
       final c2 = $(() => c1.use);
 
-      final sub = c2.listen((val) => fail('must not notify the value listener'),
-          (e) => expect(e, 42));
+      final sub = c2.listen((val) => expect(val, 42), null);
       await Future.value();
       expect(cCnt, 0);
       sub.cancel();
       expect(cCnt, 1);
-      expect(lastArg, 42);
+    });
+    test('is called even for computations without values', () async {
+      var cCnt = 0;
+      final c =
+          Computed<int>(() => throw NoValueException(), onCancel: () => cCnt++);
+
+      final sub = c.listen((val) => fail('Must not call the listener'), null);
+      await Future.value();
+      expect(cCnt, 0);
+      sub.cancel();
+      expect(cCnt, 1);
     });
     test('is called upon losing the last listener', () async {
       var cCnt = 0;
-      int? lastArg;
-      final c = Computed<int>(() => throw 42,
-          onDispose: ((value) => fail('must not call onDispose')),
-          onDisposeError: (value) {
-        cCnt++;
-        lastArg = value as int;
-      });
+      final c = Computed<int>(() => 42, onCancel: () => cCnt++);
 
-      final sub = c.listen((val) => fail('must not notify the value listener'),
-          (e) => expect(e, 42));
+      final sub = c.listen((val) => expect(val, 42), null);
       await Future.value();
       expect(cCnt, 0);
       sub.cancel();
       expect(cCnt, 1);
-      expect(lastArg, 42);
+    });
+    test('is called after dispose', () async {
+      var flag1 = false, flag2 = false;
+      final c = Computed<int>(() => 0, dispose: (value) {
+        expect(flag1, false);
+        flag1 = true;
+      }, onCancel: () {
+        expect(flag1, true);
+        expect(flag2, false);
+        flag2 = true;
+      });
+
+      final sub = c.listen(null, null);
+      sub.cancel();
+      expect(flag2, true);
     });
   });
 }

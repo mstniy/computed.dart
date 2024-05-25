@@ -15,27 +15,27 @@ class ComputationCache<K, V> {
   final _m = <K, Computed<V>>{};
   V Function(K key)? _mock;
   final _mocks = <K, _MockScheduledDone<V>>{};
-  final void Function(V value)? _onDispose;
-  final void Function(Object error)? _onDisposeError;
+  final void Function(V value)? _dispose;
+  final void Function()? _onCancel;
   final bool _memoized;
   final bool _assertIdempotent;
 
   ComputationCache(
       {bool memoized = true,
       bool assertIdempotent = true,
-      void Function(V value)? onDispose,
-      void Function(Object error)? onDisposeError})
+      void Function(V value)? dispose,
+      void Function()? onCancel})
       : _memoized = memoized,
         _assertIdempotent = assertIdempotent,
-        _onDispose = onDispose,
-        _onDisposeError = onDisposeError;
+        _dispose = dispose,
+        _onCancel = onCancel;
 
   Computed<V> wrap(K key, V Function() computation) {
     final cachedComputation = _m[key];
     if (cachedComputation != null) return cachedComputation;
     late final Computed<V> newComputation;
 
-    void onDisposeFinally() {
+    void onCancel() {
       final cachedComputation = _m[key];
       if (identical(cachedComputation, newComputation)) {
         final removed = _m.remove(key);
@@ -47,16 +47,7 @@ class ComputationCache<K, V> {
         final removed = _mocks.remove(key);
         assert(removed != null);
       }
-    }
-
-    void onDispose(V v) {
-      onDisposeFinally();
-      if (_onDispose != null) _onDispose!(v);
-    }
-
-    void onDisposeError(Object o) {
-      onDisposeFinally();
-      if (_onDisposeError != null) _onDisposeError!(o);
+      if (_onCancel != null) _onCancel!();
     }
 
     newComputation = Computed(() {
@@ -89,8 +80,8 @@ class ComputationCache<K, V> {
     },
         memoized: _memoized,
         assertIdempotent: _assertIdempotent,
-        onDispose: onDispose,
-        onDisposeError: onDisposeError);
+        dispose: _dispose,
+        onCancel: onCancel);
     return newComputation;
   }
 

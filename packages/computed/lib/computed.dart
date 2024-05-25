@@ -23,41 +23,45 @@ class Computed<T> {
   /// If [assertIdempotent] is set to false, disables the idempotency assertion.
   /// This is useful for computations returning incomparable values, like other computations.
   ///
-  /// If [onDispose] and/or [onDisposeError] is set, they will be called when the computation loses
-  /// all listeners after notifying its listeners. [onDispose] is called if the last computation
-  /// returned a value, [onDisposeError] is called if the last computation throw an exception
-  /// other than [NoValueException].
-  Computed(T Function() f,
-      {bool memoized = true,
-      bool assertIdempotent = true,
-      void Function(T value)? onDispose,
-      void Function(Object error)? onDisposeError})
-      : _impl = ComputedImpl(
-            f, memoized, assertIdempotent, false, onDispose, onDisposeError);
+  /// If [dispose] is set, it will be called with the latest value of the computation
+  /// when the computation loses all of its listeners and downstream computations,
+  /// if the computation has a current non-exception value.
+  ///
+  /// If [onCancel] is set, it will be called when the computation loses all of its listeners
+  /// and downstream computations.
+  /// [onCancel] is called after [dispose].
+  Computed(
+    T Function() f, {
+    bool memoized = true,
+    bool assertIdempotent = true,
+    void Function(T value)? dispose,
+    void Function()? onCancel,
+  }) : _impl = ComputedImpl(
+            f, memoized, assertIdempotent, false, dispose, onCancel);
 
   /// Creates an "async" computation, which is allowed to run asynchronous operations.
   /// This implicitly disables the idempotency assertion.
   Computed.async(T Function() f,
       {bool memoized = true,
-      void Function(T value)? onDispose,
-      void Function(Object error)? onDisposeError})
-      : _impl =
-            ComputedImpl(f, memoized, false, true, onDispose, onDisposeError);
+      void Function(T value)? dispose,
+      void Function()? onCancel})
+      : _impl = ComputedImpl(f, memoized, false, true, dispose, onCancel);
 
   /// As [Computed], but calls the given function with its last value.
   ///
   /// If the computation has no value yet, [prev] is set to [initialPrev].
   ///
   /// Note that setting [async] disables the idempotency check.
-  Computed.withPrev(T Function(T prev) f,
-      {required T initialPrev,
-      bool memoized = true,
-      bool assertIdempotent = true,
-      bool async = false,
-      void Function(T value)? onDispose,
-      void Function(Object error)? onDisposeError})
-      : _impl = ComputedImpl.withPrev(f, initialPrev, memoized,
-            assertIdempotent, async, onDispose, onDisposeError);
+  Computed.withPrev(
+    T Function(T prev) f, {
+    required T initialPrev,
+    bool memoized = true,
+    bool assertIdempotent = true,
+    bool async = false,
+    void Function(T value)? dispose,
+    void Function()? onCancel,
+  }) : _impl = ComputedImpl.withPrev(f, initialPrev, memoized, assertIdempotent,
+            async, dispose, onCancel);
 
   /// Defines an "effect", which is a computation meant to have side effects.
   static ComputedSubscription<void> effect(void Function() f) =>

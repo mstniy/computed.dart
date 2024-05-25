@@ -171,8 +171,8 @@ class ComputedImpl<T> {
   T Function() _f;
   final T Function() _origF;
 
-  final void Function(T value)? _onDispose;
-  final void Function(Object error)? _onDisposeError;
+  final void Function()? _onCancel;
+  final void Function(T value)? _dispose;
 
   var _dirty = false;
 
@@ -235,7 +235,7 @@ class ComputedImpl<T> {
   }
 
   ComputedImpl(this._f, this._memoized, this._assertIdempotent, this._async,
-      this._onDispose, this._onDisposeError)
+      this._dispose, this._onCancel)
       : _origF = _f;
 
   static ComputedImpl<T> withPrev<T>(
@@ -244,11 +244,11 @@ class ComputedImpl<T> {
       bool memoized,
       bool assertIdempotent,
       bool async,
-      void Function(T value)? onDispose,
-      void Function(Object error)? onDisposeError) {
+      void Function(T value)? dispose,
+      void Function()? onCancel) {
     late ComputedImpl<T> c;
     c = ComputedImpl<T>(() => f(c._prevResult?.value ?? initialPrev), memoized,
-        assertIdempotent && !async, async, onDispose, onDisposeError);
+        assertIdempotent && !async, async, dispose, onCancel);
     c._initialPrev = initialPrev;
 
     return c;
@@ -656,18 +656,11 @@ class ComputedImpl<T> {
     _lastUpdate = null;
 
     if (lastResultBackup != null) {
-      // Call onDispose/Error
-      if (lastResultBackup._isValue) {
-        if (_onDispose != null) {
-          _onDispose!(lastResultBackup._value as T);
-        }
-      } else {
-        // The last value is an exception
-        if (_onDisposeError != null) {
-          _onDisposeError!(lastResultBackup._exc!);
-        }
+      if (lastResultBackup._isValue && _dispose != null) {
+        _dispose!(lastResultBackup._value as T);
       }
     }
+    if (_onCancel != null) _onCancel!();
   }
 
   void _removeDownstreamComputation(ComputedImpl c) {
