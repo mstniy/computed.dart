@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:computed/computed.dart';
+import 'package:computed/utils/streams.dart';
 import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/icomputedmap.dart';
+import 'package:computed_collections/src/cs_computedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:test/test.dart';
 
@@ -98,7 +100,9 @@ Future<void> testFixUnmock(IComputedMap<int, int> map) async {
   await testFixUnmock_(map, true);
 }
 
-Future<void> testMock(IComputedMap<int, int> map) async {
+// Test that the replacement change stream starts with a replacement event
+// and delegates the mocked change stream thereafter
+Future<void> _testMock1(IComputedMap<int, int> map) async {
   final s = StreamController.broadcast(sync: true);
   final stream = s.stream;
   final changes1 = map.changes;
@@ -128,6 +132,34 @@ Future<void> testMock(IComputedMap<int, int> map) async {
   } finally {
     sub1.cancel();
   }
+}
+
+// Test that the replacement stream is voided once cancelled
+Future<void> _testMock2(IComputedMap<int, int> map) async {
+  final changes1 = map.changes;
+  final buffer1 = <ChangeEvent<int, int>>[];
+  var sub1 = changes1.listen(buffer1.add, null);
+  try {
+    final initialValueStream = ValueStream<IMap<int, int>>(sync: true);
+    map.mock(ChangeStreamComputedMap(
+        $(() => throw NoValueException()), () => initialValueStream.use));
+    try {
+      sub1.cancel();
+      initialValueStream.add(<int, int>{}.lock);
+      sub1 = changes1.listen(buffer1.add, null);
+      await Future.value();
+      expect(buffer1, []); // And not a replacement event
+    } finally {
+      map.unmock();
+    }
+  } finally {
+    sub1.cancel();
+  }
+}
+
+Future<void> testMock(IComputedMap<int, int> map) async {
+  await _testMock1(map);
+  await _testMock2(map);
 }
 
 void main() {
