@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:computed/computed.dart';
 import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/icomputedmap.dart';
@@ -85,8 +87,6 @@ Future<void> testFixUnmock_(
     if (trackChangeStream) {
       await testCoherence(cscm, original);
     }
-
-    // TODO: Test that the change stream is propagated while [mock]ed
   } finally {
     sub?.cancel();
   }
@@ -98,11 +98,44 @@ Future<void> testFixUnmock(IComputedMap<int, int> map) async {
   await testFixUnmock_(map, true);
 }
 
+Future<void> testMock(IComputedMap<int, int> map) async {
+  final s = StreamController.broadcast(sync: true);
+  final stream = s.stream;
+  final changes1 = map.changes;
+  final buffer1 = <ChangeEvent<int, int>>[];
+  final sub1 = changes1.listen(buffer1.add, null);
+  try {
+    map.mock(IComputedMap.fromChangeStream($(() => stream.use)));
+    try {
+      final changes2 = map.changes;
+      final buffer2 = <ChangeEvent<int, int>>[];
+      final sub2 = changes2.listen(buffer2.add, null);
+      try {
+        expect(buffer1, [ChangeEventReplace({}.lock)]);
+        expect(buffer2, []);
+        buffer1.clear();
+        buffer2.clear();
+        final change = KeyChanges({0: ChangeRecordValue(1)}.lock);
+        s.add(change);
+        expect(buffer1, [change]);
+        expect(buffer2, [change]);
+      } finally {
+        sub2.cancel();
+      }
+    } finally {
+      map.unmock();
+    }
+  } finally {
+    sub1.cancel();
+  }
+}
+
 void main() {
   test('add', () async {
     final m = IComputedMap({0: 1}.lock);
     final a = m.add(1, 2);
     await testFixUnmock(a);
+    await testMock(a);
     expect(await getValuesWhile(a.changes, () => m.fix({2: 3}.lock)), [
       ChangeEventReplace({1: 2, 2: 3}.lock)
     ]);
@@ -111,6 +144,7 @@ void main() {
     final m = IComputedMap({0: 1}.lock);
     final mv = m.mapValues((key, value) => value + 1);
     await testFixUnmock(mv);
+    await testMock(mv);
     expect(await getValuesWhile(mv.changes, () => m.fix({2: 3}.lock)), [
       ChangeEventReplace({2: 4}.lock)
     ]);
@@ -119,6 +153,7 @@ void main() {
     final m = IComputedMap({0: 1}.lock);
     final mv = m.mapValuesComputed((key, value) => $(() => value + 1));
     await testFixUnmock(mv);
+    await testMock(mv);
     expect(await getValuesWhile(mv.changes, () => m.fix({2: 3}.lock)), [
       ChangeEventReplace({2: 4}.lock)
     ]);
@@ -126,6 +161,7 @@ void main() {
   test('const', () async {
     final c = IComputedMap({0: 1}.lock);
     await testFixUnmock(c);
+    await testMock(c);
     expect(await getValues(c.changes), []);
   });
 }

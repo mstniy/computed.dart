@@ -200,8 +200,7 @@ ChangeEvent<K, V> Function() getReplacementChangeStream<K, V>(
   // Note that we do NOT need to aggregate the changes we receive until we receive a snapshot
   // Because there is no computed collection that gains a snapshot after gaining a change stream.
   var firstEmit = true;
-  void _onDispose() => firstEmit =
-      false; // TODO: This can be tested by mocking a collection to another one which has no snapshot
+
   final cs = Computed(() {
     if (firstEmit) {
       // First emit a replacement to the snapshot of the new collection
@@ -217,8 +216,13 @@ ChangeEvent<K, V> Function() getReplacementChangeStream<K, V>(
     return changeStream.use; // Then delegate to the change stream
   },
       assertIdempotent: false,
-      onDispose: (_) => _onDispose,
-      onDisposeError: (_) => _onDispose);
+      // There is no need to set [onDispose] here, as it is fired only if
+      // the computation has a value, and in this case, [firstEmit] will
+      // already have been set to [false].
+      // It would be nicer to set [firstEmit] to false even if the replacement
+      // stream has no value yet, but Computed does not support this, and
+      // we currently have no collection that may not have a snapshot.
+      onDisposeError: (_) => firstEmit = false);
   return () => cs.use;
 }
 
