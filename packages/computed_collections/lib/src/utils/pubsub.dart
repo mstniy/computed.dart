@@ -33,48 +33,47 @@ class PubSub<K, V> {
   }
 
   Computed<V> sub(K key) {
-    final myStream = ValueStream<V>();
     ValueStream<V>? leaderStream;
 
     void onCancel_() {
-      if (!leaderStream!.hasListener) {
-        final removed = _keyValueStreams.remove(key);
-        assert(removed != null);
-        leaderStream = null;
-        if (_keyValueStreams.isEmpty) {
-          onCancel();
-        }
-      } else {
-        leaderStream = null;
+      final removed = _keyValueStreams.remove(key);
+      assert(removed != null);
+      leaderStream = null;
+      if (_keyValueStreams.isEmpty) {
+        onCancel();
       }
     }
 
     V f() {
       if (leaderStream == null) {
-        if (_keyValueStreams.isEmpty) {
-          onListen();
-        }
-        leaderStream = _keyValueStreams.putIfAbsent(key, () => myStream);
-        if (identical(leaderStream, myStream)) {
-          // This key gained its first listener - computed its value with the provided key computer
+        leaderStream = _keyValueStreams.putIfAbsent(key, () {
+          if (_keyValueStreams.isEmpty) {
+            onListen();
+          }
+          // This key gained its first listener - compute its value with the provided key computer
+          final s = ValueStream<V>(onCancel: onCancel_);
           // Using immediately evaluated lambdas for control flow - nasty
           () {
             final V value;
             try {
               value = computeValue(key);
             } catch (e) {
-              myStream.addError(e);
+              s.addError(e);
               return; // Note that this only exits the lambda
             }
-            myStream.add(value);
+            s.add(value);
           }();
-        }
+          return s;
+        });
       }
       return leaderStream!.use;
     }
 
-    return Computed<V>(f,
-        onDispose: (_) => onCancel_(), onDisposeError: (_) => onCancel_());
+    return Computed<V>.async(f,
+        onDispose: (_) => leaderStream = null,
+        // TODO: This is not enough. leaderStream must also be set to null even if the sub got cancelled
+        //  before gaining a value
+        onDisposeError: (_) => leaderStream = null);
   }
 
   final _keyValueStreams = <K, ValueStream<V>>{};
