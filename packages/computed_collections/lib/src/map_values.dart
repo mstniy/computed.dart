@@ -2,10 +2,10 @@ import 'package:computed/computed.dart';
 import 'package:computed/utils/computation_cache.dart';
 import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/icomputedmap.dart';
+import 'package:computed_collections/src/utils/snapshot_computation.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import 'computedmap_mixins.dart';
-import 'cs_computedmap.dart';
 
 class MapValuesComputedMap<K, V, VParent>
     with OperatorsMixin<K, V>
@@ -48,11 +48,10 @@ class MapValuesComputedMap<K, V, VParent>
           }))),
       };
     });
-    snapshot = ChangeStreamComputedMap(
-            _changes,
-            () => _parent.snapshot.use
-                .map(((key, value) => MapEntry(key, _convert(key, value)))))
-        .snapshot;
+    snapshot = snapshotComputation(
+        _changes,
+        () => _parent.snapshot.use
+            .map(((key, value) => MapEntry(key, _convert(key, value)))));
 
     _mm = MockManager(_changes, snapshot, length, isEmpty, isNotEmpty,
         keyComputations, containsKeyComputations, containsValueComputations);

@@ -8,6 +8,7 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import 'computedmap_mixins.dart';
 import 'cs_computedmap.dart';
+import 'utils/snapshot_computation.dart';
 
 class GroupByComputedMap<K, V, KParent>
     with OperatorsMixin<K, IComputedMap<KParent, V>>
@@ -165,10 +166,10 @@ class GroupByComputedMap<K, V, KParent>
           return KeyChanges(keyChanges.lock);
       }
     }, onCancel: _onCancel);
-    snapshot = ChangeStreamComputedMap(_changes, () {
+    snapshot = snapshotComputation(_changes, () {
       final s = _parent.snapshot.use;
       return _setM(s);
-    }).snapshot;
+    });
 
     length = $(() => snapshot.use.length);
     _mm = MockManager(_changes, snapshot, length, isEmpty, isNotEmpty,

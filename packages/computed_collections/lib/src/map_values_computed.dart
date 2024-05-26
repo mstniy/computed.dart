@@ -3,10 +3,10 @@ import 'package:computed/utils/computation_cache.dart';
 import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/icomputedmap.dart';
 import 'package:computed_collections/src/utils/merging_change_stream.dart';
+import 'package:computed_collections/src/utils/snapshot_computation.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import 'computedmap_mixins.dart';
-import 'cs_computedmap.dart';
 import 'utils/option.dart';
 
 class MapValuesComputedComputedMap<K, V, VParent>
@@ -100,7 +100,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
       _computedChangesSubscription = null;
     });
     _changesComputed = $(() => _changes.use);
-    snapshot = ChangeStreamComputedMap(_changesComputed, () {
+    snapshot = snapshotComputation(_changesComputed, () {
       final entries = _parent.snapshot.use
           .map(((key, value) => MapEntry(key, _convert(key, value))));
       var gotNVE = false;
@@ -116,7 +116,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
 
       if (gotNVE) throw NoValueException();
       return unwrapped;
-    }).snapshot;
+    });
 
     // To know the length of the collection we do indeed need to compute the values for all the keys
     // as just because a key exists on the parent does not mean it also exists in us
