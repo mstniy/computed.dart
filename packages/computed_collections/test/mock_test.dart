@@ -141,8 +141,8 @@ Future<void> _testMock2(IComputedMap<int, int> map) async {
   var sub1 = changes1.listen(buffer1.add, null);
   try {
     final initialValueStream = ValueStream<IMap<int, int>>(sync: true);
-    map.mock(ChangeStreamComputedMap(
-        $(() => throw NoValueException()), () => initialValueStream.use));
+    map.mock(ChangeStreamComputedMap($(() => throw NoValueException()),
+        initialValueComputer: () => initialValueStream.use));
     try {
       sub1.cancel();
       initialValueStream.add(<int, int>{}.lock);

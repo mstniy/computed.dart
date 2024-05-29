@@ -52,8 +52,8 @@ class GroupByComputedMap<K, V, KParent>
     return _m.map((k, v) {
       return MapEntry(
           k,
-          ChangeStreamComputedMap(
-              v.$2, () => _m[k]?.$3 ?? <KParent, V>{}.lock));
+          ChangeStreamComputedMap(v.$2,
+              initialValueComputer: () => _m[k]?.$3 ?? <KParent, V>{}.lock));
     }).lock;
   }
 
@@ -99,7 +99,8 @@ class GroupByComputedMap<K, V, KParent>
                     (cs, $(() => stream.use), {parentKey: value}.lock);
                 keyChanges[groupKey] = ChangeRecordValue(
                     ChangeStreamComputedMap(group.$2,
-                        () => _m[groupKey]?.$3 ?? <KParent, V>{}.lock));
+                        initialValueComputer: () =>
+                            _m[groupKey]?.$3 ?? <KParent, V>{}.lock));
                 return group;
               },
             );

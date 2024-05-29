@@ -22,15 +22,19 @@ Set<K>? _getAffectedKeys<K, V>(ChangeEvent<K, V> change) => switch (change) {
 class ChangeStreamComputedMap<K, V>
     with OperatorsMixin<K, V>
     implements IComputedMap<K, V> {
-  final Computed<ChangeEvent<K, V>> _stream;
+  final Computed<ChangeEvent<K, V>> _changeStream;
+  // Note that this is the internal snapshot stream, used by _c
+  // The user-visible one is a wrapper around _c to ensure proper bookeeping
+  late final Computed<IMap<K, V>> _snapshotStream;
   late final Computed<IMap<K, V>> _c;
   // The "keep-alive" subscription used by key streams, as we explicitly break the dependency DAG of Computed.
   ComputedSubscription<IMap<K, V>>? _cSub;
   late final PubSub<K, Option<V>> _keyPubSub;
   ValueOrException<IMap<K, V>>? _curRes;
   var _isInitialValue = true;
-  ChangeStreamComputedMap(this._stream,
-      [IMap<K, V> Function()? initialValueComputer]) {
+  ChangeStreamComputedMap(this._changeStream,
+      {IMap<K, V> Function()? initialValueComputer,
+      Computed<IMap<K, V>>? snapshotStream}) {
     _keyPubSub = PubSub<K, Option<V>>((k) {
       final m = _curRes!.value; // Throws if there is an exception
       if (m.containsKey(k)) return Option.some(m[k]); // There is a value
@@ -46,13 +50,12 @@ class ChangeStreamComputedMap<K, V>
       _cSub!.cancel();
       _cSub = null;
     });
-    changes = $(() => _stream.use);
-    // Note that this is the internal snapshot stream, used by _c
-    // The user-visible one is a wrapper around _c to ensure proper bookeeping
-    final _snapshot = snapshotComputation(changes, initialValueComputer);
+    changes = $(() => _changeStream.use);
+    _snapshotStream =
+        snapshotStream ?? snapshotComputation(changes, initialValueComputer);
     _c = Computed.async(() {
       try {
-        _curRes = ValueOrException.value(_snapshot.use);
+        _curRes = ValueOrException.value(_snapshotStream.use);
       } on NoValueException {
         rethrow;
       } catch (e) {
@@ -70,7 +73,7 @@ class ChangeStreamComputedMap<K, V>
         _notifyKeyStreams(keysToNotify);
       }
 
-      return _snapshot.use;
+      return _snapshotStream.use;
     }, onCancel: () => _isInitialValue = true);
 
     // We do not directly expose _c because it also does bookkeeping, and
