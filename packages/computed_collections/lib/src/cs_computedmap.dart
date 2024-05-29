@@ -11,6 +11,7 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:meta/meta.dart';
 
 import 'computedmap_mixins.dart';
+import 'const_computedmap.dart';
 import 'utils/option.dart';
 import 'utils/value_or_exception.dart';
 
@@ -26,17 +27,19 @@ class ChangeStreamComputedMap<K, V>
   // Note that this is the internal snapshot stream, used by _c
   // The user-visible one is a wrapper around _c to ensure proper bookeeping
   late final Computed<IMap<K, V>> _snapshotStream;
+  // TODO: This is ridiculous
+  late final Computed<(ChangeEvent<K, V>, IMap<K, V>)> _changeAndSnapshotStream;
   late final Computed<IMap<K, V>> _c;
   // The "keep-alive" subscription used by key streams, as we explicitly break the dependency DAG of Computed.
   ComputedSubscription<IMap<K, V>>? _cSub;
   late final PubSub<K, Option<V>> _keyPubSub;
-  ValueOrException<IMap<K, V>>? _curRes;
   var _isInitialValue = true;
   ChangeStreamComputedMap(this._changeStream,
       {IMap<K, V> Function()? initialValueComputer,
       Computed<IMap<K, V>>? snapshotStream}) {
     _keyPubSub = PubSub<K, Option<V>>((k) {
-      final m = _curRes!.value; // Throws if there is an exception
+      ////////////////////// make pubsub run this in a computation
+      final m = _c.use; // Throws if there is an exception
       if (m.containsKey(k)) return Option.some(m[k]); // There is a value
       return Option.none(); // There is no value
     }, () {
@@ -53,27 +56,29 @@ class ChangeStreamComputedMap<K, V>
     changes = $(() => _changeStream.use);
     _snapshotStream =
         snapshotStream ?? snapshotComputation(changes, initialValueComputer);
+    _changeAndSnapshotStream = $(() => (changes.use, _snapshotStream.use));
     _c = Computed.async(() {
+      (ChangeEvent<K, V>, IMap<K, V>) changeAndSnapshot;
       try {
-        _curRes = ValueOrException.value(_snapshotStream.use);
+        changeAndSnapshot = _changeAndSnapshotStream.use;
       } on NoValueException {
         rethrow;
       } catch (e) {
-        _curRes = ValueOrException.exc(e);
-        _notifyAllKeyStreams();
+        _notifyAllKeyStreams(e);
         throw e;
       }
       final keysToNotify = _isInitialValue
           ? null
-          : _getAffectedKeys(changes.use); // If null -> notify all keys
+          : _getAffectedKeys(
+              changeAndSnapshot.$1); // If null -> notify all keys
       _isInitialValue = false;
       if (keysToNotify == null) {
-        _notifyAllKeyStreams();
+        _notifyAllKeyStreams(null);
       } else {
         _notifyKeyStreams(keysToNotify);
       }
 
-      return _snapshotStream.use;
+      return changeAndSnapshot.$2;
     }, onCancel: () => _isInitialValue = true);
 
     // We do not directly expose _c because it also does bookkeeping, and
@@ -85,55 +90,49 @@ class ChangeStreamComputedMap<K, V>
   }
 
   @visibleForTesting
-  void fix(IMap<K, V> value) {
-    // ignore: invalid_use_of_visible_for_testing_member
-    _c.fix(value);
-    _curRes = ValueOrException.value(value);
-    _notifyAllKeyStreams();
-  }
+  void fix(IMap<K, V> value) => mock(ConstComputedMap(value));
 
   @visibleForTesting
   void fixThrow(Object e) {
     // ignore: invalid_use_of_visible_for_testing_member
-    _c.fixThrow(e);
-    // TODO: Maybe refactor this logic out? Currently it is duplicated here and in the original computation
-    _curRes = ValueOrException.exc(e);
-    _notifyAllKeyStreams();
+    _changeAndSnapshotStream
+        // ignore: invalid_use_of_visible_for_testing_member
+        .fixThrow(
+            e); // Note that this will trigger [_c] to notify the key streams, if there are any
   }
 
   @visibleForTesting
   // ignore: invalid_use_of_visible_for_testing_member
-  void mock(IComputedMap<K, V> mock) => _c.mock(() {
-        try {
-          final mockRes = mock.snapshot.use;
-          _curRes = ValueOrException.value(mockRes);
-        } on NoValueException {
-          rethrow; // Propagate
-        } catch (e) {
-          _curRes = ValueOrException.exc(e);
-        }
-        _notifyAllKeyStreams();
-        return _curRes!
-            .value; // Will throw if there was an exception, which is fine
-      });
+  void mock(IComputedMap<K, V> mock) {
+    _isInitialValue = true; // Force [_c] to notify all the key streams
+    _changeAndSnapshotStream
+        // ignore: invalid_use_of_visible_for_testing_member
+        .mock(() => (
+              mock.changes.use,
+              mock.snapshot.use
+            )); ////////////////////// what if [mock] has no changes?
+  }
 
   @visibleForTesting
   void unmock() {
     _isInitialValue = true;
-    // ignore: invalid_use_of_visible_for_testing_member
-    _c.unmock(); // Note that this will notify key streams
+    // We always use replacement change streams to force [_c] to notify all the key streams
+    final replacementChangeStream =
+        getReplacementChangeStream(mock.snapshot, mock.changes);
+    _changeAndSnapshotStream
+        // ignore: invalid_use_of_visible_for_testing_member
+        .mock(() => (replacementChangeStream(), mock.snapshot.use));
   }
 
-  void _notifyAllKeyStreams() {
-    if (_curRes!.isValue) {
+  void _notifyAllKeyStreams(Object? exc) {
+    if (exc == null) {
       _keyPubSub.recomputeAllKeys();
     } else {
-      _keyPubSub.pubError(_curRes!.exc_!);
+      _keyPubSub.pubError(exc);
     }
   }
 
   void _notifyKeyStreams(Set<K> keys) {
-    assert(_curRes!.isValue);
     _keyPubSub.recomputeKeys(keys);
   }
 
@@ -162,7 +161,8 @@ class ChangeStreamComputedMap<K, V>
       _containsValueCache.wrap(value, () => _c.use.containsValue(value));
 
   @override
-  late final Computed<ChangeEvent<K, V>> changes;
+  late final Computed<ChangeEvent<K, V>>
+      changes; // TODO: Make these getters returning new computations at each call
 
   @override
   late final Computed<bool> isEmpty;
