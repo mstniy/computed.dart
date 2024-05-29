@@ -5,6 +5,7 @@ import 'package:computed/utils/computation_cache.dart';
 import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/icomputedmap.dart';
 import 'package:computed_collections/src/utils/pubsub.dart';
+import 'package:computed_collections/src/utils/snapshot_computation.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import 'package:meta/meta.dart';
@@ -13,17 +14,23 @@ import 'computedmap_mixins.dart';
 import 'utils/option.dart';
 import 'utils/value_or_exception.dart';
 
+Set<K>? _getAffectedKeys<K, V>(ChangeEvent<K, V> change) => switch (change) {
+      ChangeEventReplace<K, V>() => null,
+      KeyChanges<K, V>(changes: final changes) => changes.keys.toSet(),
+    };
+
 class ChangeStreamComputedMap<K, V>
     with OperatorsMixin<K, V>
     implements IComputedMap<K, V> {
-  final IMap<K, V> Function()? _initialValueComputer;
   final Computed<ChangeEvent<K, V>> _stream;
   late final Computed<IMap<K, V>> _c;
   // The "keep-alive" subscription used by key streams, as we explicitly break the dependency DAG of Computed.
   ComputedSubscription<IMap<K, V>>? _cSub;
   late final PubSub<K, Option<V>> _keyPubSub;
   ValueOrException<IMap<K, V>>? _curRes;
-  ChangeStreamComputedMap(this._stream, [this._initialValueComputer]) {
+  var _isInitialValue = true;
+  ChangeStreamComputedMap(this._stream,
+      [IMap<K, V> Function()? initialValueComputer]) {
     _keyPubSub = PubSub<K, Option<V>>((k) {
       final m = _curRes!.value; // Throws if there is an exception
       if (m.containsKey(k)) return Option.some(m[k]); // There is a value
@@ -40,68 +47,31 @@ class ChangeStreamComputedMap<K, V>
       _cSub = null;
     });
     changes = $(() => _stream.use);
-    final firstReactToken = IMap<K,
-        V>(); // TODO: This is obviously ugly. Make Computed.withPrev support null instead
-    _c = Computed.withPrev((prev) {
-      void Function()? notifier;
-      if (identical(prev, firstReactToken)) {
-        if (_initialValueComputer != null) {
-          prev = _initialValueComputer!();
-        } else {
-          prev = <K, V>{}.lock;
-        }
-
-        _curRes = ValueOrException.value(prev);
-        notifier = _notifyAllKeyStreams;
-      }
-
-      ChangeEvent<K, V>? change;
-
+    // Note that this is the internal snapshot stream, used by _c
+    // The user-visible one is a wrapper around _c to ensure proper bookeeping
+    final _snapshot = snapshotComputation(changes, initialValueComputer);
+    _c = Computed.async(() {
       try {
-        change = _stream.use;
+        _curRes = ValueOrException.value(_snapshot.use);
       } on NoValueException {
+        rethrow;
       } catch (e) {
         _curRes = ValueOrException.exc(e);
         _notifyAllKeyStreams();
         throw e;
       }
-
-      if (change != null) {
-        Set<K>? keysToNotify = <K>{}; // If null -> notify all keys
-        if (change is ChangeEventReplace<K, V>) {
-          keysToNotify = null;
-          prev = change.newCollection;
-        } else if (change is KeyChanges<K, V>) {
-          for (var e in change.changes.entries) {
-            final key = e.key;
-            switch (e.value) {
-              case ChangeRecordValue<V>(value: var value):
-                keysToNotify.add(key);
-                prev = prev.add(key, value);
-              case ChangeRecordDelete<V>():
-                keysToNotify.add(key);
-                prev = prev.remove(key);
-            }
-          }
-        }
-
-        _curRes = ValueOrException.value(prev);
-
-        if (keysToNotify == null) {
-          // Computed doesn't like it when a computation adds things to a stream,
-          // so cheat here once again
-          notifier = _notifyAllKeyStreams;
-        } else {
-          notifier ??= () => _notifyKeyStreams(keysToNotify!);
-        }
+      final keysToNotify = _isInitialValue
+          ? null
+          : _getAffectedKeys(changes.use); // If null -> notify all keys
+      _isInitialValue = false;
+      if (keysToNotify == null) {
+        _notifyAllKeyStreams();
+      } else {
+        _notifyKeyStreams(keysToNotify);
       }
 
-      if (notifier != null) {
-        notifier();
-      }
-
-      return prev;
-    }, async: true, initialPrev: firstReactToken);
+      return _snapshot.use;
+    }, onCancel: () => _isInitialValue = true);
 
     // We do not directly expose _c because it also does bookkeeping, and
     // that would get messes up if it gets mocked.
@@ -146,6 +116,7 @@ class ChangeStreamComputedMap<K, V>
 
   @visibleForTesting
   void unmock() {
+    _isInitialValue = true;
     // ignore: invalid_use_of_visible_for_testing_member
     _c.unmock(); // Note that this will notify key streams
   }
