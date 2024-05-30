@@ -1110,6 +1110,39 @@ void main() {
         }
       }
     });
+
+    test('regression test on topological sort', () {
+      final co = StreamController(sync: true);
+      final stream = co.stream;
+      final calls = [];
+      final a = $(() {
+        calls.add(0);
+        return stream.use;
+      });
+      final b = $(() {
+        calls.add(1);
+        return a.use;
+      });
+      final c = $(() {
+        calls.add(2);
+        return b.use;
+      });
+      final d = $(() {
+        calls.add(3);
+        c.use;
+        a.use;
+      });
+      final sub = d.listen(null, null);
+      expect(calls, [3, 2, 1, 0, 0, 1, 2, 3]);
+
+      for (var i = 0; i < 5; i++) {
+        calls.clear();
+        co.add(i);
+        expect(calls, [0, 0, 1, 1, 2, 2, 3, 3]);
+      }
+
+      sub.cancel();
+    });
   });
 
   test('detaching all listeners disables the computation graph', () async {

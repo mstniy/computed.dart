@@ -409,7 +409,34 @@ class ComputedImpl<T> {
   }
 
   void _rerunGraph() {
-    final numUnsatDep = <ComputedImpl, int>{};
+    // Topologically sort the relevant nodes and re-run them
+
+    // Do a DFS rooted at [this] to discover the relevant section of the computation graph
+    final open = <ComputedImpl, Set<ComputedImpl>>{};
+    void _dfs(ComputedImpl c) {
+      if (open.containsKey(c)) return;
+      final downs = {
+        ...c._weakDownstreamComputations,
+        ...c._memoizedDownstreamComputations,
+        ...c._nonMemoizedDownstreamComputations
+      };
+      // Keep a copy of the downstream
+      // As re-running a computation might change its set of dependencies
+      // to change and this will mess up the topological sort
+      open[c] = downs;
+      for (var down in downs) {
+        _dfs(down);
+      }
+    }
+
+    _dfs(this);
+
+    // Do not consider dependencies to nodes which are not relevant (they will not be recomputed)
+    final numUnsatDep = Map.fromEntries(open.keys.map((c) => MapEntry(
+        c,
+        c._lastUpstreamComputations.keys.fold<int>(
+            0, (nud, down) => nud + (open.containsKey(down) ? 1 : 0)))));
+
     final noUnsatDep = <ComputedImpl>{this};
     final done = <ComputedImpl>{};
 
@@ -417,44 +444,28 @@ class ComputedImpl<T> {
       final cur = noUnsatDep.first;
       noUnsatDep.remove(cur);
       if (done.contains(cur)) continue;
-      try {
-        if (cur._lastUpdate != GlobalCtx._currentUpdate) {
-          try {
-            if (cur == this) {
-              _evalF();
-            } else {
-              cur.onDependencyUpdated();
-            }
-          } on NoValueException {
-            // Do not evaluate the children
-            continue;
+      done.add(cur);
+      // It is possible that this node has been forced to be evaluated by another
+      // In this case, do not re-compute it again
+      if (cur._lastUpdate != GlobalCtx._currentUpdate) {
+        try {
+          if (cur == this) {
+            _evalF();
+          } else {
+            cur.onDependencyUpdated();
           }
+        } on NoValueException {
+          // Pass. We must still consider the downstream.
         }
-        for (var down in [
-          ...cur._weakDownstreamComputations,
-          ...cur._memoizedDownstreamComputations,
-          ...cur._nonMemoizedDownstreamComputations
-        ]) {
-          if (!done.contains(down)) {
-            var nud = numUnsatDep[down];
-            if (nud == null) {
-              nud = 0;
-              for (var up in down._lastUpstreamComputations.keys) {
-                nud = nud! + (up._dirty ? 1 : 0);
-              }
-            } else {
-              assert(nud > 0);
-              nud--;
-            }
-            if (nud == 0) {
-              noUnsatDep.add(down);
-            } else {
-              numUnsatDep[down] = nud!;
-            }
-          }
+      }
+
+      // Rely on the copy of downstream computations in [open]
+      for (var down in open[cur]!) {
+        assert(!done.contains(down));
+        final nud = numUnsatDep.update(down, (value) => value - 1);
+        if (nud == 0) {
+          noUnsatDep.add(down);
         }
-      } finally {
-        done.add(cur);
       }
     }
   }
