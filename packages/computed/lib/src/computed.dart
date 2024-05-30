@@ -412,18 +412,18 @@ class ComputedImpl<T> {
     // Topologically sort the relevant nodes and re-run them
 
     // Do a DFS rooted at [this] to discover the relevant section of the computation graph
-    final open = <ComputedImpl, Set<ComputedImpl>>{};
+    final nodes = <ComputedImpl, List<ComputedImpl>>{};
     void _dfs(ComputedImpl c) {
-      if (open.containsKey(c)) return;
-      final downs = {
+      if (nodes.containsKey(c)) return;
+      final downs = [
         ...c._weakDownstreamComputations,
         ...c._memoizedDownstreamComputations,
         ...c._nonMemoizedDownstreamComputations
-      };
+      ];
       // Keep a copy of the downstream
       // As re-running a computation might change its set of dependencies
       // to change and this will mess up the topological sort
-      open[c] = downs;
+      nodes[c] = downs;
       for (var down in downs) {
         _dfs(down);
       }
@@ -432,10 +432,10 @@ class ComputedImpl<T> {
     _dfs(this);
 
     // Do not consider dependencies to nodes which are not relevant (they will not be recomputed)
-    final numUnsatDep = Map.fromEntries(open.keys.map((c) => MapEntry(
+    final numUnsatDep = Map.fromEntries(nodes.keys.map((c) => MapEntry(
         c,
         c._lastUpstreamComputations.keys.fold<int>(
-            0, (nud, down) => nud + (open.containsKey(down) ? 1 : 0)))));
+            0, (nud, down) => nud + (nodes.containsKey(down) ? 1 : 0)))));
 
     final noUnsatDep = <ComputedImpl>{this};
     final done = <ComputedImpl>{};
@@ -460,7 +460,7 @@ class ComputedImpl<T> {
       }
 
       // Rely on the copy of downstream computations in [open]
-      for (var down in open[cur]!) {
+      for (var down in nodes[cur]!) {
         assert(!done.contains(down));
         final nud = numUnsatDep.update(down, (value) => value - 1);
         if (nud == 0) {
