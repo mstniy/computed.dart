@@ -2,8 +2,6 @@ import 'package:computed/computed.dart';
 import 'package:computed/utils/streams.dart';
 
 class PubSub<K, V> {
-  // Note that this is NOT run as part of a Computed computation.
-  // It is just a regular function
   final V Function(K key) computeValue;
   final void Function() onListen;
   final void Function() onCancel;

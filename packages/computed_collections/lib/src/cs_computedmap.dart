@@ -27,11 +27,9 @@ class ChangeStreamComputedMap<K, V>
   // Note that this is the internal snapshot stream, used by _c
   // The user-visible one is a wrapper around _c to ensure proper bookeeping
   late final Computed<IMap<K, V>> _snapshotStream;
-  // TODO: This is ridiculous
-  late final Computed<(ChangeEvent<K, V>, IMap<K, V>)> _changeAndSnapshotStream;
-  late final Computed<IMap<K, V>> _c;
+  late final Computed<void> _c;
   // The "keep-alive" subscription used by key streams, as we explicitly break the dependency DAG of Computed.
-  ComputedSubscription<IMap<K, V>>? _cSub;
+  ComputedSubscription<void>? _cSub;
   late final PubSub<K, Option<V>> _keyPubSub;
   var _isInitialValue = true;
   ChangeStreamComputedMap(this._changeStream,
@@ -39,7 +37,7 @@ class ChangeStreamComputedMap<K, V>
       Computed<IMap<K, V>>? snapshotStream}) {
     _keyPubSub = PubSub<K, Option<V>>((k) {
       ////////////////////// make pubsub run this in a computation
-      final m = _c.use; // Throws if there is an exception
+      final m = _snapshotStream.use; // Throws if there is an exception
       if (m.containsKey(k)) return Option.some(m[k]); // There is a value
       return Option.none(); // There is no value
     }, () {
@@ -47,7 +45,7 @@ class ChangeStreamComputedMap<K, V>
       // Kickstart the keepalive subscription
       // Escape the Computed zone
       Zone.current.parent!.run(() {
-        _cSub = _c.listen((e) {}, null);
+        _cSub = _c.listen(null, null);
       });
     }, () {
       _cSub!.cancel();
@@ -56,37 +54,39 @@ class ChangeStreamComputedMap<K, V>
     changes = $(() => _changeStream.use);
     _snapshotStream =
         snapshotStream ?? snapshotComputation(changes, initialValueComputer);
-    _changeAndSnapshotStream = $(() => (changes.use, _snapshotStream.use));
     _c = Computed.async(() {
-      (ChangeEvent<K, V>, IMap<K, V>) changeAndSnapshot;
       try {
-        changeAndSnapshot = _changeAndSnapshotStream.use;
+        _snapshotStream.use;
       } on NoValueException {
         rethrow;
       } catch (e) {
         _notifyAllKeyStreams(e);
         throw e;
       }
-      final keysToNotify = _isInitialValue
-          ? null
-          : _getAffectedKeys(
-              changeAndSnapshot.$1); // If null -> notify all keys
-      _isInitialValue = false;
-      if (keysToNotify == null) {
+      if (_isInitialValue) {
+        _isInitialValue = false;
         _notifyAllKeyStreams(null);
       } else {
-        _notifyKeyStreams(keysToNotify);
+        // We really should not get any exception here
+        // As we are not in the initial computation and we got a (new) snapshot,
+        // so there must be a change.
+        // If this [.use] nevertheless throws, we'll end up reporting an
+        // uncaught error to the current zone, which is desired.
+        final keysToNotify = _getAffectedKeys(_changeStream.use);
+        if (keysToNotify == null) {
+          _notifyAllKeyStreams(null);
+        } else {
+          _notifyKeyStreams(keysToNotify);
+        }
       }
-
-      return changeAndSnapshot.$2;
     }, onCancel: () => _isInitialValue = true);
 
     // We do not directly expose _c because it also does bookkeeping, and
     // that would get messes up if it gets mocked.
-    snapshot = $(() => _c.use);
-    isEmpty = $(() => _c.use.isEmpty);
-    isNotEmpty = $(() => _c.use.isNotEmpty);
-    length = $(() => _c.use.length);
+    snapshot = $(() => _snapshotStream.use);
+    isEmpty = $(() => _snapshotStream.use.isEmpty);
+    isNotEmpty = $(() => _snapshotStream.use.isNotEmpty);
+    length = $(() => _snapshotStream.use.length);
   }
 
   @visibleForTesting
@@ -95,33 +95,31 @@ class ChangeStreamComputedMap<K, V>
   @visibleForTesting
   void fixThrow(Object e) {
     // ignore: invalid_use_of_visible_for_testing_member
-    _changeAndSnapshotStream
-        // ignore: invalid_use_of_visible_for_testing_member
-        .fixThrow(
-            e); // Note that this will trigger [_c] to notify the key streams, if there are any
+    _snapshotStream.fixThrow(e);
+    // Note that by now [_c] has stopped listening to the [_changeStream].
+    // ignore: invalid_use_of_visible_for_testing_member
+    _changeStream.fixThrow(e);
   }
 
   @visibleForTesting
   // ignore: invalid_use_of_visible_for_testing_member
   void mock(IComputedMap<K, V> mock) {
     _isInitialValue = true; // Force [_c] to notify all the key streams
-    _changeAndSnapshotStream
-        // ignore: invalid_use_of_visible_for_testing_member
-        .mock(() => (
-              mock.changes.use,
-              mock.snapshot.use
-            )); ////////////////////// what if [mock] has no changes?
+    // ignore: invalid_use_of_visible_for_testing_member
+    _snapshotStream.mock(() => mock.snapshot.use);
+    // Note that by now [_c] has stopped listening to the [_changeStream].
+    // ignore: invalid_use_of_visible_for_testing_member
+    _changeStream.mock(() => mock.changes.use);
   }
 
   @visibleForTesting
   void unmock() {
-    _isInitialValue = true;
-    // We always use replacement change streams to force [_c] to notify all the key streams
-    final replacementChangeStream =
-        getReplacementChangeStream(mock.snapshot, mock.changes);
-    _changeAndSnapshotStream
-        // ignore: invalid_use_of_visible_for_testing_member
-        .mock(() => (replacementChangeStream(), mock.snapshot.use));
+    _isInitialValue = true; // Force [_c] to notify all the key streams
+    // ignore: invalid_use_of_visible_for_testing_member
+    _snapshotStream.unmock();
+    // Note that by now [_c] has stopped listening to the [_changeStream].
+    // ignore: invalid_use_of_visible_for_testing_member
+    _changeStream.unmock();
   }
 
   void _notifyAllKeyStreams(Object? exc) {
@@ -157,8 +155,8 @@ class ChangeStreamComputedMap<K, V>
   final _containsValueCache = ComputationCache<V, bool>();
 
   @override
-  Computed<bool> containsValue(V value) =>
-      _containsValueCache.wrap(value, () => _c.use.containsValue(value));
+  Computed<bool> containsValue(V value) => _containsValueCache.wrap(
+      value, () => _snapshotStream.use.containsValue(value));
 
   @override
   late final Computed<ChangeEvent<K, V>>
