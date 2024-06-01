@@ -34,9 +34,8 @@ class GroupByComputedMap<K, V, KParent>
   var _m = <K,
       (
     StreamController<ChangeEvent<KParent, V>>,
-    Computed<ChangeEvent<KParent, V>>,
     IMap<KParent, V>
-  )>{}; // group key -> (change stream, computation using it, group snapshot)
+  )>{}; // group key -> (change stream, group snapshot)
 
   IMap<K, IComputedMap<KParent, V>> _setM(IMap<KParent, V> m) {
     final (grouped, mappedKeys) = m.groupBy(_convert);
@@ -44,16 +43,16 @@ class GroupByComputedMap<K, V, KParent>
     _m = grouped.map((k, v) {
       final vlocked = v.lock;
       final cs = StreamController<ChangeEvent<KParent, V>>.broadcast();
-      final stream = cs.stream;
-      return MapEntry(k, (cs, $(() => stream.use), vlocked));
+      return MapEntry(k, (cs, vlocked));
     });
     _mappedKeys = mappedKeys;
 
     return _m.map((k, v) {
+      final stream = v.$1.stream;
       return MapEntry(
           k,
-          ChangeStreamComputedMap(v.$2,
-              initialValueComputer: () => _m[k]?.$3 ?? <KParent, V>{}.lock));
+          ChangeStreamComputedMap($(() => stream.use),
+              initialValueComputer: () => _m[k]?.$2 ?? <KParent, V>{}.lock));
     }).lock;
   }
 
@@ -90,17 +89,16 @@ class GroupByComputedMap<K, V, KParent>
             final value = e.value.$2;
             _m.update(
               groupKey,
-              (group) => (group.$1, group.$2, group.$3.add(parentKey, value)),
+              (group) => (group.$1, group.$2.add(parentKey, value)),
               ifAbsent: () {
                 final cs =
                     StreamController<ChangeEvent<KParent, V>>.broadcast();
                 final stream = cs.stream;
-                final group =
-                    (cs, $(() => stream.use), {parentKey: value}.lock);
+                final group = (cs, {parentKey: value}.lock);
                 keyChanges[groupKey] = ChangeRecordValue(
-                    ChangeStreamComputedMap(group.$2,
+                    ChangeStreamComputedMap($(() => stream.use),
                         initialValueComputer: () =>
-                            _m[groupKey]?.$3 ?? <KParent, V>{}.lock));
+                            _m[groupKey]?.$2 ?? <KParent, V>{}.lock));
                 return group;
               },
             );
@@ -116,8 +114,8 @@ class GroupByComputedMap<K, V, KParent>
             if (oldGroupKey != null) {
               if (oldGroupKey != groupKey) {
                 final oldGroup = _m.update(
-                    oldGroupKey, (g) => (g.$1, g.$2, g.$3.remove(parentKey)));
-                if (oldGroup.$3.isEmpty) {
+                    oldGroupKey, (g) => (g.$1, g.$2.remove(parentKey)));
+                if (oldGroup.$2.isEmpty) {
                   keyChanges[oldGroupKey] = ChangeRecordDelete();
                   _m.remove(oldGroupKey);
                   batchedChanges.remove(oldGroupKey);
@@ -139,8 +137,8 @@ class GroupByComputedMap<K, V, KParent>
               continue; // Extraneous deletion from upstream?
             final oldGroup = _mappedKeys.remove(deletedKey) as K;
             _m.update(oldGroup, (group) {
-              group = (group.$1, group.$2, group.$3.remove(deletedKey));
-              if (group.$3.isEmpty) {
+              group = (group.$1, group.$2.remove(deletedKey));
+              if (group.$2.isEmpty) {
                 keyChanges[oldGroup] = ChangeRecordDelete();
                 batchedChanges.remove(oldGroup);
               } else {
