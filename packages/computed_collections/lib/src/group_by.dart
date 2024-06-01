@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:computed/computed.dart';
 import 'package:computed/utils/computation_cache.dart';
+import 'package:computed/utils/streams.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import '../change_event.dart';
@@ -29,13 +30,12 @@ class GroupByComputedMap<K, V, KParent>
       ComputationCache<IComputedMap<KParent, V>, bool>();
 
   var _mappedKeys = <KParent, K>{};
-  // TODO: GroupByComputedMap keeps its own snapshots (in `_m`), so do the groups' ChangeStreamComputedMap-s.
-  //  Can we de-dup this replicated effort?
   var _m = <K,
       (
     StreamController<ChangeEvent<KParent, V>>,
-    IMap<KParent, V>
-  )>{}; // group key -> (change stream, group snapshot)
+    IMap<KParent, V>,
+    ValueStream<IMap<KParent, V>>,
+  )>{}; // group key -> (change stream, group snapshot, group snapshot stream)
 
   IMap<K, IComputedMap<KParent, V>> _setM(IMap<KParent, V> m) {
     final (grouped, mappedKeys) = m.groupBy(_convert);
@@ -43,16 +43,18 @@ class GroupByComputedMap<K, V, KParent>
     _m = grouped.map((k, v) {
       final vlocked = v.lock;
       final cs = StreamController<ChangeEvent<KParent, V>>.broadcast();
-      return MapEntry(k, (cs, vlocked));
+      final ss = ValueStream.seeded(vlocked);
+      return MapEntry(k, (cs, vlocked, ss));
     });
     _mappedKeys = mappedKeys;
 
     return _m.map((k, v) {
-      final stream = v.$1.stream;
+      final cstream = v.$1.stream;
       return MapEntry(
           k,
-          ChangeStreamComputedMap($(() => stream.use),
-              initialValueComputer: () => _m[k]?.$2 ?? <KParent, V>{}.lock));
+          ChangeStreamComputedMap($(() => cstream.use),
+              initialValueComputer: () => _m[k]?.$2 ?? <KParent, V>{}.lock,
+              snapshotStream: $(() => v.$3.use)));
     }).lock;
   }
 
@@ -89,16 +91,19 @@ class GroupByComputedMap<K, V, KParent>
             final value = e.value.$2;
             _m.update(
               groupKey,
-              (group) => (group.$1, group.$2.add(parentKey, value)),
+              (group) => (group.$1, group.$2.add(parentKey, value), group.$3),
               ifAbsent: () {
                 final cs =
                     StreamController<ChangeEvent<KParent, V>>.broadcast();
-                final stream = cs.stream;
-                final group = (cs, {parentKey: value}.lock);
+                final snapshot = {parentKey: value}.lock;
+                final ss = ValueStream.seeded(snapshot);
+                final cstream = cs.stream;
+                final group = (cs, snapshot, ss);
                 keyChanges[groupKey] = ChangeRecordValue(
-                    ChangeStreamComputedMap($(() => stream.use),
+                    ChangeStreamComputedMap($(() => cstream.use),
                         initialValueComputer: () =>
-                            _m[groupKey]?.$2 ?? <KParent, V>{}.lock));
+                            _m[groupKey]?.$2 ?? <KParent, V>{}.lock,
+                        snapshotStream: $(() => ss.use)));
                 return group;
               },
             );
@@ -114,7 +119,7 @@ class GroupByComputedMap<K, V, KParent>
             if (oldGroupKey != null) {
               if (oldGroupKey != groupKey) {
                 final oldGroup = _m.update(
-                    oldGroupKey, (g) => (g.$1, g.$2.remove(parentKey)));
+                    oldGroupKey, (g) => (g.$1, g.$2.remove(parentKey), g.$3));
                 if (oldGroup.$2.isEmpty) {
                   keyChanges[oldGroupKey] = ChangeRecordDelete();
                   _m.remove(oldGroupKey);
@@ -137,7 +142,7 @@ class GroupByComputedMap<K, V, KParent>
               continue; // Extraneous deletion from upstream?
             final oldGroup = _mappedKeys.remove(deletedKey) as K;
             _m.update(oldGroup, (group) {
-              group = (group.$1, group.$2.remove(deletedKey));
+              group = (group.$1, group.$2.remove(deletedKey), group.$3);
               if (group.$2.isEmpty) {
                 keyChanges[oldGroup] = ChangeRecordDelete();
                 batchedChanges.remove(oldGroup);
@@ -152,6 +157,7 @@ class GroupByComputedMap<K, V, KParent>
                 group.$1.add(KeyChanges(<KParent, ChangeRecord<V>>{
                   deletedKey: ChangeRecordDelete<V>()
                 }.lock));
+                group.$3.add(group.$2);
               }
               return group;
             }); // Not passing `ifAbsent` as the key has to be present (ow/ we have a corrupt internal state)
@@ -160,6 +166,7 @@ class GroupByComputedMap<K, V, KParent>
           for (var e in batchedChanges.entries) {
             final group = _m[e.key]!;
             group.$1.add(e.value);
+            group.$3.add(group.$2);
           }
 
           return KeyChanges(keyChanges.lock);

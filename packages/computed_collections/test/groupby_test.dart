@@ -38,6 +38,7 @@ void main() {
     expect(lastRes3, null);
     expect(lastRes4, null);
     s.add(KeyChanges({0: ChangeRecordValue(1)}.lock)); // Add a new group
+    await Future.value();
     expect(lastRes1!.keys, [1]);
     expect(lastRes2, null);
     expect(lastRes3, {0: 1}.lock);
@@ -45,6 +46,7 @@ void main() {
     // Change the value of an existing item, removing a group
     // + add a new group
     s.add(KeyChanges({0: ChangeRecordValue(2), 1: ChangeRecordValue(0)}.lock));
+    await Future.value();
     expect(lastRes1!.keys, containsAll([0, 2]));
     expect(lastRes2, {1: 0}.lock);
     expect(lastRes3, null);
@@ -75,6 +77,7 @@ void main() {
     expect(lastRes4, null);
     // Upstream replacement
     s.add(ChangeEventReplace({0: 0, 1: 1, 2: 3}.lock));
+    await Future.value();
     expect(lastRes1!.keys, containsAll([0, 1]));
     expect(lastRes2, {0: 0, 2: 3}.lock);
     expect(lastRes3, {1: 1}.lock);
