@@ -83,7 +83,9 @@ class GroupByComputedMap<K, V, KParent>
 
           final keyChanges = <K, ChangeRecord<IComputedMap<KParent, V>>>{};
 
-          final batchedChanges = <K, KeyChanges<KParent, V>>{};
+          final batchedChanges = <K,
+              KeyChanges<KParent,
+                  V>?>{}; // If null -> just notify the snapshot stream
 
           for (var e in valueKeysAndGroups.entries) {
             final groupKey = e.value.$1;
@@ -107,13 +109,17 @@ class GroupByComputedMap<K, V, KParent>
                 return group;
               },
             );
-            batchedChanges.update(
-                groupKey,
-                (changes) => KeyChanges(
-                    changes.changes.add(e.key, ChangeRecordValue(e.value.$2))),
-                ifAbsent: () => KeyChanges(<KParent, ChangeRecord<V>>{
-                      e.key: ChangeRecordValue(e.value.$2)
-                    }.lock));
+            if (!(_m[groupKey]?.$1.hasListener ?? false)) {
+              batchedChanges[groupKey] = null;
+            } else {
+              batchedChanges.update(
+                  groupKey,
+                  (changes) => KeyChanges(changes!.changes
+                      .add(e.key, ChangeRecordValue(e.value.$2))),
+                  ifAbsent: () => KeyChanges(<KParent, ChangeRecord<V>>{
+                        e.key: ChangeRecordValue(e.value.$2)
+                      }.lock));
+            }
             final oldGroupKey = _mappedKeys[parentKey];
             _mappedKeys[parentKey] = groupKey;
             if (oldGroupKey != null) {
@@ -125,13 +131,17 @@ class GroupByComputedMap<K, V, KParent>
                   _m.remove(oldGroupKey);
                   batchedChanges.remove(oldGroupKey);
                 } else {
-                  batchedChanges.update(
-                      oldGroupKey,
-                      (changes) => KeyChanges(
-                          changes.changes.add(e.key, ChangeRecordDelete<V>())),
-                      ifAbsent: () => KeyChanges(<KParent, ChangeRecord<V>>{
-                            e.key: ChangeRecordDelete<V>()
-                          }.lock));
+                  if (!(_m[oldGroupKey]?.$1.hasListener ?? false)) {
+                    batchedChanges[oldGroupKey] = null;
+                  } else {
+                    batchedChanges.update(
+                        oldGroupKey,
+                        (changes) => KeyChanges(changes!.changes
+                            .add(e.key, ChangeRecordDelete<V>())),
+                        ifAbsent: () => KeyChanges(<KParent, ChangeRecord<V>>{
+                              e.key: ChangeRecordDelete<V>()
+                            }.lock));
+                  }
                 }
               }
             }
@@ -147,13 +157,17 @@ class GroupByComputedMap<K, V, KParent>
                 keyChanges[oldGroup] = ChangeRecordDelete();
                 batchedChanges.remove(oldGroup);
               } else {
-                batchedChanges.update(
-                    oldGroup,
-                    (changes) => KeyChanges(changes.changes
-                        .add(deletedKey, ChangeRecordDelete<V>())),
-                    ifAbsent: () => KeyChanges(<KParent, ChangeRecord<V>>{
-                          deletedKey: ChangeRecordDelete<V>()
-                        }.lock));
+                if (!(_m[oldGroup]?.$1.hasListener ?? false)) {
+                  batchedChanges[oldGroup] = null;
+                } else {
+                  batchedChanges.update(
+                      oldGroup,
+                      (changes) => KeyChanges(changes!.changes
+                          .add(deletedKey, ChangeRecordDelete<V>())),
+                      ifAbsent: () => KeyChanges(<KParent, ChangeRecord<V>>{
+                            deletedKey: ChangeRecordDelete<V>()
+                          }.lock));
+                }
                 group.$1.add(KeyChanges(<KParent, ChangeRecord<V>>{
                   deletedKey: ChangeRecordDelete<V>()
                 }.lock));
@@ -165,7 +179,9 @@ class GroupByComputedMap<K, V, KParent>
 
           for (var e in batchedChanges.entries) {
             final group = _m[e.key]!;
-            group.$1.add(e.value);
+            if (e.value != null) {
+              group.$1.add(e.value!);
+            }
             group.$3.add(group.$2);
           }
 
