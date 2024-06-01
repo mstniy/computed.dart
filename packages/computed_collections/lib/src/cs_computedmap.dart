@@ -13,12 +13,6 @@ import 'package:meta/meta.dart';
 import 'computedmap_mixins.dart';
 import 'const_computedmap.dart';
 import 'utils/option.dart';
-import 'utils/value_or_exception.dart';
-
-Set<K>? _getAffectedKeys<K, V>(ChangeEvent<K, V> change) => switch (change) {
-      ChangeEventReplace<K, V>() => null,
-      KeyChanges<K, V>(changes: final changes) => changes.keys.toSet(),
-    };
 
 class ChangeStreamComputedMap<K, V>
     with OperatorsMixin<K, V>
@@ -30,17 +24,12 @@ class ChangeStreamComputedMap<K, V>
   late final Computed<void> _c;
   // The "keep-alive" subscription used by key streams, as we explicitly break the dependency DAG of Computed.
   ComputedSubscription<void>? _cSub;
-  late final PubSub<K, Option<V>> _keyPubSub;
+  late final PubSub<K, V> _keyPubSub;
   var _isInitialValue = true;
   ChangeStreamComputedMap(this._changeStream,
       {IMap<K, V> Function()? initialValueComputer,
       Computed<IMap<K, V>>? snapshotStream}) {
-    _keyPubSub = PubSub<K, Option<V>>((k) {
-      ////////////////////// make pubsub run this in a computation
-      final m = _snapshotStream.use; // Throws if there is an exception
-      if (m.containsKey(k)) return Option.some(m[k]); // There is a value
-      return Option.none(); // There is no value
-    }, () {
+    _keyPubSub = PubSub<K, V>(() {
       assert(_cSub == null);
       // Kickstart the keepalive subscription
       // Escape the Computed zone
@@ -54,31 +43,39 @@ class ChangeStreamComputedMap<K, V>
     changes = $(() => _changeStream.use);
     _snapshotStream =
         snapshotStream ?? snapshotComputation(changes, initialValueComputer);
+    // TODO: Make this into an effect instead of an async computation and an empty listener
+    //  after we introduce effect onCancel
     _c = Computed.async(() {
+      IMap<K, V> snapshot;
       try {
-        _snapshotStream.use;
+        snapshot = _snapshotStream.use;
       } on NoValueException {
         rethrow;
       } catch (e) {
-        _notifyAllKeyStreams(e);
-        throw e;
+        _keyPubSub.pubError(e);
+        return;
       }
       if (_isInitialValue) {
         _isInitialValue = false;
-        _notifyAllKeyStreams(null);
       } else {
         // We really should not get any exception here
         // As we are not in the initial computation and we got a (new) snapshot,
         // so there must be a change.
         // If this [.use] nevertheless throws, we'll end up reporting an
         // uncaught error to the current zone, which is desired.
-        final keysToNotify = _getAffectedKeys(_changeStream.use);
-        if (keysToNotify == null) {
-          _notifyAllKeyStreams(null);
-        } else {
-          _notifyKeyStreams(keysToNotify);
+        final change = _changeStream.use;
+        if (change is KeyChanges<K, V>) {
+          _keyPubSub.pubMany(change.changes.map((key, value) => MapEntry(
+              key,
+              switch (value) {
+                ChangeRecordValue<V>(value: final value) => Option.some(value),
+                ChangeRecordDelete<V>() => Option.none(),
+              })));
+          return; // Do not call pubAll
         }
       }
+
+      _keyPubSub.pubAll(snapshot);
     }, onCancel: () => _isInitialValue = true);
 
     // We do not directly expose _c because it also does bookkeeping, and
@@ -116,22 +113,9 @@ class ChangeStreamComputedMap<K, V>
   void unmock() {
     _isInitialValue = true; // Force [_c] to notify all the key streams
     // ignore: invalid_use_of_visible_for_testing_member
-    _snapshotStream.unmock();
-    // Note that by now [_c] has stopped listening to the [_changeStream].
-    // ignore: invalid_use_of_visible_for_testing_member
     _changeStream.unmock();
-  }
-
-  void _notifyAllKeyStreams(Object? exc) {
-    if (exc == null) {
-      _keyPubSub.recomputeAllKeys();
-    } else {
-      _keyPubSub.pubError(exc);
-    }
-  }
-
-  void _notifyKeyStreams(Set<K> keys) {
-    _keyPubSub.recomputeKeys(keys);
+    // ignore: invalid_use_of_visible_for_testing_member
+    _snapshotStream.unmock();
   }
 
   Computed<V?> operator [](K key) {

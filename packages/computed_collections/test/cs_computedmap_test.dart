@@ -378,6 +378,7 @@ void main() {
       expect(callCnt1, 1);
       expect(callCnt2, 1);
       await Future.value(); // Wait for Computed to subscribe to `s2`
+      await Future.value(); // Await the microtask lag of PubSub
       expect(callCnt1, 2);
       expect(callCnt2, 2);
       expect(lastRes1, {0: 1}.lock);
