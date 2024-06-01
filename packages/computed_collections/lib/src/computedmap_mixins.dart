@@ -192,7 +192,7 @@ class MockManager<K, V> {
     }
   }
 
-  Computed<ChangeEvent<K, V>> get changes => _changes_wrapped;
+  Computed<ChangeEvent<K, V>> get changes => $(() => _changes_wrapped.use);
 }
 
 ChangeEvent<K, V> Function() getReplacementChangeStream<K, V>(

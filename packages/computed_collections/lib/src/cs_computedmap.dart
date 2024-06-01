@@ -18,10 +18,7 @@ class ChangeStreamComputedMap<K, V>
     with OperatorsMixin<K, V>
     implements IComputedMap<K, V> {
   final Computed<ChangeEvent<K, V>> _changeStream;
-  // Note that this is the internal snapshot stream, used by _c
-  // The user-visible one is a wrapper around _c to ensure proper bookeeping
   late final Computed<IMap<K, V>> _snapshotStream;
-  late final Computed<void> _c;
   // The "keep-alive" subscription used by key streams, as we explicitly break the dependency DAG of Computed.
   ComputedSubscription<void>? _cSub;
   late final PubSub<K, V> _keyPubSub;
@@ -29,23 +26,11 @@ class ChangeStreamComputedMap<K, V>
   ChangeStreamComputedMap(this._changeStream,
       {IMap<K, V> Function()? initialValueComputer,
       Computed<IMap<K, V>>? snapshotStream}) {
-    _keyPubSub = PubSub<K, V>(() {
-      assert(_cSub == null);
-      // Kickstart the keepalive subscription
-      // Escape the Computed zone
-      Zone.current.parent!.run(() {
-        _cSub = _c.listen(null, null);
-      });
-    }, () {
-      _cSub!.cancel();
-      _cSub = null;
-    });
-    changes = $(() => _changeStream.use);
     _snapshotStream =
         snapshotStream ?? snapshotComputation(changes, initialValueComputer);
     // TODO: Make this into an effect instead of an async computation and an empty listener
     //  after we introduce effect onCancel
-    _c = Computed.async(() {
+    final _c = Computed.async(() {
       IMap<K, V> snapshot;
       try {
         snapshot = _snapshotStream.use;
@@ -78,12 +63,17 @@ class ChangeStreamComputedMap<K, V>
       _keyPubSub.pubAll(snapshot);
     }, onCancel: () => _isInitialValue = true);
 
-    // We do not directly expose _c because it also does bookkeeping, and
-    // that would get messes up if it gets mocked.
-    snapshot = $(() => _snapshotStream.use);
-    isEmpty = $(() => _snapshotStream.use.isEmpty);
-    isNotEmpty = $(() => _snapshotStream.use.isNotEmpty);
-    length = $(() => _snapshotStream.use.length);
+    _keyPubSub = PubSub<K, V>(() {
+      assert(_cSub == null);
+      // Kickstart the keepalive subscription
+      // Escape the Computed zone
+      Zone.current.parent!.run(() {
+        _cSub = _c.listen(null, null);
+      });
+    }, () {
+      _cSub!.cancel();
+      _cSub = null;
+    });
   }
 
   @visibleForTesting
@@ -143,18 +133,17 @@ class ChangeStreamComputedMap<K, V>
       value, () => _snapshotStream.use.containsValue(value));
 
   @override
-  late final Computed<ChangeEvent<K, V>>
-      changes; // TODO: Make these getters returning new computations at each call
+  Computed<ChangeEvent<K, V>> get changes => $(() => _changeStream.use);
 
   @override
-  late final Computed<bool> isEmpty;
+  Computed<bool> get isEmpty => $(() => _snapshotStream.use.isEmpty);
 
   @override
-  late final Computed<bool> isNotEmpty;
+  Computed<bool> get isNotEmpty => $(() => _snapshotStream.use.isNotEmpty);
 
   @override
-  late final Computed<int> length;
+  Computed<int> get length => $(() => _snapshotStream.use.length);
 
   @override
-  late final Computed<IMap<K, V>> snapshot;
+  Computed<IMap<K, V>> get snapshot => $(() => _snapshotStream.use);
 }
