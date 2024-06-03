@@ -58,7 +58,6 @@ class MapValuesComputedMap<K, V, VParent>
   @override
   Computed<bool> containsKey(K key) {
     final parentContainsKey = _parent.containsKey(key);
-    // TODO: This is inefficient. Make the computation map take computations as parameter?
     return _containsKeyComputations.wrap(key, () => parentContainsKey.use);
   }
 
