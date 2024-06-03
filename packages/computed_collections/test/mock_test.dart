@@ -163,6 +163,16 @@ Future<void> testMock(IComputedMap<int, int> map) async {
 }
 
 void main() {
+  test('fromChangeStream', () async {
+    final s = ValueStream<ChangeEvent<int, int>>.seeded(
+        ChangeEventReplace({1: 2}.lock));
+    final m = IComputedMap.fromChangeStream($(() => s.use));
+    await testFixUnmock(m);
+    await testMock(m);
+    expect(await getValuesWhile(m.changes, () => m.fix({2: 3}.lock)), [
+      ChangeEventReplace({2: 3}.lock)
+    ]);
+  });
   test('add', () async {
     final m = IComputedMap({0: 1}.lock);
     final a = m.add(1, 2);

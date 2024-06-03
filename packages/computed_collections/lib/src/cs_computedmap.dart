@@ -18,14 +18,17 @@ class ChangeStreamComputedMap<K, V>
     with OperatorsMixin<K, V>
     implements IComputedMap<K, V> {
   final Computed<ChangeEvent<K, V>> _changeStream;
+  late final Computed<ChangeEvent<K, V>> _changeStreamWrapped;
   late final Computed<IMap<K, V>> _snapshotStream;
   // The "keep-alive" subscription used by key streams, as we explicitly break the dependency DAG of Computed.
   ComputedSubscription<void>? _cSub;
   late final PubSub<K, V> _keyPubSub;
   var _isInitialValue = true;
+  // Note that the instance may mock the given snapshot stream
   ChangeStreamComputedMap(this._changeStream,
       {IMap<K, V> Function()? initialValueComputer,
       Computed<IMap<K, V>>? snapshotStream}) {
+    _changeStreamWrapped = $(() => _changeStream.use);
     _snapshotStream = snapshotStream ??
         snapshotComputation(_changeStream, initialValueComputer);
     // TODO: Make this into an effect instead of an async computation and an empty listener
@@ -85,7 +88,7 @@ class ChangeStreamComputedMap<K, V>
     _snapshotStream.fixThrow(e);
     // Note that by now [_c] has stopped listening to the [_changeStream].
     // ignore: invalid_use_of_visible_for_testing_member
-    _changeStream.fixThrow(e);
+    _changeStreamWrapped.fixThrow(e);
   }
 
   @visibleForTesting
@@ -95,15 +98,32 @@ class ChangeStreamComputedMap<K, V>
     // ignore: invalid_use_of_visible_for_testing_member
     _snapshotStream.mock(() => mock.snapshot.use);
     // Note that by now [_c] has stopped listening to the [_changeStream].
-    // ignore: invalid_use_of_visible_for_testing_member
-    _changeStream.mock(() => mock.changes.use);
+    // This logic is copied over from MockManager
+    if (changesHasListeners(_changeStreamWrapped)) {
+      // We have to mock to a "replacement stream" that emits
+      // a replacement event to keep the existing listeners in sync
+      _changeStreamWrapped
+          // ignore: invalid_use_of_visible_for_testing_member
+          .mock(getReplacementChangeStream(mock.snapshot, mock.changes));
+    } else {
+      // If there are no existing listeners, we can be naive
+      // ignore: invalid_use_of_visible_for_testing_member
+      _changeStreamWrapped.mock(() => mock.changes.use);
+    }
   }
 
   @visibleForTesting
   void unmock() {
     _isInitialValue = true; // Force [_c] to notify all the key streams
-    // ignore: invalid_use_of_visible_for_testing_member
-    _changeStream.unmock();
+    // See the corresponding part in [mock]
+    if (changesHasListeners(_changeStreamWrapped)) {
+      _changeStreamWrapped
+          // ignore: invalid_use_of_visible_for_testing_member
+          .mock(getReplacementChangeStream(_snapshotStream, _changeStream));
+    } else {
+      // ignore: invalid_use_of_visible_for_testing_member
+      _changeStreamWrapped.unmock();
+    }
     // ignore: invalid_use_of_visible_for_testing_member
     _snapshotStream.unmock();
   }
@@ -133,7 +153,7 @@ class ChangeStreamComputedMap<K, V>
       value, () => _snapshotStream.use.containsValue(value));
 
   @override
-  Computed<ChangeEvent<K, V>> get changes => $(() => _changeStream.use);
+  Computed<ChangeEvent<K, V>> get changes => $(() => _changeStreamWrapped.use);
 
   @override
   Computed<bool> get isEmpty => $(() => _snapshotStream.use.isEmpty);
