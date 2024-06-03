@@ -15,18 +15,12 @@ class MapValuesComputedComputedMap<K, V, VParent>
   late final MockManager<K, V> _mm;
   final IComputedMap<K, VParent> _parent;
   final Computed<V> Function(K key, VParent value) _convert;
-  late final Computed<bool> isEmpty;
-  late final Computed<bool> isNotEmpty;
-  late final Computed<int> length;
-  late final MergingChangeStream<K, V> _changes;
-  late final Computed<ChangeEvent<K, V>> _changesComputed;
-  var _changesState = <K, ComputedSubscription<V>>{};
-  late final Computed<IMap<K, V>> snapshot;
 
-  final keyComputations = ComputationCache<K, V?>();
-  final keyOptionComputations = ComputationCache<K, Option<V>>();
-  final containsKeyComputations = ComputationCache<K, bool>();
-  final containsValueComputations = ComputationCache<V, bool>();
+  late final Computed<IMap<K, V>> _snapshot;
+  final _keyComputations = ComputationCache<K, V?>();
+  final _keyOptionComputations = ComputationCache<K, Option<V>>();
+  final _containsKeyComputations = ComputationCache<K, bool>();
+  final _containsValueComputations = ComputationCache<V, bool>();
 
   MapValuesComputedComputedMap(this._parent, this._convert) {
     final _computedChanges = Computed(() {
@@ -47,6 +41,9 @@ class MapValuesComputedComputedMap<K, V, VParent>
           }))),
       };
     }, assertIdempotent: false);
+
+    late final MergingChangeStream<K, V> _changes;
+    var _changesState = <K, ComputedSubscription<V>>{};
 
     void _computationListener(K key, V value) {
       _changes.add(KeyChanges(
@@ -99,8 +96,8 @@ class MapValuesComputedComputedMap<K, V, VParent>
       _computedChangesSubscription!.cancel();
       _computedChangesSubscription = null;
     });
-    _changesComputed = $(() => _changes.use);
-    snapshot = snapshotComputation(_changesComputed, () {
+    final _changesComputed = $(() => _changes.use);
+    _snapshot = snapshotComputation(_changesComputed, () {
       final entries = _parent.snapshot.use
           .map(((key, value) => MapEntry(key, _convert(key, value))));
       var gotNVE = false;
@@ -121,19 +118,16 @@ class MapValuesComputedComputedMap<K, V, VParent>
     // To know the length of the collection we do indeed need to compute the values for all the keys
     // as just because a key exists on the parent does not mean it also exists in us
     // because the corresponding computation might not have a value yet
-    length = $(() => snapshot.use.length);
+    final length = $(() => _snapshot.use.length);
 
     // TODO: We can be slightly smarter about this by not evaluating any computation as soon as
     //  one of them gains a value. Cannot think of an easy way to implement this, though.
-    isEmpty = $(() => length.use == 0);
-    isNotEmpty = $(() => length.use > 0);
+    final isEmpty = $(() => length.use == 0);
+    final isNotEmpty = $(() => length.use > 0);
 
-    _mm = MockManager(_changesComputed, snapshot, length, isEmpty, isNotEmpty,
-        keyComputations, containsKeyComputations, containsValueComputations);
+    _mm = MockManager(_changesComputed, _snapshot, length, isEmpty, isNotEmpty,
+        _keyComputations, _containsKeyComputations, _containsValueComputations);
   }
-
-  @override
-  Computed<ChangeEvent<K, V>> get changes => _mm.changes;
 
   Computed<Option<V>> _getKeyOptionComputation(K key) {
     // This logic is extracted to a separate cache so that the mapped computations'
@@ -149,9 +143,9 @@ class MapValuesComputedComputedMap<K, V, VParent>
     // We could mock this cache also, but it would be extra code for likely little gain.
     // So `operator[]` and `containsKey` further wraps it to separate caches and let
     // the [MockMixin] handle it.
-    return keyOptionComputations.wrap(key, () {
+    return _keyOptionComputations.wrap(key, () {
       try {
-        final s = snapshot.useWeak;
+        final s = _snapshot.useWeak;
         // useWeak returned - means there is an existing non-weak listener on the snapshot
         if (s.containsKey(key)) return Option.some(s[key]);
         return Option.none();
@@ -174,7 +168,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
   @override
   Computed<V?> operator [](K key) {
     final keyOptionComputation = _getKeyOptionComputation(key);
-    final resultComputation = keyComputations.wrap(key, () {
+    final resultComputation = _keyComputations.wrap(key, () {
       final option = keyOptionComputation.use;
       if (!option.is_)
         return null; // The key does not exist in the parent or the mapped computations has no value yet
@@ -188,7 +182,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
   @override
   Computed<bool> containsKey(K key) {
     final keyOptionComputation = _getKeyOptionComputation(key);
-    final resultComputation = containsKeyComputations.wrap(key, () {
+    final resultComputation = _containsKeyComputations.wrap(key, () {
       final option = keyOptionComputation.use;
       if (!option.is_)
         return false; // The key does not exist in the parent or the mapped computations has no value yet
@@ -200,8 +194,8 @@ class MapValuesComputedComputedMap<K, V, VParent>
   }
 
   @override
-  Computed<bool> containsValue(V value) => containsValueComputations.wrap(
-      value, () => snapshot.use.containsValue(value));
+  Computed<bool> containsValue(V value) => _containsValueComputations.wrap(
+      value, () => _snapshot.use.containsValue(value));
 
   @override
   void fix(IMap<K, V> value) => _mm.fix(value);
@@ -214,4 +208,15 @@ class MapValuesComputedComputedMap<K, V, VParent>
 
   @override
   void unmock() => _mm.unmock();
+
+  @override
+  Computed<ChangeEvent<K, V>> get changes => _mm.changes;
+  @override
+  Computed<IMap<K, V>> get snapshot => _mm.snapshot;
+  @override
+  Computed<bool> get isEmpty => _mm.isEmpty;
+  @override
+  Computed<bool> get isNotEmpty => _mm.isNotEmpty;
+  @override
+  Computed<int> get length => _mm.length;
 }

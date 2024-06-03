@@ -13,20 +13,15 @@ class AddComputedMap<K, V>
   V _value;
   late final MockManager<K, V> _mm;
   final IComputedMap<K, V> _parent;
-  late final Computed<ChangeEvent<K, V>> _changes;
-  Computed<ChangeEvent<K, V>> get changes => _mm.changes;
-  late final Computed<IMap<K, V>> snapshot;
-  final keyComputations = ComputationCache<K, V?>();
-  final containsKeyComputations = ComputationCache<K, bool>();
-  final containsValueComputations = ComputationCache<V, bool>();
-  final isEmpty = $(() => false);
-  final isNotEmpty = $(() => true);
-  late final Computed<int> length;
+  final _keyComputations = ComputationCache<K, V?>();
+  final _containsKeyComputations = ComputationCache<K, bool>();
+  final _containsValueComputations = ComputationCache<V, bool>();
   AddComputedMap(this._parent, this._key, this._value) {
     final parentContainsKey = _parent.containsKey(_key);
-    length = $(() => _parent.length.use + (parentContainsKey.use ? 0 : 1));
-    snapshot = $(() => _parent.snapshot.use.add(this._key, this._value));
-    _changes = Computed(() {
+    final length =
+        $(() => _parent.length.use + (parentContainsKey.use ? 0 : 1));
+    final snapshot = $(() => _parent.snapshot.use.add(this._key, this._value));
+    final changes = Computed(() {
       final changeEvent = _parent.changes.use;
       switch (changeEvent) {
         case ChangeEventReplace<K, V>():
@@ -43,13 +38,13 @@ class AddComputedMap<K, V>
           return KeyChanges(IMap.fromEntries(changes));
       }
     });
-    _mm = MockManager(_changes, snapshot, length, isEmpty, isNotEmpty,
-        keyComputations, containsKeyComputations, containsValueComputations);
+    _mm = MockManager(changes, snapshot, length, $(() => false), $(() => true),
+        _keyComputations, _containsKeyComputations, _containsValueComputations);
   }
 
   Computed<V?> operator [](K key) {
     final parentKey = _parent[key];
-    return keyComputations.wrap(key, () {
+    return _keyComputations.wrap(key, () {
       // We make this decision inside the computation as opposed to directly inside `operator[]`
       // so that even mocks changing the value of `key` are possible.
       if (key == _key) return _value;
@@ -69,7 +64,7 @@ class AddComputedMap<K, V>
   @override
   Computed<bool> containsKey(K key) {
     final parentContainsKey = _parent.containsKey(key);
-    return containsKeyComputations.wrap(key, () {
+    return _containsKeyComputations.wrap(key, () {
       if (key == _key) return true;
       return parentContainsKey.use;
     });
@@ -78,7 +73,7 @@ class AddComputedMap<K, V>
   @override
   Computed<bool> containsValue(V value) {
     final parentContainsValue = _parent.containsValue(value);
-    return containsValueComputations.wrap(value, () {
+    return _containsValueComputations.wrap(value, () {
       if (value == _value) return true;
       return parentContainsValue.use;
     });
@@ -95,4 +90,10 @@ class AddComputedMap<K, V>
 
   @override
   void unmock() => _mm.unmock();
+
+  Computed<ChangeEvent<K, V>> get changes => _mm.changes;
+  Computed<IMap<K, V>> get snapshot => _mm.snapshot;
+  Computed<bool> get isEmpty => _mm.isEmpty;
+  Computed<bool> get isNotEmpty => _mm.isNotEmpty;
+  Computed<int> get length => _mm.length;
 }

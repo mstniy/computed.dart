@@ -13,23 +13,14 @@ class MapValuesComputedMap<K, V, VParent>
   late final MockManager<K, V> _mm;
   final IComputedMap<K, VParent> _parent;
   final V Function(K key, VParent value) _convert;
-  final Computed<bool> isEmpty;
-  final Computed<bool> isNotEmpty;
-  final Computed<int> length;
   late final Computed<ChangeEvent<K, V>> _changes;
-  Computed<ChangeEvent<K, V>> get changes => _mm.changes;
-  late final Computed<IMap<K, V>> snapshot;
+  late final Computed<IMap<K, V>> _snapshot;
 
-  final keyComputations = ComputationCache<K, V?>();
-  final containsKeyComputations = ComputationCache<K, bool>();
-  final containsValueComputations = ComputationCache<V, bool>();
+  final _keyComputations = ComputationCache<K, V?>();
+  final _containsKeyComputations = ComputationCache<K, bool>();
+  final _containsValueComputations = ComputationCache<V, bool>();
 
-  MapValuesComputedMap(this._parent, this._convert)
-      // We wrap the parent's attributes into new computations
-      // so that they are independently mockable
-      : isEmpty = $(() => _parent.isEmpty.use),
-        isNotEmpty = $(() => _parent.isNotEmpty.use),
-        length = $(() => _parent.length.use) {
+  MapValuesComputedMap(this._parent, this._convert) {
     _changes = Computed(() {
       final change = _parent.changes.use;
       return switch (change) {
@@ -48,29 +39,36 @@ class MapValuesComputedMap<K, V, VParent>
           }))),
       };
     });
-    snapshot = snapshotComputation(
+    _snapshot = snapshotComputation(
         _changes,
         () => _parent.snapshot.use
             .map(((key, value) => MapEntry(key, _convert(key, value)))));
 
-    _mm = MockManager(_changes, snapshot, length, isEmpty, isNotEmpty,
-        keyComputations, containsKeyComputations, containsValueComputations);
+    _mm = MockManager(
+        _changes,
+        _snapshot,
+        $(() => _parent.length.use),
+        $(() => _parent.isEmpty.use),
+        $(() => _parent.isNotEmpty.use),
+        _keyComputations,
+        _containsKeyComputations,
+        _containsValueComputations);
   }
 
   @override
   Computed<bool> containsKey(K key) {
     final parentContainsKey = _parent.containsKey(key);
     // TODO: This is inefficient. Make the computation map take computations as parameter?
-    return containsKeyComputations.wrap(key, () => parentContainsKey.use);
+    return _containsKeyComputations.wrap(key, () => parentContainsKey.use);
   }
 
   @override
   Computed<V?> operator [](K key) {
     final parentContainsKey = _parent.containsKey(key);
     final parentKey = _parent[key];
-    return keyComputations.wrap(key, () {
+    return _keyComputations.wrap(key, () {
       try {
-        final s = snapshot.useWeak;
+        final s = _snapshot.useWeak;
         // If there is a snapshot, use the value from there
         return s[key];
       } on NoStrongUserException {
@@ -84,8 +82,8 @@ class MapValuesComputedMap<K, V, VParent>
   }
 
   @override
-  Computed<bool> containsValue(V value) => containsValueComputations.wrap(
-      value, () => snapshot.use.containsValue(value));
+  Computed<bool> containsValue(V value) => _containsValueComputations.wrap(
+      value, () => _snapshot.use.containsValue(value));
 
   @override
   void fix(IMap<K, V> value) => _mm.fix(value);
@@ -98,4 +96,15 @@ class MapValuesComputedMap<K, V, VParent>
 
   @override
   void unmock() => _mm.unmock();
+
+  @override
+  Computed<ChangeEvent<K, V>> get changes => _mm.changes;
+  @override
+  Computed<IMap<K, V>> get snapshot => _mm.snapshot;
+  @override
+  Computed<bool> get isEmpty => _mm.isEmpty;
+  @override
+  Computed<bool> get isNotEmpty => _mm.isNotEmpty;
+  @override
+  Computed<int> get length => _mm.length;
 }

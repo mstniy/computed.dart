@@ -8,101 +8,80 @@ import 'computedmap_mixins.dart';
 class ConstComputedMap<K, V>
     with OperatorsMixin<K, V>
     implements IComputedMap<K, V> {
-  final IMap<K, V> m;
-  final Computed<IMap<K, V>> snapshot;
-  final Computed<bool> isEmpty;
-  final Computed<bool> isNotEmpty;
-  final Computed<int> length;
+  final Computed<IMap<K, V>> _snapshot;
+  final Computed<ChangeEvent<K, V>> _changes =
+      $(() => throw NoValueException());
 
-  ConstComputedMap(this.m)
-      : snapshot = $(() => m),
-        isEmpty = $(() => m.isEmpty),
-        isNotEmpty = $(() => m.isNotEmpty),
-        length = $(() => m.length);
+  ConstComputedMap(IMap<K, V> m) : _snapshot = $(() => m);
 
   @override
-  Computed<V?> operator [](K key) => $(() => snapshot.use[key]);
-
-  final changes = Computed<ChangeEvent<K, V>>(() => throw NoValueException());
+  Computed<V?> operator [](K key) => $(() => _snapshot.use[key]);
 
   @override
-  Computed<bool> containsKey(K key) => $(() => snapshot.use.containsKey(key));
+  Computed<bool> containsKey(K key) => $(() => _snapshot.use.containsKey(key));
 
   @override
   Computed<bool> containsValue(V value) =>
-      $(() => snapshot.use.containsValue(value));
+      $(() => _snapshot.use.containsValue(value));
 
   @override
   void fix(IMap<K, V> m) {
     // ignore: invalid_use_of_visible_for_testing_member
-    snapshot.fix(m);
-    // ignore: invalid_use_of_visible_for_testing_member
-    isEmpty.fix(m.isEmpty);
-    // ignore: invalid_use_of_visible_for_testing_member
-    isNotEmpty.fix(m.isNotEmpty);
-    // ignore: invalid_use_of_visible_for_testing_member
-    length.fix(m.length);
-    if (changesHasListeners(changes)) {
+    _snapshot.fix(m);
+    if (changesHasListeners(_changes)) {
       // ignore: invalid_use_of_visible_for_testing_member
-      changes.mock(getReplacementChangeStream(
-          snapshot, $(() => throw NoValueException())));
+      _changes.mock(getReplacementChangeStream(
+          _snapshot, $(() => throw NoValueException())));
     } else {
       // We might be already mocked to some other computed collection
       // ignore: invalid_use_of_visible_for_testing_member
-      changes.mock(() => throw NoValueException());
+      _changes.mock(() => throw NoValueException());
     }
   }
 
   @override
   void fixThrow(Object e) {
     // ignore: invalid_use_of_visible_for_testing_member
-    snapshot.fixThrow(e);
+    _snapshot.fixThrow(e);
     // ignore: invalid_use_of_visible_for_testing_member
-    isEmpty.fixThrow(e);
-    // ignore: invalid_use_of_visible_for_testing_member
-    isNotEmpty.fixThrow(e);
-    // ignore: invalid_use_of_visible_for_testing_member
-    length.fixThrow(e);
-    // ignore: invalid_use_of_visible_for_testing_member
-    changes.fixThrow(e);
+    _changes.fixThrow(e);
   }
 
   @override
   void mock(IComputedMap<K, V> mock) {
     // ignore: invalid_use_of_visible_for_testing_member
-    snapshot.mock(() => mock.snapshot.use);
-    // ignore: invalid_use_of_visible_for_testing_member
-    isEmpty.mock(() => mock.isEmpty.use);
-    // ignore: invalid_use_of_visible_for_testing_member
-    isNotEmpty.mock(() => mock.isNotEmpty.use);
-    // ignore: invalid_use_of_visible_for_testing_member
-    length.mock(() => mock.length.use);
-    if (changesHasListeners(changes)) {
+    _snapshot.mock(() => mock.snapshot.use);
+    if (changesHasListeners(_changes)) {
       // ignore: invalid_use_of_visible_for_testing_member
-      changes.mock(getReplacementChangeStream(mock.snapshot, mock.changes));
+      _changes.mock(getReplacementChangeStream(mock.snapshot, mock.changes));
     } else {
       // ignore: invalid_use_of_visible_for_testing_member
-      changes.mock(() => mock.changes.use);
+      _changes.mock(() => mock.changes.use);
     }
   }
 
   @override
   void unmock() {
     // ignore: invalid_use_of_visible_for_testing_member
-    snapshot.unmock();
-    // ignore: invalid_use_of_visible_for_testing_member
-    isEmpty.unmock();
-    // ignore: invalid_use_of_visible_for_testing_member
-    isNotEmpty.unmock();
-    // ignore: invalid_use_of_visible_for_testing_member
-    length.unmock();
-    if (changesHasListeners(changes)) {
+    _snapshot.unmock();
+    if (changesHasListeners(_changes)) {
       // ignore: invalid_use_of_visible_for_testing_member
-      changes.mock(getReplacementChangeStream(
-          snapshot, $(() => throw NoValueException())));
+      _changes.mock(getReplacementChangeStream(
+          _snapshot, $(() => throw NoValueException())));
     } else {
       // ignore: invalid_use_of_visible_for_testing_member
-      changes.unmock();
+      _changes.unmock();
     }
   }
+
+  @override
+  Computed<ChangeEvent<K, V>> get changes => $(() => _changes.use);
+  @override
+  Computed<IMap<K, V>> get snapshot => $(() => _snapshot.use);
+  @override
+  Computed<bool> get isEmpty => $(() => _snapshot.use.isEmpty);
+  @override
+  Computed<bool> get isNotEmpty => $(() => _snapshot.use.isNotEmpty);
+  @override
+  Computed<int> get length => $(() => _snapshot.use.length);
 }

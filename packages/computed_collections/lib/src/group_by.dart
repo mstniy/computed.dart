@@ -17,16 +17,11 @@ class GroupByComputedMap<K, V, KParent>
   late final MockManager<K, IComputedMap<KParent, V>> _mm;
   final IComputedMap<KParent, V> _parent;
   final K Function(KParent key, V value) _convert;
-  final Computed<bool> isEmpty;
-  final Computed<bool> isNotEmpty;
-  late final Computed<int> length;
-  late final Computed<ChangeEvent<K, IComputedMap<KParent, V>>> _changes;
-  Computed<ChangeEvent<K, IComputedMap<KParent, V>>> get changes => _mm.changes;
-  late final Computed<IMap<K, IComputedMap<KParent, V>>> snapshot;
 
-  final keyComputations = ComputationCache<K, IComputedMap<KParent, V>?>();
-  final containsKeyComputations = ComputationCache<K, bool>();
-  final containsValueComputations =
+  late final Computed<IMap<K, IComputedMap<KParent, V>>> _snapshot;
+  final _keyComputations = ComputationCache<K, IComputedMap<KParent, V>?>();
+  final _containsKeyComputations = ComputationCache<K, bool>();
+  final _containsValueComputations =
       ComputationCache<IComputedMap<KParent, V>, bool>();
 
   var _mappedKeys = <KParent, K>{};
@@ -58,12 +53,8 @@ class GroupByComputedMap<K, V, KParent>
     }).lock;
   }
 
-  GroupByComputedMap(this._parent, this._convert)
-      // We wrap the parent's attributes into new computations
-      // so that they are independently mockable
-      : isEmpty = $(() => _parent.isEmpty.use),
-        isNotEmpty = $(() => _parent.isNotEmpty.use) {
-    _changes = Computed.async(() {
+  GroupByComputedMap(this._parent, this._convert) {
+    final changes = Computed.async(() {
       final change = _parent.changes.use;
 
       switch (change) {
@@ -188,14 +179,20 @@ class GroupByComputedMap<K, V, KParent>
           return KeyChanges(keyChanges.lock);
       }
     }, onCancel: _onCancel);
-    snapshot = snapshotComputation(_changes, () {
+    _snapshot = snapshotComputation(changes, () {
       final s = _parent.snapshot.use;
       return _setM(s);
     });
 
-    length = $(() => snapshot.use.length);
-    _mm = MockManager(_changes, snapshot, length, isEmpty, isNotEmpty,
-        keyComputations, containsKeyComputations, containsValueComputations);
+    _mm = MockManager(
+        changes,
+        _snapshot,
+        $(() => snapshot.use.length),
+        $(() => _parent.isEmpty.use),
+        $(() => _parent.isNotEmpty.use),
+        _keyComputations,
+        _containsKeyComputations,
+        _containsValueComputations);
   }
 
   void _onCancel() {
@@ -205,16 +202,16 @@ class GroupByComputedMap<K, V, KParent>
 
   @override
   Computed<bool> containsKey(K key) =>
-      containsKeyComputations.wrap(key, () => snapshot.use.containsKey(key));
+      _containsKeyComputations.wrap(key, () => _snapshot.use.containsKey(key));
 
   @override
   Computed<IComputedMap<KParent, V>?> operator [](K key) =>
-      keyComputations.wrap(key, () => snapshot.use[key]);
+      _keyComputations.wrap(key, () => _snapshot.use[key]);
 
   @override
   Computed<bool> containsValue(IComputedMap<KParent, V> value) =>
-      containsValueComputations.wrap(
-          value, () => snapshot.use.containsValue(value));
+      _containsValueComputations.wrap(
+          value, () => _snapshot.use.containsValue(value));
 
   @override
   void fix(IMap<K, IComputedMap<KParent, V>> value) => _mm.fix(value);
@@ -227,6 +224,20 @@ class GroupByComputedMap<K, V, KParent>
 
   @override
   void unmock() => _mm.unmock();
+
+  @override
+  Computed<IMap<K, IComputedMap<KParent, V>>> get snapshot => _mm.snapshot;
+
+  @override
+  Computed<ChangeEvent<K, IComputedMap<KParent, V>>> get changes => _mm.changes;
+
+  @override
+  Computed<bool> get isEmpty => _mm.isEmpty;
+  @override
+  Computed<bool> get isNotEmpty => _mm.isNotEmpty;
+
+  @override
+  Computed<int> get length => _mm.length;
 }
 
 extension<K, V> on IMap<K, V> {

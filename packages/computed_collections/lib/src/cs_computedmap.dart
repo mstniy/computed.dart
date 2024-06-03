@@ -26,8 +26,8 @@ class ChangeStreamComputedMap<K, V>
   ChangeStreamComputedMap(this._changeStream,
       {IMap<K, V> Function()? initialValueComputer,
       Computed<IMap<K, V>>? snapshotStream}) {
-    _snapshotStream =
-        snapshotStream ?? snapshotComputation(changes, initialValueComputer);
+    _snapshotStream = snapshotStream ??
+        snapshotComputation(_changeStream, initialValueComputer);
     // TODO: Make this into an effect instead of an async computation and an empty listener
     //  after we introduce effect onCancel
     final _c = Computed.async(() {

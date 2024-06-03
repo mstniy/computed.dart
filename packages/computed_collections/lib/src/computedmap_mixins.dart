@@ -192,7 +192,13 @@ class MockManager<K, V> {
     }
   }
 
+  // Wrap all these to make sure they return different instances each time
+  // This results in more intuitive behaviour when they are mocked
   Computed<ChangeEvent<K, V>> get changes => $(() => _changes_wrapped.use);
+  Computed<IMap<K, V>> get snapshot => $(() => _snapshot.use);
+  Computed<int> get length => $(() => _length.use);
+  Computed<bool> get isEmpty => $(() => _isEmpty.use);
+  Computed<bool> get isNotEmpty => $(() => _isNotEmpty.use);
 }
 
 ChangeEvent<K, V> Function() getReplacementChangeStream<K, V>(
