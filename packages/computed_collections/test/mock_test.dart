@@ -100,55 +100,72 @@ Future<void> testFixUnmock(IComputedMap<int, int> map) async {
   await testFixUnmock_(map, true);
 }
 
-// Test that the replacement change stream starts with a replacement event
-// and delegates the mocked change stream thereafter
+// Test that the replacement change stream is consistent across
+// mocks/unmocks and delegates the mocked change stream
 Future<void> _testMock1(IComputedMap<int, int> map) async {
   final s = StreamController.broadcast(sync: true);
   final stream = s.stream;
-  final changes1 = map.changes;
-  final buffer1 = <ChangeEvent<int, int>>[];
-  final sub1 = changes1.listen(buffer1.add, null);
+  // Track the change stream of the given map
+  final cscm = IComputedMap.fromChangeStream(map.changes);
+  final sub = cscm.snapshot
+      .listen(null, null); // Make sure the cscm has listeners throughout
   try {
+    final snapshotBefore = await getValue(map.snapshot);
     map.mock(IComputedMap.fromChangeStream($(() => stream.use)));
     try {
-      final changes2 = map.changes;
-      final buffer2 = <ChangeEvent<int, int>>[];
-      final sub2 = changes2.listen(buffer2.add, null);
-      try {
-        expect(buffer1, [ChangeEventReplace({}.lock)]);
-        expect(buffer2, []);
-        buffer1.clear();
-        buffer2.clear();
-        final change = KeyChanges({0: ChangeRecordValue(1)}.lock);
-        s.add(change);
-        expect(buffer1, [change]);
-        expect(buffer2, [change]);
-      } finally {
-        sub2.cancel();
-      }
+      expect(await getValue(cscm.snapshot), {}.lock);
+      s.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
+      // If the cscm receives the correct value, map.changes must be propagating the mocked change stream
+      expect(await getValue(cscm.snapshot), {0: 1}.lock);
+      // Make it propagate another change just for good measure
+      s.add(ChangeEventReplace({1: 2}.lock));
+      expect(await getValue(cscm.snapshot), {1: 2}.lock);
     } finally {
       map.unmock();
     }
+    // After unmocking, the value of the tracking cscm must be replaced with
+    // the snapshot of the collection before the mock
+    expect(await getValue(cscm.snapshot), snapshotBefore);
   } finally {
-    sub1.cancel();
+    sub.cancel();
   }
 }
 
-// Test that the replacement stream is voided once cancelled
+// Test that the replacement stream works even after being cancelled and re-listened
 Future<void> _testMock2(IComputedMap<int, int> map) async {
-  final changes1 = map.changes;
-  final buffer1 = <ChangeEvent<int, int>>[];
-  var sub1 = changes1.listen(buffer1.add, null);
+  final cscm = IComputedMap.fromChangeStream(map.changes);
+  var sub1 = cscm.snapshot.listen(null, null);
   try {
     final initialValueStream = ValueStream<IMap<int, int>>(sync: true);
-    map.mock(ChangeStreamComputedMap($(() => throw NoValueException()),
+    final cs = StreamController<ChangeEvent<int, int>>.broadcast(sync: true);
+    final changeStream = cs.stream;
+    map.mock(ChangeStreamComputedMap($(() => changeStream.use),
         initialValueComputer: () => initialValueStream.use));
     try {
       sub1.cancel();
-      initialValueStream.add(<int, int>{}.lock);
-      sub1 = changes1.listen(buffer1.add, null);
-      await Future.value();
-      expect(buffer1, []); // And not a replacement event
+      initialValueStream.add(<int, int>{1: 2}.lock);
+      sub1 = cscm.snapshot.listen(null, null);
+      // This may be empty - as cscm is merely tracking the change stream of the given map
+      // and not looking at its snapshot, and the value of the mocked collection did not
+      // actually change since the listener was added.
+      // SnapshotStreamComputedMap still emits a replacement event, though
+      expect(
+          await getValue(cscm.snapshot),
+          anyOf([
+            {}.lock,
+            {1: 2}.lock
+          ]));
+      // Make it propagate a change
+      cs.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
+      expect(
+          await getValue(cscm.snapshot),
+          anyOf([
+            {0: 1}.lock,
+            {0: 1, 1: 2}.lock
+          ]));
+      // Make it propagate another change for good measure
+      cs.add(ChangeEventReplace({1: 2}.lock));
+      expect(await getValue(cscm.snapshot), {1: 2}.lock);
     } finally {
       map.unmock();
     }
@@ -171,6 +188,14 @@ void main() {
     await testMock(m);
     expect(await getValuesWhile(m.changes, () => m.fix({2: 3}.lock)), [
       ChangeEventReplace({2: 3}.lock)
+    ]);
+  });
+  test('fromSnapshotStream', () async {
+    final m = IComputedMap.fromSnapshotStream($(() => {0: 1}.lock));
+    await testFixUnmock(m);
+    await testMock(m);
+    expect(await getValuesWhile(m.changes, () => m.fix({2: 3}.lock)), [
+      KeyChanges({0: ChangeRecordDelete<int>(), 2: ChangeRecordValue(3)}.lock)
     ]);
   });
   test('add', () async {

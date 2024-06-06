@@ -6,6 +6,7 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:meta/meta.dart';
 
 import 'src/cs_computedmap.dart';
+import 'src/ss_computedmap.dart';
 
 /// An in-memory, partially- or fully-observable key-value store.
 /// Similar to the ObservableMap from the `observable` package, but with the following upsides:
@@ -15,6 +16,8 @@ abstract class IComputedMap<K, V> {
   factory IComputedMap(IMap<K, V> m) => ConstComputedMap(m);
   factory IComputedMap.fromChangeStream(Computed<ChangeEvent<K, V>> stream) =>
       ChangeStreamComputedMap(stream);
+  factory IComputedMap.fromSnapshotStream(Computed<IMap<K, V>> stream) =>
+      SnapshotStreamComputedMap(stream);
   Computed<ChangeEvent<K, V>> get changes;
 
   @visibleForTesting
