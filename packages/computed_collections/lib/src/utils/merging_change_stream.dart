@@ -16,6 +16,8 @@ class MergingChangeStream<K, V> extends Stream<ChangeEvent<K, V>> {
     _stream.add(oldChangesLastAdded);
   }
 
+  bool get hasListener => _stream.hasListener;
+
   void add(ChangeEvent<K, V> change) {
     if (_changesLastAdded == null) {
       _changesLastAdded = change;

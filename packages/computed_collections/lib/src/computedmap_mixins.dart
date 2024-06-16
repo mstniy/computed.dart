@@ -2,6 +2,7 @@ import 'package:computed/computed.dart';
 import 'package:computed/utils/computation_cache.dart';
 import 'package:computed_collections/src/const_computedmap.dart';
 import 'package:computed_collections/src/group_by.dart';
+import 'package:computed_collections/src/group_by_computed.dart';
 import 'package:computed_collections/src/map_values.dart';
 import 'package:computed_collections/src/map_values_computed.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
@@ -91,10 +92,8 @@ mixin OperatorsMixin<K, V> {
       GroupByComputedMap(this as IComputedMap<K, V>, key);
 
   IComputedMap<K2, IComputedMap<K, V>> groupByComputed<K2>(
-      Computed<K2> Function(K key, V value) key) {
-    // TODO: implement groupByComputed
-    throw UnimplementedError();
-  }
+          Computed<K2> Function(K key, V value) key) =>
+      GroupByComputedComputedMap(this as IComputedMap<K, V>, key);
 }
 
 class MockManager<K, V> {

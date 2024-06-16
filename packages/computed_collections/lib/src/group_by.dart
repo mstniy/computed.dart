@@ -82,7 +82,7 @@ class GroupByComputedMap<K, V, KParent>
             final groupKey = e.value.$1;
             final parentKey = e.key;
             final value = e.value.$2;
-            _m.update(
+            final group = _m.update(
               groupKey,
               (group) => (group.$1, group.$2.add(parentKey, value), group.$3),
               ifAbsent: () {
@@ -100,7 +100,7 @@ class GroupByComputedMap<K, V, KParent>
                 return group;
               },
             );
-            if (!(_m[groupKey]?.$1.hasListener ?? false)) {
+            if (!group.$1.hasListener) {
               batchedChanges[groupKey] = null;
             } else {
               batchedChanges.update(
@@ -122,7 +122,7 @@ class GroupByComputedMap<K, V, KParent>
                   _m.remove(oldGroupKey);
                   batchedChanges.remove(oldGroupKey);
                 } else {
-                  if (!(_m[oldGroupKey]?.$1.hasListener ?? false)) {
+                  if (!oldGroup.$1.hasListener) {
                     batchedChanges[oldGroupKey] = null;
                   } else {
                     batchedChanges.update(
@@ -145,10 +145,11 @@ class GroupByComputedMap<K, V, KParent>
             _m.update(oldGroup, (group) {
               group = (group.$1, group.$2.remove(deletedKey), group.$3);
               if (group.$2.isEmpty) {
+                // TODO: Shouldn't we also delete the group from _m?
                 keyChanges[oldGroup] = ChangeRecordDelete();
                 batchedChanges.remove(oldGroup);
               } else {
-                if (!(_m[oldGroup]?.$1.hasListener ?? false)) {
+                if (!group.$1.hasListener) {
                   batchedChanges[oldGroup] = null;
                 } else {
                   batchedChanges.update(
