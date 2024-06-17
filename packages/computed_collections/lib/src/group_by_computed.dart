@@ -135,6 +135,7 @@ class GroupByComputedComputedMap<K, V, KParent>
               KeyChanges<KParent,
                   V>?>{}; // If null -> just notify the snapshot stream
 
+          // TODO: Can we merge these two stages?
           for (var e in valueKeysAndSubs.entries) {
             final parentKey = e.key;
             final groupSub = e.value.$1;

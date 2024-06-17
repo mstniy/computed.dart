@@ -38,6 +38,14 @@ void main() {
     final sub5 = $(() => m2.snapshot.use[0]?.changes.use).listen((event) {
       lastRes5 = event;
     }, null);
+    ChangeEvent<int, int>? lastRes6;
+    final sub6 = $(() => m2.snapshot.use[1]?.changes.use).listen((event) {
+      lastRes6 = event;
+    }, null);
+    ChangeEvent<int, int>? lastRes7;
+    final sub7 = $(() => m2.snapshot.use[2]?.changes.use).listen((event) {
+      lastRes7 = event;
+    }, null);
     await Future.value();
     expect(lastRes1, {}.lock);
     for (var i = 0; i < 5; i++) {
@@ -47,6 +55,8 @@ void main() {
     expect(lastRes3, null);
     expect(lastRes4, null);
     expect(lastRes5, null);
+    expect(lastRes6, null);
+    expect(lastRes7, null);
     s1.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
     // This by itself causes no change on the collection, as the group computation has no value yet
     for (var i = 0; i < 5; i++) {
@@ -57,6 +67,8 @@ void main() {
     expect(lastRes3, null);
     expect(lastRes4, null);
     expect(lastRes5, null);
+    expect(lastRes6, null);
+    expect(lastRes7, null);
     // This adds a new group
     lookups[0].add([0, 1, 2].lock);
     await Future.value();
@@ -66,6 +78,8 @@ void main() {
     expect(lastRes3, {0: 1}.lock);
     expect(lastRes4, null);
     expect(lastRes5, null);
+    expect(lastRes6, null); // Just got created
+    expect(lastRes7, null);
     // Change the group of an existing item, removing a group
     // + add a new group
     lookups[0].add([1, 2, 2].lock);
@@ -76,6 +90,8 @@ void main() {
     expect(lastRes3, null);
     expect(lastRes4, {0: 1}.lock);
     expect(lastRes5, null);
+    expect(lastRes6, null); // The group is gone
+    expect(lastRes7, null); // The group just got created
     // Change the value of an existing item, while preserving its group
     s1.add(KeyChanges({0: ChangeRecordValue(2)}.lock));
     await Future.value();
@@ -85,6 +101,9 @@ void main() {
     expect(lastRes3, null);
     expect(lastRes4, {0: 2}.lock);
     expect(lastRes5, null);
+    expect(lastRes6, null);
+    expect(lastRes7,
+        null); // The group got removed and re-created behind the scenes
     // Remove a group by removing the only element in it
     // And add a new element upstream, creating a new group
     lookups[1].add([0, 0, 2].lock);
@@ -97,6 +116,8 @@ void main() {
     expect(lastRes3, null);
     expect(lastRes4, null);
     expect(lastRes5, null); // No change yet as the group just got created
+    expect(lastRes6, null);
+    expect(lastRes7, null); // The group is gone
     // Add a value to an existing group
     s1.add(KeyChanges({4: ChangeRecordValue(0)}.lock));
     expect(lastRes1!.keys, [0]);
@@ -106,6 +127,8 @@ void main() {
     expect(lastRes3, null);
     expect(lastRes4, null);
     expect(lastRes5, KeyChanges({4: ChangeRecordValue(0)}.lock));
+    expect(lastRes6, null);
+    expect(lastRes7, null);
     // Remove a value from an existing group, which has other elements
     s1.add(KeyChanges({4: ChangeRecordDelete<int>()}.lock));
     expect(lastRes1!.keys, [0]);
@@ -114,6 +137,8 @@ void main() {
     expect(lastRes3, null);
     expect(lastRes4, null);
     expect(lastRes5, KeyChanges({4: ChangeRecordDelete<int>()}.lock));
+    expect(lastRes6, null);
+    expect(lastRes7, null);
     // Upstream replacement
     s1.add(ChangeEventReplace({0: 0, 1: 1, 3: 2, 4: 0}.lock));
     await Future.value();
@@ -125,6 +150,8 @@ void main() {
     // This is "stuck" at its previous value as the new group collection's change stream is empty now
     // This also demonstrates that this is not a reliable way of tracking the changes to a group
     expect(lastRes5, KeyChanges({4: ChangeRecordDelete<int>()}.lock));
+    expect(lastRes6, null); // Just got created
+    expect(lastRes7, null); // Just got created
     // Change the group of an item, changing its group, but keeping its former group populated
     s1.add(KeyChanges({1: ChangeRecordValue(2)}.lock));
     await Future.value();
@@ -134,6 +161,9 @@ void main() {
     expect(lastRes3, {0: 0}.lock);
     expect(lastRes4, {3: 2, 1: 2}.lock);
     expect(lastRes5, KeyChanges({1: ChangeRecordDelete<int>()}.lock));
+    expect(lastRes6, null); // No changes still
+    expect(lastRes7,
+        KeyChanges({1: ChangeRecordValue(2)}.lock)); // Just got created
     // Delete a key, removing a group, but a new key immediately re-creates it
     s1.add(KeyChanges(
         {0: ChangeRecordDelete<int>(), 6: ChangeRecordValue(0)}.lock));
@@ -147,6 +177,9 @@ void main() {
     expect(lastRes3, {6: 0}.lock);
     expect(lastRes4, {3: 2, 1: 2}.lock);
     expect(lastRes5, KeyChanges({1: ChangeRecordDelete<int>()}.lock));
+    expect(lastRes6, null); // No changes still
+    expect(
+        lastRes7, KeyChanges({1: ChangeRecordValue(2)}.lock)); // No new change
     // Make multiple changes to groups in one upstream change
     s1.add(KeyChanges({
       1: ChangeRecordValue(1),
@@ -154,30 +187,87 @@ void main() {
       4: ChangeRecordValue(2),
       6: ChangeRecordDelete<int>(),
       7: ChangeRecordValue(2),
+      9: ChangeRecordValue(1)
     }.lock));
     await Future.value();
     expect(lastRes1!.keys, unorderedEquals([0, 1, 2]));
     await Future.value();
     expect(lastRes2, {1: 1}.lock);
     expect(lastRes3, {3: 3}.lock);
-    expect(lastRes4, {4: 2, 7: 2}.lock);
+    expect(lastRes4, {4: 2, 7: 2, 9: 1}.lock);
     // This is stuck again, as the group just got re-created, thus has no change yet
     expect(lastRes5, KeyChanges({1: ChangeRecordDelete<int>()}.lock));
+    expect(lastRes6, null); // The group got recreated
+    // The group got re-created, so no new changes
+    expect(lastRes7, KeyChanges({1: ChangeRecordValue(2)}.lock));
 
-    // Change the grouping for some mayhem
-    lookups[1].add([0, 2, 1].lock);
+    // Change the grouping
+    lookups[0].add([0, 2, 2].lock);
     await Future.value();
-    expect(lastRes1!.keys, unorderedEquals([1, 2]));
-    expect(lastRes2, null);
-    expect(lastRes3, {3: 3, 4: 2, 7: 2}.lock);
-    expect(lastRes4, {1: 1}.lock);
-    expect(lastRes5, null); // The group is gone
+    expect(lastRes1!.keys, unorderedEquals([0, 2]));
+    expect(lastRes2, {1: 1, 3: 3}.lock);
+    expect(lastRes3, null);
+    expect(lastRes4, {4: 2, 7: 2, 9: 1}.lock);
+    expect(lastRes5, KeyChanges({3: ChangeRecordValue(3)}.lock));
+    expect(lastRes6, null); // The group got deleted
+    // Still no changes
+    expect(lastRes7, KeyChanges({1: ChangeRecordValue(2)}.lock));
+
+    s1.add(KeyChanges({10: ChangeRecordValue(1)}.lock));
+    await Future.value();
+    expect(lastRes1!.keys, unorderedEquals([0, 2]));
+    await Future.value();
+    expect(lastRes2, {1: 1, 3: 3, 10: 1}.lock);
+    expect(lastRes3, null);
+    expect(lastRes4, {4: 2, 7: 2, 9: 1}.lock);
+    expect(lastRes5, KeyChanges({10: ChangeRecordValue(1)}.lock));
+    expect(lastRes6, null); // No change
+    // Still no changes
+    expect(lastRes7, KeyChanges({1: ChangeRecordValue(2)}.lock));
+
+    s1.add(KeyChanges({
+      1: ChangeRecordValue(0),
+      3: ChangeRecordValue(0),
+      4: ChangeRecordDelete<int>(),
+      7: ChangeRecordDelete<int>()
+    }.lock));
+    await Future.value();
+    expect(lastRes1!.keys, unorderedEquals([0, 2]));
+    await Future.value();
+    expect(lastRes2, {1: 0, 3: 0, 10: 1}.lock);
+    expect(lastRes3, null);
+    expect(lastRes4, {9: 1}.lock);
+    expect(lastRes5,
+        KeyChanges({1: ChangeRecordValue(0), 3: ChangeRecordValue(0)}.lock));
+    expect(lastRes6, null); // No change
+    // Still no changes
+    expect(
+        lastRes7,
+        KeyChanges(
+            {4: ChangeRecordDelete<int>(), 7: ChangeRecordDelete<int>()}.lock));
+
+    lookups[1].add([1, 2, 0].lock);
+    await Future.value();
+    expect(lastRes1!.keys, unorderedEquals([0, 1, 2]));
+    await Future.value();
+    expect(lastRes2, {3: 0}.lock);
+    expect(lastRes3, {1: 0}.lock);
+    expect(lastRes4, {9: 1, 10: 1}.lock);
+    expect(
+        lastRes5,
+        KeyChanges({1: ChangeRecordDelete<int>(), 10: ChangeRecordDelete<int>()}
+            .lock));
+    expect(lastRes6, null); // The group just got created
+    // Still no changes
+    expect(lastRes7, KeyChanges({10: ChangeRecordValue(1)}.lock));
 
     sub1.cancel();
     sub2.cancel();
     sub3.cancel();
     sub4.cancel();
     sub5.cancel();
+    sub6.cancel();
+    sub7.cancel();
   });
 
   test('unsubscribes from group computations correctly', () async {
