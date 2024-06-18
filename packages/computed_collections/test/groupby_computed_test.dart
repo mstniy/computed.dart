@@ -356,4 +356,26 @@ void main() {
 
     sub1.cancel();
   });
+
+  test('elements can lose groups', () async {
+    final s1 = StreamController<ChangeEvent<int, int>>.broadcast(sync: true);
+    final s1stream = s1.stream;
+    final cs = <Computed<int>>[$(() => throw NoValueException()), $(() => 42)];
+    final m1 = IComputedMap.fromChangeStream($(() => s1stream.use));
+    final m2 = m1.groupByComputed((k, v) => cs[v]);
+    IMap<int, IComputedMap<int, int>>? lastRes1;
+    var sub1 = m2.snapshot.listen((event) {
+      lastRes1 = event;
+    }, null);
+
+    s1.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
+    await Future.value();
+    expect(lastRes1!.keys, [42].lock);
+
+    s1.add(KeyChanges({0: ChangeRecordValue(0)}.lock));
+    await Future.value();
+    expect(lastRes1!.keys, [].lock);
+
+    sub1.cancel();
+  });
 }

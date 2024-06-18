@@ -135,21 +135,31 @@ class GroupByComputedComputedMap<K, V, KParent>
               KeyChanges<KParent,
                   V>?>{}; // If null -> just notify the snapshot stream
 
-          // TODO: Can we merge these two stages?
-          for (var e in valueKeysAndSubs.entries) {
-            final parentKey = e.key;
-            final groupSub = e.value.$1;
-            final oldGroupKeySub = _mappedKeysSubs[parentKey];
-            _mappedKeysSubs[parentKey] = (Option.none(), groupSub);
+          void _removeOrReplaceKeyGroupSub(
+              KParent parentKey, ComputedSubscription<K>? newSub) {
+            late final (Option<K>, ComputedSubscription<K>)? oldGroupKeySub;
+            if (newSub != null) {
+              final newKeySub = (Option<K>.none(), newSub);
+              _mappedKeysSubs.update(parentKey, (keySub) {
+                oldGroupKeySub = keySub;
+                return newKeySub;
+              }, ifAbsent: () {
+                oldGroupKeySub = null;
+                return newKeySub;
+              });
+            } else {
+              oldGroupKeySub = _mappedKeysSubs.remove(parentKey);
+            }
             if (oldGroupKeySub != null) {
-              if (oldGroupKeySub.$1.is_) {
-                final oldGroupKey = oldGroupKeySub.$1.value as K;
+              if (oldGroupKeySub!.$1.is_) {
+                final oldGroupKey = oldGroupKeySub!.$1.value as K;
                 final oldGroup = _m.update(
                     oldGroupKey, (g) => (g.$1, g.$2.remove(parentKey), g.$3));
+
                 if (oldGroup.$2.isEmpty) {
                   keyChanges[oldGroupKey] = ChangeRecordDelete();
-                  _m.remove(oldGroupKey);
                   batchedChanges.remove(oldGroupKey);
+                  _m.remove(oldGroupKey);
                 } else {
                   if (!oldGroup.$1.hasListener) {
                     batchedChanges[oldGroupKey] = null;
@@ -157,57 +167,26 @@ class GroupByComputedComputedMap<K, V, KParent>
                     batchedChanges.update(
                         oldGroupKey,
                         (changes) => KeyChanges(changes!.changes
-                            .add(e.key, ChangeRecordDelete<V>())),
+                            .add(parentKey, ChangeRecordDelete<V>())),
                         ifAbsent: () => KeyChanges(<KParent, ChangeRecord<V>>{
-                              e.key: ChangeRecordDelete<V>()
+                              parentKey: ChangeRecordDelete<V>()
                             }.lock));
                   }
                 }
               }
-              oldGroupKeySub.$2.cancel();
+              oldGroupKeySub!.$2.cancel();
             }
+          }
+
+          for (var e in valueKeysAndSubs.entries) {
+            _removeOrReplaceKeyGroupSub(e.key, e.value.$1);
           }
 
           for (var deletedKey in deletedKeys) {
-            if (!_mappedKeysSubs.containsKey(deletedKey))
-              continue; // Extraneous deletion from upstream?
-            final oldGroupSub = _mappedKeysSubs.remove(deletedKey)!;
-            if (oldGroupSub.$1.is_) {
-              final oldGroupKey = oldGroupSub.$1.value as K;
-              final oldGroup = _m.update(
-                  oldGroupKey,
-                  (group) => (
-                        group.$1,
-                        group.$2.remove(deletedKey),
-                        group.$3
-                      )); // Not passing `ifAbsent` as the key has to be present (ow/ we have a corrupt internal state)
-              if (oldGroup.$2.isEmpty) {
-                keyChanges[oldGroupKey] = ChangeRecordDelete();
-                batchedChanges.remove(oldGroupKey);
-                _m.remove(oldGroupKey);
-              } else {
-                if (!oldGroup.$1.hasListener) {
-                  batchedChanges[oldGroupKey] = null;
-                } else {
-                  batchedChanges.update(
-                      oldGroupKey,
-                      (changes) => KeyChanges(changes!.changes
-                          .add(deletedKey, ChangeRecordDelete<V>())),
-                      ifAbsent: () => KeyChanges(<KParent, ChangeRecord<V>>{
-                            deletedKey: ChangeRecordDelete<V>()
-                          }.lock));
-                }
-                if (oldGroup.$1.hasListener) {
-                  oldGroup.$1.add(KeyChanges(<KParent, ChangeRecord<V>>{
-                    deletedKey: ChangeRecordDelete<V>()
-                  }.lock));
-                }
-                oldGroup.$3.add(oldGroup.$2);
-              }
-            }
-            oldGroupSub.$2.cancel();
+            _removeOrReplaceKeyGroupSub(deletedKey, null);
           }
 
+          // Publish the aggregated changes
           for (var e in batchedChanges.entries) {
             final group = _m[e.key]!;
             if (e.value != null) {
