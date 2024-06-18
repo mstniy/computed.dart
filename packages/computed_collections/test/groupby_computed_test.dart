@@ -396,4 +396,57 @@ void main() {
     sub1.cancel();
     sub2.cancel();
   });
+
+  test('has consistent attributes', () async {
+    final m1 = ConstComputedMap({0: 1, 1: 2, 2: 3, 3: 4}.lock);
+    final m2 = m1.groupByComputed((k, v) => $(() => k % 3));
+
+    // operator[]
+    expect(await getValues($(() => m2[0].use?.snapshot.use)), [
+      null,
+      {0: 1, 3: 4}.lock
+    ]);
+    expect(await getValues($(() => m2[1].use?.snapshot.use)), [
+      null,
+      {1: 2}.lock
+    ]);
+    expect(await getValues($(() => m2[2].use?.snapshot.use)), [
+      null,
+      {2: 3}.lock
+    ]);
+    expect(await getValue(m2[3]), null);
+
+    // containsKey
+    for (var i in [0, 1, 2]) {
+      expect(await getValues(m2.containsKey(i)), [false, true]);
+    }
+    expect(await getValue(m2.containsKey(3)), false);
+
+    // is(Not)Empty
+    expect(await getValue(m2.isEmpty), false);
+    expect(await getValue(m2.isNotEmpty), true);
+
+    // length
+    expect(await getValues(m2.length), [0, 3]);
+
+    final m3 = ConstComputedMap({}.lock)
+        .groupByComputed((k, v) => $(() => fail('Must never be called')));
+
+    expect(await getValue(m3.isEmpty), true);
+    expect(await getValue(m3.isNotEmpty), false);
+
+    // containsValue
+    IMap<int, IComputedMap<int, int>>? res;
+    final sub = m2.snapshot.listen((s) => res = s, null);
+    await Future.value();
+    await Future.value();
+    expect(await getValue(m2.containsValue(res![0]!)), true);
+    expect(await getValue(m2.containsValue(res![1]!)), true);
+    expect(await getValue(m2.containsValue(res![2]!)), true);
+    expect(
+        await getValue(m2.containsValue(ConstComputedMap(<int, int>{}.lock))),
+        false);
+
+    sub.cancel();
+  });
 }
