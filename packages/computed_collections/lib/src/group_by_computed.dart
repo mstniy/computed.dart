@@ -196,7 +196,11 @@ class GroupByComputedComputedMap<K, V, KParent>
             group.$3.add(group.$2);
           }
 
-          return KeyChanges(keyChanges.lock);
+          if (keyChanges.isNotEmpty) {
+            return KeyChanges(keyChanges.lock);
+          } else {
+            throw NoValueException();
+          }
       }
       // We set memoized to false as this is a change stream merged with another change stream
       // (coming from the group computations - see [_onConvertGroup])
