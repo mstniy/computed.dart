@@ -10,6 +10,7 @@ import '../icomputedmap.dart';
 import 'computedmap_mixins.dart';
 import 'cs_computedmap.dart';
 import 'utils/snapshot_computation.dart';
+import 'utils/group_by.dart';
 
 class GroupByComputedMap<K, V, KParent>
     with OperatorsMixin<K, IComputedMap<KParent, V>>
@@ -239,20 +240,4 @@ class GroupByComputedMap<K, V, KParent>
 
   @override
   Computed<int> get length => _mm.length;
-}
-
-extension<K, V> on IMap<K, V> {
-  (Map<K2, Map<K, V>>, Map<K, K2>) groupBy<K2>(K2 Function(K key, V value) f) {
-    final res = <K2, Map<K, V>>{};
-    final maps = <K, K2>{};
-    for (var e in this.entries) {
-      final k2 = f(e.key, e.value);
-      maps[e.key] = k2;
-      res.update(k2, (v) {
-        v[e.key] = e.value;
-        return v;
-      }, ifAbsent: () => {e.key: e.value});
-    }
-    return (res, maps);
-  }
 }
