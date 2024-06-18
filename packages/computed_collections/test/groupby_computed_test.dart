@@ -367,15 +367,33 @@ void main() {
     var sub1 = m2.snapshot.listen((event) {
       lastRes1 = event;
     }, null);
+    IMap<int, int>? lastRes2;
+    var sub2 = $(() => m2.snapshot.use[42]?.snapshot.use).listen((event) {
+      lastRes2 = event;
+    }, null);
 
-    s1.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
+    s1.add(KeyChanges({
+      0: ChangeRecordValue(1),
+      1: ChangeRecordValue(1),
+    }.lock));
     await Future.value();
     expect(lastRes1!.keys, [42].lock);
+    await Future.value();
+    expect(lastRes2, {0: 1, 1: 1}.lock);
 
     s1.add(KeyChanges({0: ChangeRecordValue(0)}.lock));
     await Future.value();
+    expect(lastRes1!.keys, [42].lock);
+    await Future.value();
+    expect(lastRes2, {1: 1}.lock);
+
+    s1.add(KeyChanges({1: ChangeRecordValue(0)}.lock));
+    await Future.value();
     expect(lastRes1!.keys, [].lock);
+    await Future.value();
+    expect(lastRes2, null);
 
     sub1.cancel();
+    sub2.cancel();
   });
 }
