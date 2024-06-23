@@ -49,7 +49,6 @@ class GroupByComputedMap<K, V, KParent>
       return MapEntry(
           k,
           ChangeStreamComputedMap($(() => cstream.use),
-              initialValueComputer: () => _m[k]?.$2 ?? <KParent, V>{}.lock,
               snapshotStream: $(() => v.$3.use)));
     }).lock;
   }
@@ -95,8 +94,6 @@ class GroupByComputedMap<K, V, KParent>
                 final group = (cs, snapshot, ss);
                 keyChanges[groupKey] = ChangeRecordValue(
                     ChangeStreamComputedMap($(() => cstream.use),
-                        initialValueComputer: () =>
-                            _m[groupKey]?.$2 ?? <KParent, V>{}.lock,
                         snapshotStream: $(() => ss.use)));
                 return group;
               },
@@ -161,10 +158,6 @@ class GroupByComputedMap<K, V, KParent>
                             deletedKey: ChangeRecordDelete<V>()
                           }.lock));
                 }
-                group.$1.add(KeyChanges(<KParent, ChangeRecord<V>>{
-                  deletedKey: ChangeRecordDelete<V>()
-                }.lock));
-                group.$3.add(group.$2);
               }
               return group;
             }); // Not passing `ifAbsent` as the key has to be present (ow/ we have a corrupt internal state)

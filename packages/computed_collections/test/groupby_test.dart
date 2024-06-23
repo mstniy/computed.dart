@@ -126,16 +126,41 @@ void main() {
       2: ChangeRecordValue(1),
       1: ChangeRecordValue(3),
       0: ChangeRecordValue(1),
+      3: ChangeRecordValue(0),
+      4: ChangeRecordValue(0)
     }.lock));
     expect(lastRes1!.keys, unorderedEquals([0, 1]));
     await Future.value();
-    expect(lastRes2, {1: 3}.lock);
+    expect(lastRes2, {1: 3, 3: 0, 4: 0}.lock);
     expect(lastRes3, {0: 1, 2: 1}.lock);
     expect(lastRes4, null);
     expect(
         lastRes5,
-        KeyChanges(
-            {0: ChangeRecordDelete<int>(), 1: ChangeRecordValue(3)}.lock));
+        KeyChanges({
+          0: ChangeRecordDelete<int>(),
+          1: ChangeRecordValue(3),
+          3: ChangeRecordValue(0),
+          4: ChangeRecordValue(0),
+        }.lock));
+
+    // Multiple upstream deletions leading to a group being deleted
+    s.add(KeyChanges({
+      0: ChangeRecordDelete<int>(),
+      1: ChangeRecordDelete<int>(),
+      2: ChangeRecordDelete<int>(),
+      3: ChangeRecordDelete<int>(),
+    }.lock));
+    expect(lastRes1!.keys, unorderedEquals([0]));
+    await Future.value();
+    expect(lastRes2, {4: 0}.lock);
+    expect(lastRes3, null);
+    expect(lastRes4, null);
+    expect(
+        lastRes5,
+        KeyChanges({
+          1: ChangeRecordDelete<int>(),
+          3: ChangeRecordDelete<int>(),
+        }.lock));
 
     sub1.cancel();
     sub2.cancel();
