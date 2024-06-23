@@ -139,28 +139,31 @@ class GroupByComputedMap<K, V, KParent>
           for (var deletedKey in deletedKeys) {
             if (!_mappedKeys.containsKey(deletedKey))
               continue; // Extraneous deletion from upstream?
-            final oldGroup = _mappedKeys.remove(deletedKey) as K;
-            _m.update(oldGroup, (group) {
-              group = (group.$1, group.$2.remove(deletedKey), group.$3);
-              if (group.$2.isEmpty) {
-                // TODO: Shouldn't we also delete the group from _m?
-                keyChanges[oldGroup] = ChangeRecordDelete();
-                batchedChanges.remove(oldGroup);
+            final oldGroupKey = _mappedKeys.remove(deletedKey) as K;
+            final oldGroup = _m.update(
+                oldGroupKey,
+                (oldGroup) => (
+                      oldGroup.$1,
+                      oldGroup.$2.remove(deletedKey),
+                      oldGroup.$3
+                    )); // Not passing `ifAbsent` as the key has to be present (ow/ we have a corrupt internal state)
+            if (oldGroup.$2.isEmpty) {
+              keyChanges[oldGroupKey] = ChangeRecordDelete();
+              _m.remove(oldGroup.$1);
+              batchedChanges.remove(oldGroupKey);
+            } else {
+              if (!oldGroup.$1.hasListener) {
+                batchedChanges[oldGroupKey] = null;
               } else {
-                if (!group.$1.hasListener) {
-                  batchedChanges[oldGroup] = null;
-                } else {
-                  batchedChanges.update(
-                      oldGroup,
-                      (changes) => KeyChanges(changes!.changes
-                          .add(deletedKey, ChangeRecordDelete<V>())),
-                      ifAbsent: () => KeyChanges(<KParent, ChangeRecord<V>>{
-                            deletedKey: ChangeRecordDelete<V>()
-                          }.lock));
-                }
+                batchedChanges.update(
+                    oldGroupKey,
+                    (changes) => KeyChanges(changes!.changes
+                        .add(deletedKey, ChangeRecordDelete<V>())),
+                    ifAbsent: () => KeyChanges(<KParent, ChangeRecord<V>>{
+                          deletedKey: ChangeRecordDelete<V>()
+                        }.lock));
               }
-              return group;
-            }); // Not passing `ifAbsent` as the key has to be present (ow/ we have a corrupt internal state)
+            }
           }
 
           for (var e in batchedChanges.entries) {
