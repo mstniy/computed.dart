@@ -174,7 +174,11 @@ class GroupByComputedMap<K, V, KParent>
             group.$3.add(group.$2);
           }
 
-          return KeyChanges(keyChanges.lock);
+          if (keyChanges.isNotEmpty) {
+            return KeyChanges(keyChanges.lock);
+          } else {
+            throw NoValueException();
+          }
       }
     }, onCancel: _onCancel);
     _snapshot = snapshotComputation(changes, () {
