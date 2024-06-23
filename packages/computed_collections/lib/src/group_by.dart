@@ -46,7 +46,7 @@ class GroupByComputedMap<K, V, KParent>
 
     return _m.map((k, v) {
       final cstream = v.$1.stream;
-      return MapEntry(
+      return MapEntry<K, IComputedMap<KParent, V>>(
           k,
           ChangeStreamComputedMap($(() => cstream.use),
               snapshotStream: $(() => v.$3.use)));

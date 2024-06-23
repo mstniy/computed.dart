@@ -212,7 +212,25 @@ void main() {
     sub.cancel();
   });
 
-  test('mock works', () async {
-    // TODO: How to test this without duplicating code from the other mock tests?
-  }, skip: true);
+  test('fix/mock works', () async {
+    final m1 = ConstComputedMap(<int, int>{}.lock);
+    final m2 = m1.groupBy((key, value) => 0);
+
+    final group = ConstComputedMap({1: 2}.lock);
+
+    m2.fix({0: group}.lock);
+
+    await testCoherence(
+        m2, {0: group}.lock, 1, ConstComputedMap(<int, int>{}.lock));
+
+    m2.mock(ConstComputedMap({1: group}.lock));
+
+    await testCoherence(
+        m2, {1: group}.lock, 0, ConstComputedMap(<int, int>{}.lock));
+
+    m2.unmock();
+
+    await testCoherence(m2, <int, IComputedMap<int, int>>{}.lock, 0,
+        ConstComputedMap(<int, int>{}.lock));
+  });
 }
