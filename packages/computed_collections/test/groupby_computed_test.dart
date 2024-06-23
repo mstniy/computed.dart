@@ -536,4 +536,26 @@ void main() {
 
     sub.cancel();
   });
+
+  test('fix/mock works', () async {
+    final m1 = ConstComputedMap(<int, int>{}.lock);
+    final m2 = m1.groupByComputed((key, value) => $(() => 0));
+
+    final group = ConstComputedMap({1: 2}.lock);
+
+    m2.fix({0: group}.lock);
+
+    await testCoherence(
+        m2, {0: group}.lock, 1, ConstComputedMap(<int, int>{}.lock));
+
+    m2.mock(ConstComputedMap({1: group}.lock));
+
+    await testCoherence(
+        m2, {1: group}.lock, 0, ConstComputedMap(<int, int>{}.lock));
+
+    m2.unmock();
+
+    await testCoherence(m2, <int, IComputedMap<int, int>>{}.lock, 0,
+        ConstComputedMap(<int, int>{}.lock));
+  });
 }

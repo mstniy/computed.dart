@@ -11,7 +11,7 @@ import 'helpers.dart';
 void main() {
   test('works', () async {
     final ss = SnapshotStreamComputedMap($(() => {0: 1}.lock));
-    await testCoherence(ss, {0: 1}.lock);
+    await testCoherenceInt(ss, {0: 1}.lock);
   });
 
   test('change stream works', () async {

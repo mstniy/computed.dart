@@ -251,6 +251,6 @@ void main() {
 
     sub.cancel();
 
-    await testCoherence(m, <int, int>{}.lock);
+    await testCoherenceInt(m, <int, int>{}.lock);
   });
 }

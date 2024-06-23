@@ -43,10 +43,10 @@ Future<void> testFixUnmock_(
     final length = map.length;
 
     map.fix(myMap);
-    await testCoherence(map, myMap);
+    await testCoherenceInt(map, myMap);
     if (trackChangeStream) {
       // The change stream should also be consistent, evidenced by the coherence of the cscm tracking the change strean
-      await testCoherence(cscm, myMap);
+      await testCoherenceInt(cscm, myMap);
     }
 
     expect(await getValue(snapshot), myMap);
@@ -62,9 +62,9 @@ Future<void> testFixUnmock_(
 
     // Mock to an empty map
     map.fix(<int, int>{}.lock);
-    await testCoherence(map, <int, int>{}.lock);
+    await testCoherenceInt(map, <int, int>{}.lock);
     if (trackChangeStream) {
-      await testCoherence(cscm, <int, int>{}.lock);
+      await testCoherenceInt(cscm, <int, int>{}.lock);
     }
 
     expect(await getValue(snapshot), {}.lock);
@@ -79,15 +79,15 @@ Future<void> testFixUnmock_(
     expect(await getValue(length), 0);
 
     map.fix(myMap);
-    await testCoherence(map, myMap);
+    await testCoherenceInt(map, myMap);
     if (trackChangeStream) {
-      await testCoherence(cscm, myMap);
+      await testCoherenceInt(cscm, myMap);
     }
 
     map.unmock();
-    await testCoherence(map, original);
+    await testCoherenceInt(map, original);
     if (trackChangeStream) {
-      await testCoherence(cscm, original);
+      await testCoherenceInt(cscm, original);
     }
   } finally {
     sub?.cancel();

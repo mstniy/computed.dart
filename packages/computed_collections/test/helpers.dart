@@ -28,12 +28,16 @@ Future<T> getValue<T>(Computed<T> c) async {
   return values.first;
 }
 
-Future<void> testCoherence(
+Future<void> testCoherenceInt(
     IComputedMap<int, int> map, IMap<int, int> expected) async {
   final nonExistentKey = expected.isEmpty ? 0 : expected.keys.reduce(max) + 1;
   final nonExistentValue =
       expected.isEmpty ? 0 : expected.values.reduce(max) + 1;
+  return testCoherence(map, expected, nonExistentKey, nonExistentValue);
+}
 
+Future<void> testCoherence<K, V>(IComputedMap<K, V> map, IMap<K, V> expected,
+    K nonExistentKey, V nonExistentValue) async {
   expect(await getValues(map.snapshot),
       anyOf(equals([expected]), [{}.lock, expected]));
   expect(await getValue(map[nonExistentKey]), null);
