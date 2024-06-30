@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:computed/computed.dart';
 import 'package:computed/utils/streams.dart';
 import 'package:computed_collections/change_event.dart';
@@ -65,6 +67,52 @@ void main() {
 
     sub1.cancel();
     sub2.cancel();
+  });
+  test('can resubscribe after cancel', () async {
+    final s = StreamController<ChangeEvent<int, int>>.broadcast(sync: true);
+    final stream = s.stream;
+    final s2 = ValueStream.seeded(0, sync: true);
+    final m1 = IComputedMap.fromChangeStream($(() => stream.use));
+    var cCnt = 0;
+    final m2 = m1.mapValuesComputed((k, v) => $(() {
+          cCnt++;
+          return v + s2.use;
+        }));
+    IMap<int, int?>? lastRes;
+    var sub = m2.snapshot.listen((event) {
+      lastRes = event;
+    }, (e) => fail(e.toString()));
+    await Future.value();
+    expect(lastRes, {}.lock);
+    s.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
+    expect(lastRes, {}.lock);
+    expect(cCnt, 2); // Two runs in which it throws NVE
+    await Future.value();
+    expect(cCnt, 4); // After Computed subscribes to s2
+    expect(lastRes, {0: 1}.lock);
+
+    sub.cancel();
+
+    s.add(KeyChanges({1: ChangeRecordValue(2)}.lock));
+    s2.add(1);
+    for (var i = 0; i < 5; i++) await Future.value();
+    expect(cCnt, 4); // No new computations as there are no listeners
+
+    sub = m2.snapshot.listen((event) {
+      lastRes = event;
+    }, (e) => fail(e.toString()));
+
+    await Future.value();
+    expect(lastRes, {}.lock);
+
+    s.add(KeyChanges({2: ChangeRecordValue(3)}.lock));
+    expect(cCnt, 6); // Two runs in which it throws NVE
+    expect(lastRes, {}.lock);
+    await Future.value();
+    expect(cCnt, 8); // After Computed subscribes to s2
+    expect(lastRes, {2: 4}.lock);
+
+    sub.cancel();
   });
   test('operator[] works', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
