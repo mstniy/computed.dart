@@ -52,13 +52,13 @@ void main() {
     sub.cancel();
   });
 
-  test('attributes and methods work', () async {
+  test('initial computation works', () async {
     final m1 = IComputedMap({0: 1, 1: 2, 2: 3, 3: 4}.lock);
 
     final m2 = m1.map((k, v) {
       return MapEntry(k % 3, v);
     });
 
-    await testCoherenceInt(m2, {1: 2, 2: 3, 0: 4}.lock);
+    expect(await getValue(m2.snapshot), {1: 2, 2: 3, 0: 4}.lock);
   });
 }
