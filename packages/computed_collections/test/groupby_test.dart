@@ -210,6 +210,7 @@ void main() {
     sub3.cancel();
     sub4.cancel();
     sub5.cancel();
+    sub6.cancel();
   });
 
   test('initial computation works', () async {
