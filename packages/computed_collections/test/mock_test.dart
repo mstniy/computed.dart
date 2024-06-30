@@ -231,4 +231,14 @@ void main() {
     await testMock(c);
     expect(await getValues(c.changes), []);
   });
+
+  test('map', () async {
+    final m = IComputedMap({0: 1}.lock);
+    final mv = m.map((key, value) => MapEntry(key, value));
+    await testFixUnmock(mv);
+    await testMock(mv);
+    expect(await getValuesWhile(mv.changes, () => m.fix({2: 3}.lock)), [
+      ChangeEventReplace({2: 3}.lock)
+    ]);
+  });
 }
