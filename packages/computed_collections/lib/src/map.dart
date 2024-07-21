@@ -1,10 +1,12 @@
 import 'package:computed/computed.dart';
 import 'package:computed/utils/computation_cache.dart';
+import 'package:computed_collections/src/utils/pubsub.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import '../change_event.dart';
 import '../icomputedmap.dart';
 import 'computedmap_mixins.dart';
+import 'utils/option.dart';
 import 'utils/snapshot_computation.dart';
 
 class MapComputedMap<K, V, KParent, VParent>
@@ -23,6 +25,9 @@ class MapComputedMap<K, V, KParent, VParent>
   final _mappedKeys = <KParent, K>{};
   final _mappedKeysReverse = <K, Map<KParent, V>>{};
 
+  ComputedSubscription<void>? _pubSubListener;
+  late final PubSub<K, V> _keyPubSub;
+
   IMap<K, V> _setUpstream(IMap<KParent, VParent> up) {
     _mappedKeys.clear();
     _mappedKeysReverse.clear();
@@ -39,7 +44,11 @@ class MapComputedMap<K, V, KParent, VParent>
       }, ifAbsent: () => {e.key: res.value});
     }
 
-    return ress.lock;
+    final ressLocked = ress.lock;
+
+    _keyPubSub.pubAll(ressLocked);
+
+    return ressLocked;
   }
 
   MapComputedMap(this._parent, this._convert) {
@@ -85,6 +94,14 @@ class MapComputedMap<K, V, KParent, VParent>
           }
 
           if (keyChanges.isNotEmpty) {
+            _keyPubSub.pubMany(keyChanges
+                .map((key, value) => MapEntry(
+                    key,
+                    switch (value) {
+                      ChangeRecordValue<V>() => Option.some(value.value),
+                      ChangeRecordDelete<V>() => Option<V>.none(),
+                    }))
+                .toIMap());
             return KeyChanges(keyChanges.lock);
           } else {
             throw NoValueException();
@@ -93,6 +110,10 @@ class MapComputedMap<K, V, KParent, VParent>
     }, onCancel: _onCancel);
     _snapshot =
         snapshotComputation(changes, () => _setUpstream(_parent.snapshot.use));
+
+    _keyPubSub = PubSub<K, V>(
+        () => _pubSubListener = _snapshot.listen(null, null),
+        () => _pubSubListener!.cancel());
 
     _mm = MockManager(
         changes,
@@ -111,14 +132,22 @@ class MapComputedMap<K, V, KParent, VParent>
   }
 
   @override
-  Computed<bool> containsKey(K key) =>
-      _containsKeyComputations.wrap(key, () => _snapshot.use.containsKey(key));
+  Computed<bool> containsKey(K key) {
+    final sub = _keyPubSub.sub(key);
+    return _containsKeyComputations.wrap(key, () => sub.use.is_);
+  }
 
   @override
-  Computed<V?> operator [](K key) =>
-      _keyComputations.wrap(key, () => _snapshot.use[key]);
+  Computed<V?> operator [](K key) {
+    final sub = _keyPubSub.sub(key);
+    return _keyComputations.wrap(key, () {
+      final opt = sub.use;
+      return opt.is_ ? opt.value as V : null;
+    });
+  }
 
   @override
+  // TODO: This can be made more scalable by using a pubsub on values
   Computed<bool> containsValue(V value) => _containsValueComputations.wrap(
       value, () => _snapshot.use.containsValue(value));
 
