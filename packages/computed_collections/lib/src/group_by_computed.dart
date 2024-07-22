@@ -88,6 +88,7 @@ class GroupByComputedComputedMap<K, V, KParent>
       group.$1.addError(err);
       group.$3.addError(err);
     }
+    // TODO: Also addError to _changes?
   }
 
   void _setM(IMap<KParent, V> m) {
@@ -240,6 +241,7 @@ class GroupByComputedComputedMap<K, V, KParent>
       _containsKeyComputations.wrap(key, () => _snapshot.use.containsKey(key));
 
   @override
+  /////////// TODO: this is suboptimal
   Computed<IComputedMap<KParent, V>?> operator [](K key) =>
       _keyComputations.wrap(key, () => _snapshot.use[key]);
 

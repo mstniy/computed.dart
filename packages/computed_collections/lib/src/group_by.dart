@@ -207,6 +207,7 @@ class GroupByComputedMap<K, V, KParent>
       _containsKeyComputations.wrap(key, () => _snapshot.use.containsKey(key));
 
   @override
+  /////////// TODO: this is suboptimal
   Computed<IComputedMap<KParent, V>?> operator [](K key) =>
       _keyComputations.wrap(key, () => _snapshot.use[key]);
 

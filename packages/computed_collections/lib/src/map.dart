@@ -111,9 +111,12 @@ class MapComputedMap<K, V, KParent, VParent>
     _snapshot =
         snapshotComputation(changes, () => _setUpstream(_parent.snapshot.use));
 
-    _keyPubSub = PubSub<K, V>(
-        () => _pubSubListener = _snapshot.listen(null, null),
-        () => _pubSubListener!.cancel());
+    _keyPubSub = PubSub<K, V>(() {
+      /////////// this logic is broken if _snapshot already has listeners, but not pubsub
+      _pubSubListener = _snapshot.listen(null, null);
+    }, () {
+      _pubSubListener!.cancel();
+    });
 
     _mm = MockManager(
         changes,
