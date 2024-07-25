@@ -75,6 +75,7 @@ void main() {
 
     expect(callCnt1, 0);
     await Future.value();
+    await Future.value();
     expect(callCnt1, 1);
     expect(lastRes1, 1);
 
@@ -103,6 +104,7 @@ void main() {
     }, (e) => fail(e.toString()));
 
     expect(callCnt2, 0);
+    await Future.value();
     await Future.value();
     expect(callCnt2, 1);
     expect(lastRes2, null);

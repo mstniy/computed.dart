@@ -243,6 +243,7 @@ void main() {
       lastRes = event;
     }, null);
     await Future.value();
+    await Future.value();
     expect(lCnt, 1);
     expect(lastRes, null);
 

@@ -136,6 +136,7 @@ void main() {
     final sub2 = m2[0].listen(null, null);
 
     await Future.value();
+    await Future.value();
     expect(cCnt, 0);
     expect(callCnt1, 1);
     expect(lastRes1, null);

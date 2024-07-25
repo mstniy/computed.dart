@@ -5,7 +5,6 @@ import 'package:computed_collections/src/utils/value_or_exception.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import '../../change_event.dart';
-import 'snapshot_computation.dart';
 
 class PubSub<K, V> {
   ValueOrException<IMap<K, V>>? _snapshot;
@@ -14,14 +13,7 @@ class PubSub<K, V> {
   ComputedSubscription<ChangeEvent<K, V>>? _changeSubscription;
   ComputedSubscription<IMap<K, V>>? _snapshotSubscription;
 
-  PubSub(this._changeStream,
-      {IMap<K, V> Function()? initialValueComputer,
-      Computed<IMap<K, V>>? snapshotStream}) {
-    _snapshotStream = snapshotStream ??
-        snapshotComputation(_changeStream, initialValueComputer);
-  }
-
-  Computed<IMap<K, V>> get snapshot => _snapshotStream;
+  PubSub(this._changeStream, this._snapshotStream);
 
   void _pubAll(IMap<K, V> m) {
     _snapshot = ValueOrException.value(m);

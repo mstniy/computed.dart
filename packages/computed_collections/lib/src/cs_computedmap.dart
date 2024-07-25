@@ -3,6 +3,7 @@ import 'package:computed/utils/computation_cache.dart';
 import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/icomputedmap.dart';
 import 'package:computed_collections/src/utils/pubsub.dart';
+import 'package:computed_collections/src/utils/snapshot_computation.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import 'package:meta/meta.dart';
@@ -22,11 +23,10 @@ class ChangeStreamComputedMap<K, V>
       {IMap<K, V> Function()? initialValueComputer,
       Computed<IMap<K, V>>? snapshotStream}) {
     _changeStreamWrapped = $(() => _changeStream.use);
+    _snapshotStream = snapshotStream ??
+        snapshotComputation(_changeStream, initialValueComputer);
     // Passing _changeStreamWrapped to KeyPub allows it to be consistent with mocks
-    _keyPubSub = PubSub(_changeStreamWrapped,
-        initialValueComputer: initialValueComputer,
-        snapshotStream: snapshotStream);
-    _snapshotStream = _keyPubSub.snapshot;
+    _keyPubSub = PubSub(_changeStreamWrapped, _snapshotStream);
   }
 
   @visibleForTesting

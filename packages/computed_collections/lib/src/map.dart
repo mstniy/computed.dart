@@ -100,7 +100,7 @@ class MapComputedMap<K, V, KParent, VParent>
     _snapshot =
         snapshotComputation(changes, () => _setUpstream(_parent.snapshot.use));
 
-    _keyPubSub = PubSub<K, V>(changes, snapshotStream: _snapshot);
+    _keyPubSub = PubSub<K, V>(changes, _snapshot);
 
     _mm = MockManager(
         changes,
