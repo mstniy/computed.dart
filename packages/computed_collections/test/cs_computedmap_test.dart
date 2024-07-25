@@ -46,6 +46,7 @@ void main() {
 
     expect(callCnt1, 0);
     await Future.value();
+    await Future.value();
     expect(callCnt1, 1);
     expect(lastRes1, null);
 
@@ -171,6 +172,7 @@ void main() {
     });
     expect(callCnt1, 0);
     expect(callCnt2, 0);
+    await Future.value();
     await Future.value();
     expect(callCnt1, 1);
     expect(lastRes1, {}.lock);

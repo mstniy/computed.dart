@@ -6,7 +6,6 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import '../change_event.dart';
 import '../icomputedmap.dart';
 import 'computedmap_mixins.dart';
-import 'utils/option.dart';
 import 'utils/snapshot_computation.dart';
 
 class MapComputedMap<K, V, KParent, VParent>
@@ -25,7 +24,6 @@ class MapComputedMap<K, V, KParent, VParent>
   final _mappedKeys = <KParent, K>{};
   final _mappedKeysReverse = <K, Map<KParent, V>>{};
 
-  ComputedSubscription<void>? _pubSubListener;
   late final PubSub<K, V> _keyPubSub;
 
   IMap<K, V> _setUpstream(IMap<KParent, VParent> up) {
@@ -45,8 +43,6 @@ class MapComputedMap<K, V, KParent, VParent>
     }
 
     final ressLocked = ress.lock;
-
-    _keyPubSub.pubAll(ressLocked);
 
     return ressLocked;
   }
@@ -94,29 +90,17 @@ class MapComputedMap<K, V, KParent, VParent>
           }
 
           if (keyChanges.isNotEmpty) {
-            _keyPubSub.pubMany(keyChanges
-                .map((key, value) => MapEntry(
-                    key,
-                    switch (value) {
-                      ChangeRecordValue<V>() => Option.some(value.value),
-                      ChangeRecordDelete<V>() => Option<V>.none(),
-                    }))
-                .toIMap());
             return KeyChanges(keyChanges.lock);
           } else {
             throw NoValueException();
           }
       }
     }, onCancel: _onCancel);
+
     _snapshot =
         snapshotComputation(changes, () => _setUpstream(_parent.snapshot.use));
 
-    _keyPubSub = PubSub<K, V>(() {
-      /////////// this logic is broken if _snapshot already has listeners, but not pubsub
-      _pubSubListener = _snapshot.listen(null, null);
-    }, () {
-      _pubSubListener!.cancel();
-    });
+    _keyPubSub = PubSub<K, V>(changes, snapshotStream: _snapshot);
 
     _mm = MockManager(
         changes,
