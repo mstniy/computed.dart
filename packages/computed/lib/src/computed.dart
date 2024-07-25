@@ -593,14 +593,19 @@ class ComputedImpl<T> {
   }
 
   void _notifyListeners() {
+    // Take a copy in case the listeners cancel themselves/other listeners on this node
+    final listenersCopy = _listeners.keys.toList();
     if (!_lastResult!._isValue) {
       // Exception
       var onErrorNotified = false;
-      for (var listener in _listeners.keys) {
-        _listeners[listener] = true;
-        if (listener._onError != null) {
-          onErrorNotified = true;
-          listener._onError!(_lastResult!._exc!);
+      for (var listener in listenersCopy) {
+        // Might have been cancelled, so double-check
+        if (_listeners.containsKey(listener)) {
+          _listeners[listener] = true;
+          if (listener._onError != null) {
+            onErrorNotified = true;
+            listener._onError!(_lastResult!._exc!);
+          }
         }
       }
       if (_listeners
@@ -615,10 +620,13 @@ class ComputedImpl<T> {
         Zone.current.handleUncaughtError(_lastResult!._exc!, _lastResult!._st!);
       }
     } else {
-      for (var listener in _listeners.keys) {
-        _listeners[listener] = true;
-        if (listener._onData != null) {
-          listener._onData!(_lastResult!._value as T);
+      for (var listener in listenersCopy) {
+        // Might have been cancelled, so double-check
+        if (_listeners.containsKey(listener)) {
+          _listeners[listener] = true;
+          if (listener._onData != null) {
+            listener._onData!(_lastResult!._value as T);
+          }
         }
       }
     }

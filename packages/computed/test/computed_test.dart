@@ -721,6 +721,62 @@ void main() {
     sub2.cancel();
   });
 
+  test('(regression) listeners can cancel themselves', () async {
+    final s = ValueStream.seeded(0, sync: true);
+    final c = $(() => s.use);
+    var cCnt = 0;
+    late final ComputedSubscription<void> sub;
+    sub = c.listen((_) {
+      cCnt++;
+      if (cCnt == 2) {
+        sub.cancel();
+      }
+    }, null);
+    await Future.value();
+    expect(cCnt, 1);
+    s.add(1);
+    expect(cCnt, 2);
+    s.add(2);
+    // The listener has been cancelled
+    expect(cCnt, 2);
+  });
+
+  test(
+      '(regression) listeners can cancel other listeners on the same computation',
+      () async {
+    final s = ValueStream.seeded(0, sync: true);
+    final c = $(() => s.use);
+    var cnt1 = 0, cnt2 = 0, cnt3 = 0;
+    final sub1 = c.listen((_) {
+      cnt1++;
+    }, null);
+    late final ComputedSubscription<int> sub3;
+    final sub2 = c.listen((_) {
+      cnt2++;
+      if (cnt2 == 2) {
+        sub1.cancel();
+        sub3.cancel();
+      }
+    }, null);
+    sub3 = c.listen((_) {
+      cnt3++;
+    }, null);
+    await Future.value();
+    expect(cnt1, 1);
+    expect(cnt2, 1);
+    expect(cnt3, 1);
+    s.add(1);
+    expect(cnt1, 2);
+    expect(cnt2, 2);
+    expect(cnt3, 1); // Got cancelled by sub2
+    s.add(2);
+    expect(cnt1, 2); // Got cancelled by sub2
+    expect(cnt2, 3);
+    expect(cnt3, 1);
+
+    sub2.cancel();
+  });
+
   test(
       'does not invoke handleUncaughtError if there are downstream computations',
       () async {
