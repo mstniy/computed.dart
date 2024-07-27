@@ -13,13 +13,19 @@ class PubSub<K, V> {
   ComputedSubscription<ChangeEvent<K, V>>? _changeSubscription;
   ComputedSubscription<IMap<K, V>>? _snapshotSubscription;
 
+  final _keyStreams = <K, ValueStream<Option<V>>>{};
+  final _valueStreams = <V, ValueStream<bool>>{};
+
   PubSub(this._changeStream, this._snapshotStream);
 
   void _pubAll(IMap<K, V> m) {
     _snapshot = ValueOrException.value(m);
-    for (var e in _keyValueStreams.entries) {
+    for (var e in _keyStreams.entries) {
       e.value.add(
           m.containsKey(e.key) ? Option.some(m[e.key] as V) : Option.none());
+    }
+    for (var e in _valueStreams.entries) {
+      e.value.add(m.containsValue(e.key));
     }
   }
 
@@ -39,10 +45,20 @@ class PubSub<K, V> {
           switch (e.value) {
             case ChangeRecordValue<V>(value: final value):
               s = s.add(e.key, value);
-              _keyValueStreams[e.key]?.add(Option.some(value));
+              _keyStreams[e.key]?.add(Option.some(value));
+              _valueStreams[value]?.add(true);
             case ChangeRecordDelete<V>():
-              s = s.remove(e.key);
-              _keyValueStreams[e.key]?.add(Option.none());
+              if (s.containsKey(e.key)) {
+                final snew = s.remove(e.key);
+                final oldValue = s[e.key] as V;
+                if (_valueStreams.containsValue(oldValue)) {
+                  // Note that this could be further optimized by keeping a set of keys
+                  // containing each value, at the cost of additional memory.
+                  _valueStreams[oldValue]!.add(snew.containsValue(oldValue));
+                }
+                _keyStreams[e.key]?.add(Option.none());
+                s = snew;
+              }
           }
         }
         _snapshot = ValueOrException.value(s);
@@ -57,31 +73,42 @@ class PubSub<K, V> {
     _snapshotSubscription?.cancel();
     _snapshotSubscription = null;
     _snapshot = ValueOrException.exc(error);
-    for (var e in _keyValueStreams.entries) {
-      e.value.addError(error);
+    for (var s in _keyStreams.values) {
+      s.addError(error);
+    }
+    for (var s in _valueStreams.values) {
+      s.addError(error);
     }
   }
 
-  Computed<Option<V>> sub(K key) {
+  void _maybeCancelSubs() {
+    if (_keyStreams.isEmpty && _valueStreams.isEmpty) {
+      _snapshot = null;
+      _changeSubscription?.cancel();
+      _changeSubscription = null;
+      _snapshotSubscription?.cancel();
+      _snapshotSubscription = null;
+    }
+  }
+
+  void _maybeCreateSubs() {
+    if (_keyStreams.isEmpty && _valueStreams.isEmpty) {
+      _snapshotSubscription =
+          _snapshotStream.listen(_onSnapshot, _onStreamError);
+      _changeSubscription = _changeStream.listen(_onChange, _onStreamError);
+    }
+  }
+
+  Computed<Option<V>> subKey(K key) {
     void onCancel_() {
-      final removed = _keyValueStreams.remove(key);
+      final removed = _keyStreams.remove(key);
       assert(removed != null);
-      if (_keyValueStreams.isEmpty) {
-        _snapshot = null;
-        _changeSubscription?.cancel();
-        _changeSubscription = null;
-        _snapshotSubscription?.cancel();
-        _snapshotSubscription = null;
-      }
+      _maybeCancelSubs();
     }
 
     return Computed.async(() {
-      final leaderStream = _keyValueStreams.putIfAbsent(key, () {
-        if (_keyValueStreams.isEmpty) {
-          _snapshotSubscription =
-              _snapshotStream.listen(_onSnapshot, _onStreamError);
-          _changeSubscription = _changeStream.listen(_onChange, _onStreamError);
-        }
+      final leaderStream = _keyStreams.putIfAbsent(key, () {
+        _maybeCreateSubs();
         // This key gained its first listener - get its value from the snapshot, if there is one
         final s = ValueStream<Option<V>>(onCancel: onCancel_);
         if (_snapshot != null) {
@@ -101,5 +128,28 @@ class PubSub<K, V> {
     });
   }
 
-  final _keyValueStreams = <K, ValueStream<Option<V>>>{};
+  Computed<bool> containsValue(V value) {
+    void onCancel_() {
+      final removed = _valueStreams.remove(value);
+      assert(removed != null);
+      _maybeCancelSubs();
+    }
+
+    return Computed.async(() {
+      final leaderStream = _valueStreams.putIfAbsent(value, () {
+        _maybeCreateSubs();
+        // This value gained its first listener - get its presence from the snapshot, if there is one
+        final s = ValueStream<bool>(onCancel: onCancel_);
+        if (_snapshot != null) {
+          if (_snapshot!.isValue) {
+            s.add(_snapshot!.value_!.containsValue(value));
+          } else {
+            s.addError(_snapshot!.exc_!);
+          }
+        }
+        return s;
+      });
+      return leaderStream.use;
+    });
+  }
 }

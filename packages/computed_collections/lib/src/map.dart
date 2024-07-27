@@ -24,7 +24,7 @@ class MapComputedMap<K, V, KParent, VParent>
   final _mappedKeys = <KParent, K>{};
   final _mappedKeysReverse = <K, Map<KParent, V>>{};
 
-  late final PubSub<K, V> _keyPubSub;
+  late final PubSub<K, V> _pubSub;
 
   IMap<K, V> _setUpstream(IMap<KParent, VParent> up) {
     _mappedKeys.clear();
@@ -100,7 +100,7 @@ class MapComputedMap<K, V, KParent, VParent>
     _snapshot =
         snapshotComputation(changes, () => _setUpstream(_parent.snapshot.use));
 
-    _keyPubSub = PubSub<K, V>(changes, _snapshot);
+    _pubSub = PubSub<K, V>(changes, _snapshot);
 
     _mm = MockManager(
         changes,
@@ -120,13 +120,13 @@ class MapComputedMap<K, V, KParent, VParent>
 
   @override
   Computed<bool> containsKey(K key) {
-    final sub = _keyPubSub.sub(key);
+    final sub = _pubSub.subKey(key);
     return _containsKeyComputations.wrap(key, () => sub.use.is_);
   }
 
   @override
   Computed<V?> operator [](K key) {
-    final sub = _keyPubSub.sub(key);
+    final sub = _pubSub.subKey(key);
     return _keyComputations.wrap(key, () {
       final opt = sub.use;
       return opt.is_ ? opt.value as V : null;
@@ -134,9 +134,7 @@ class MapComputedMap<K, V, KParent, VParent>
   }
 
   @override
-  // TODO: This can be made more scalable by using a pubsub on values
-  Computed<bool> containsValue(V value) => _containsValueComputations.wrap(
-      value, () => _snapshot.use.containsValue(value));
+  Computed<bool> containsValue(V value) => _pubSub.containsValue(value);
 
   @override
   void fix(IMap<K, V> value) => _mm.fix(value);

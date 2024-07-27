@@ -75,7 +75,7 @@ class ChangeStreamComputedMap<K, V>
   }
 
   Computed<V?> operator [](K key) {
-    final keySub = _keyPubSub.sub(key);
+    final keySub = _keyPubSub.subKey(key);
     return $(() {
       final keyOption = keySub.use;
       if (keyOption.is_) return keyOption.value;
@@ -85,18 +85,15 @@ class ChangeStreamComputedMap<K, V>
 
   @override
   Computed<bool> containsKey(K key) {
-    final keySub = _keyPubSub.sub(key);
+    final keySub = _keyPubSub.subKey(key);
     return $(() {
       final keyOption = keySub.use;
       return keyOption.is_;
     });
   }
 
-  final _containsValueCache = ComputationCache<V, bool>();
-
   @override
-  Computed<bool> containsValue(V value) => _containsValueCache.wrap(
-      value, () => _snapshotStream.use.containsValue(value));
+  Computed<bool> containsValue(V value) => _keyPubSub.containsValue(value);
 
   @override
   Computed<ChangeEvent<K, V>> get changes => $(() => _changeStreamWrapped.use);
