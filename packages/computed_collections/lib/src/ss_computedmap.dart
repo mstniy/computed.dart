@@ -56,14 +56,6 @@ class SnapshotStreamComputedMap<K, V>
       value, () => _snapshotStream.use.containsValue(value));
 
   @override
-  // ignore: invalid_use_of_visible_for_testing_member
-  void fix(IMap<K, V> value) => _snapshotStream.fix(value);
-
-  @override
-  // ignore: invalid_use_of_visible_for_testing_member
-  void fixThrow(Object e) => _snapshotStream.fixThrow(e);
-
-  @override
   Computed<bool> get isEmpty => $(() => _snapshotStream.use.isEmpty);
 
   @override
@@ -73,14 +65,5 @@ class SnapshotStreamComputedMap<K, V>
   Computed<int> get length => $(() => _snapshotStream.use.length);
 
   @override
-  void mock(IComputedMap<K, V> mock) =>
-      // ignore: invalid_use_of_visible_for_testing_member
-      _snapshotStream.mock(() => mock.snapshot.use);
-
-  @override
   Computed<IMap<K, V>> get snapshot => $(() => _snapshotStream.use);
-
-  @override
-  // ignore: invalid_use_of_visible_for_testing_member
-  void unmock() => _snapshotStream.unmock();
 }

@@ -149,4 +149,10 @@ void main() {
     sub1.cancel();
     sub2.cancel();
   });
+
+  test('attributes are coherent', () async {
+    final m = IComputedMap({0: 1}.lock);
+    final mv = m.mapValues((key, value) => value + 1);
+    await testCoherenceInt(mv, {0: 2}.lock);
+  });
 }

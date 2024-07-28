@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:computed/computed.dart';
-import 'package:computed/utils/computation_cache.dart';
 import 'package:computed/utils/streams.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
@@ -9,21 +8,17 @@ import '../change_event.dart';
 import '../icomputedmap.dart';
 import 'computedmap_mixins.dart';
 import 'cs_computedmap.dart';
+import 'utils/pubsub.dart';
 import 'utils/snapshot_computation.dart';
 import 'utils/group_by.dart';
 
 class GroupByComputedMap<K, V, KParent>
     with OperatorsMixin<K, IComputedMap<KParent, V>>
     implements IComputedMap<K, IComputedMap<KParent, V>> {
-  late final MockManager<K, IComputedMap<KParent, V>> _mm;
   final IComputedMap<KParent, V> _parent;
   final K Function(KParent key, V value) _convert;
 
-  late final Computed<IMap<K, IComputedMap<KParent, V>>> _snapshot;
-  final _keyComputations = ComputationCache<K, IComputedMap<KParent, V>?>();
-  final _containsKeyComputations = ComputationCache<K, bool>();
-  final _containsValueComputations =
-      ComputationCache<IComputedMap<KParent, V>, bool>();
+  late final PubSub<K, IComputedMap<KParent, V>> _pubSub;
 
   var _mappedKeys = <KParent, K>{};
   var _m = <K,
@@ -54,7 +49,7 @@ class GroupByComputedMap<K, V, KParent>
   }
 
   GroupByComputedMap(this._parent, this._convert) {
-    final changes = Computed.async(() {
+    changes = Computed.async(() {
       final change = _parent.changes.use;
 
       switch (change) {
@@ -181,20 +176,12 @@ class GroupByComputedMap<K, V, KParent>
           }
       }
     }, onCancel: _onCancel);
-    _snapshot = snapshotComputation(changes, () {
+    snapshot = snapshotComputation(changes, () {
       final s = _parent.snapshot.use;
       return _setM(s);
     });
 
-    _mm = MockManager(
-        changes,
-        _snapshot,
-        $(() => snapshot.use.length),
-        $(() => _parent.isEmpty.use),
-        $(() => _parent.isNotEmpty.use),
-        _keyComputations,
-        _containsKeyComputations,
-        _containsValueComputations);
+    _pubSub = PubSub(changes, snapshot);
   }
 
   void _onCancel() {
@@ -203,42 +190,35 @@ class GroupByComputedMap<K, V, KParent>
   }
 
   @override
-  Computed<bool> containsKey(K key) =>
-      _containsKeyComputations.wrap(key, () => _snapshot.use.containsKey(key));
+  Computed<bool> containsKey(K key) {
+    final sub = _pubSub.subKey(key);
+    return $(() => sub.use.is_);
+  }
 
   @override
-  /////////// TODO: this is suboptimal
-  Computed<IComputedMap<KParent, V>?> operator [](K key) =>
-      _keyComputations.wrap(key, () => _snapshot.use[key]);
+  Computed<IComputedMap<KParent, V>?> operator [](K key) {
+    final sub = _pubSub.subKey(key);
+    return $(() {
+      final used = sub.use;
+      return used.is_ ? used.value : null;
+    });
+  }
 
   @override
   Computed<bool> containsValue(IComputedMap<KParent, V> value) =>
-      _containsValueComputations.wrap(
-          value, () => _snapshot.use.containsValue(value));
+      _pubSub.containsValue(value);
 
   @override
-  void fix(IMap<K, IComputedMap<KParent, V>> value) => _mm.fix(value);
+  late final Computed<IMap<K, IComputedMap<KParent, V>>> snapshot;
 
   @override
-  void fixThrow(Object e) => _mm.fixThrow(e);
+  late final Computed<ChangeEvent<K, IComputedMap<KParent, V>>> changes;
 
   @override
-  void mock(IComputedMap<K, IComputedMap<KParent, V>> mock) => _mm.mock(mock);
+  Computed<bool> get isEmpty => _parent.isEmpty;
+  @override
+  Computed<bool> get isNotEmpty => _parent.isNotEmpty;
 
   @override
-  void unmock() => _mm.unmock();
-
-  @override
-  Computed<IMap<K, IComputedMap<KParent, V>>> get snapshot => _mm.snapshot;
-
-  @override
-  Computed<ChangeEvent<K, IComputedMap<KParent, V>>> get changes => _mm.changes;
-
-  @override
-  Computed<bool> get isEmpty => _mm.isEmpty;
-  @override
-  Computed<bool> get isNotEmpty => _mm.isNotEmpty;
-
-  @override
-  Computed<int> get length => _mm.length;
+  Computed<int> get length => $(() => snapshot.use.length);
 }

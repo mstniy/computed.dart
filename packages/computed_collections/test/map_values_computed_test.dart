@@ -7,6 +7,8 @@ import 'package:computed_collections/icomputedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:test/test.dart';
 
+import 'helpers.dart';
+
 void main() {
   test('incremental update works', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
@@ -343,5 +345,11 @@ void main() {
 
     sub1.cancel();
     sub2.cancel();
+  });
+
+  test('attributes are coherent', () async {
+    final m = IComputedMap({0: 1}.lock);
+    final mv = m.mapValuesComputed((key, value) => $(() => value + 1));
+    await testCoherenceInt(mv, {0: 2}.lock);
   });
 }

@@ -489,29 +489,20 @@ void main() {
     final m2 = m1.groupByComputed((k, v) => $(() => k % 3));
 
     // operator[]
-    expect(await getValues($(() => m2[0].use?.snapshot.use)), [
-      null,
-      {0: 1, 3: 4}.lock
-    ]);
-    expect(await getValues($(() => m2[1].use?.snapshot.use)), [
-      null,
-      {1: 2}.lock
-    ]);
-    expect(await getValues($(() => m2[2].use?.snapshot.use)), [
-      null,
-      {2: 3}.lock
-    ]);
+    expect(await getValue($(() => m2[0].use?.snapshot.use)), {0: 1, 3: 4}.lock);
+    expect(await getValue($(() => m2[1].use?.snapshot.use)), {1: 2}.lock);
+    expect(await getValue($(() => m2[2].use?.snapshot.use)), {2: 3}.lock);
     expect(await getValue(m2[3]), null);
 
     // containsKey
     for (var i in [0, 1, 2]) {
-      expect(await getValues(m2.containsKey(i)), [false, true]);
+      expect(await getValue(m2.containsKey(i)), true);
     }
     expect(await getValue(m2.containsKey(3)), false);
 
     // is(Not)Empty
-    expect(await getValue(m2.isEmpty), false);
-    expect(await getValue(m2.isNotEmpty), true);
+    expect(await getValues(m2.isEmpty), [true, false]);
+    expect(await getValues(m2.isNotEmpty), [false, true]);
 
     // length
     expect(await getValues(m2.length), [0, 3]);
@@ -535,27 +526,5 @@ void main() {
         false);
 
     sub.cancel();
-  });
-
-  test('fix/mock works', () async {
-    final m1 = ConstComputedMap(<int, int>{}.lock);
-    final m2 = m1.groupByComputed((key, value) => $(() => 0));
-
-    final group = ConstComputedMap({1: 2}.lock);
-
-    m2.fix({0: group}.lock);
-
-    await testCoherence(
-        m2, {0: group}.lock, 1, ConstComputedMap(<int, int>{}.lock));
-
-    m2.mock(ConstComputedMap({1: group}.lock));
-
-    await testCoherence(
-        m2, {1: group}.lock, 0, ConstComputedMap(<int, int>{}.lock));
-
-    m2.unmock();
-
-    await testCoherence(m2, <int, IComputedMap<int, int>>{}.lock, 0,
-        ConstComputedMap(<int, int>{}.lock));
   });
 }

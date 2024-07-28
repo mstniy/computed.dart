@@ -8,19 +8,19 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import 'computedmap_mixins.dart';
 import 'utils/option.dart';
+import 'utils/pubsub.dart';
 
 class MapValuesComputedComputedMap<K, V, VParent>
     with OperatorsMixin<K, V>
     implements IComputedMap<K, V> {
-  late final MockManager<K, V> _mm;
   final IComputedMap<K, VParent> _parent;
   final Computed<V> Function(K key, VParent value) _convert;
 
-  late final Computed<IMap<K, V>> _snapshot;
   final _keyComputations = ComputationCache<K, V?>();
   final _keyOptionComputations = ComputationCache<K, Option<V>>();
   final _containsKeyComputations = ComputationCache<K, bool>();
-  final _containsValueComputations = ComputationCache<V, bool>();
+
+  late final PubSub<K, V> _pubSub;
 
   MapValuesComputedComputedMap(this._parent, this._convert) {
     final _computedChanges = Computed(() {
@@ -96,8 +96,8 @@ class MapValuesComputedComputedMap<K, V, VParent>
       _computedChangesSubscription!.cancel();
       _computedChangesSubscription = null;
     });
-    final _changesComputed = $(() => _changes.use);
-    _snapshot = snapshotComputation(_changesComputed, () {
+    changes = $(() => _changes.use);
+    snapshot = snapshotComputation(changes, () {
       final entries = _parent.snapshot.use
           .map(((key, value) => MapEntry(key, _convert(key, value))));
       var gotNVE = false;
@@ -115,18 +115,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
       return unwrapped;
     });
 
-    // To know the length of the collection we do indeed need to compute the values for all the keys
-    // as just because a key exists on the parent does not mean it also exists in us
-    // because the corresponding computation might not have a value yet
-    final length = $(() => _snapshot.use.length);
-
-    // TODO: We can be slightly smarter about this by not evaluating any computation as soon as
-    //  one of them gains a value. Cannot think of an easy way to implement this, though.
-    final isEmpty = $(() => length.use == 0);
-    final isNotEmpty = $(() => length.use > 0);
-
-    _mm = MockManager(_changesComputed, _snapshot, length, isEmpty, isNotEmpty,
-        _keyComputations, _containsKeyComputations, _containsValueComputations);
+    _pubSub = PubSub(changes, snapshot);
   }
 
   Computed<Option<V>> _getKeyOptionComputation(K key) {
@@ -145,7 +134,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
     // the [MockMixin] handle it.
     return _keyOptionComputations.wrap(key, () {
       try {
-        final s = _snapshot.useWeak;
+        final s = snapshot.useWeak;
         // useWeak returned - means there is an existing non-weak listener on the snapshot
         if (s.containsKey(key)) return Option.some(s[key]);
         return Option.none();
@@ -194,29 +183,23 @@ class MapValuesComputedComputedMap<K, V, VParent>
   }
 
   @override
-  Computed<bool> containsValue(V value) => _containsValueComputations.wrap(
-      value, () => _snapshot.use.containsValue(value));
+  Computed<bool> containsValue(V value) => _pubSub.containsValue(value);
 
   @override
-  void fix(IMap<K, V> value) => _mm.fix(value);
+  late final Computed<ChangeEvent<K, V>> changes;
 
   @override
-  void fixThrow(Object e) => _mm.fixThrow(e);
+  late final Computed<IMap<K, V>> snapshot;
 
+  // TODO: We can be slightly smarter about this by not evaluating any computation as soon as
+  //  one of them gains a value. PubSub can likely do that
   @override
-  void mock(IComputedMap<K, V> mock) => _mm.mock(mock);
-
+  Computed<bool> get isEmpty => $(() => snapshot.use.isEmpty);
   @override
-  void unmock() => _mm.unmock();
-
+  Computed<bool> get isNotEmpty => $(() => snapshot.use.isNotEmpty);
+  // To know the length of the collection we do indeed need to compute the values for all the keys
+  // as just because a key exists on the parent does not mean it also exists in us
+  // because the corresponding computation might not have a value yet
   @override
-  Computed<ChangeEvent<K, V>> get changes => _mm.changes;
-  @override
-  Computed<IMap<K, V>> get snapshot => _mm.snapshot;
-  @override
-  Computed<bool> get isEmpty => _mm.isEmpty;
-  @override
-  Computed<bool> get isNotEmpty => _mm.isNotEmpty;
-  @override
-  Computed<int> get length => _mm.length;
+  Computed<int> get length => $(() => snapshot.use.length);
 }

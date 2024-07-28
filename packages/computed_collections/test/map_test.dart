@@ -52,7 +52,7 @@ void main() {
     sub.cancel();
   });
 
-  test('is coherent', () async {
+  test('attributes are coherent', () async {
     final m1 = IComputedMap({0: 1, 1: 2, 2: 3, 3: 4}.lock);
 
     final m2 = m1.map((k, v) {

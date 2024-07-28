@@ -5,6 +5,8 @@ import 'package:computed_collections/icomputedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:test/test.dart';
 
+import 'helpers.dart';
+
 void main() {
   test('snapshot works', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
@@ -171,5 +173,15 @@ void main() {
     expect(lastRes, ChangeEventReplace({0: 1, 1: 6, 2: 7}.lock));
 
     sub.cancel();
+  });
+
+  test('attributes are coherent', () async {
+    final m = IComputedMap({0: 1}.lock);
+    final a = m.add(1, 2);
+    final b = a.add(0, 2);
+    final c = a.add(0, 3);
+    await testCoherenceInt(a, {0: 1, 1: 2}.lock);
+    await testCoherenceInt(b, {0: 2, 1: 2}.lock);
+    await testCoherenceInt(c, {0: 3, 1: 2}.lock);
   });
 }

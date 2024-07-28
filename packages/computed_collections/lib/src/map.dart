@@ -11,15 +11,11 @@ import 'utils/snapshot_computation.dart';
 class MapComputedMap<K, V, KParent, VParent>
     with OperatorsMixin<K, V>
     implements IComputedMap<K, V> {
-  late final MockManager<K, V> _mm;
-
   final IComputedMap<KParent, VParent> _parent;
   final MapEntry<K, V> Function(KParent key, VParent value) _convert;
 
-  late final Computed<IMap<K, V>> _snapshot;
   final _keyComputations = ComputationCache<K, V?>();
   final _containsKeyComputations = ComputationCache<K, bool>();
-  final _containsValueComputations = ComputationCache<V, bool>();
 
   final _mappedKeys = <KParent, K>{};
   final _mappedKeysReverse = <K, Map<KParent, V>>{};
@@ -48,7 +44,7 @@ class MapComputedMap<K, V, KParent, VParent>
   }
 
   MapComputedMap(this._parent, this._convert) {
-    final changes = Computed.async(() {
+    changes = Computed.async(() {
       final change = _parent.changes.use;
 
       switch (change) {
@@ -97,20 +93,10 @@ class MapComputedMap<K, V, KParent, VParent>
       }
     }, onCancel: _onCancel);
 
-    _snapshot =
+    snapshot =
         snapshotComputation(changes, () => _setUpstream(_parent.snapshot.use));
 
-    _pubSub = PubSub<K, V>(changes, _snapshot);
-
-    _mm = MockManager(
-        changes,
-        _snapshot,
-        $(() => snapshot.use.length),
-        $(() => _parent.isEmpty.use),
-        $(() => _parent.isNotEmpty.use),
-        _keyComputations,
-        _containsKeyComputations,
-        _containsValueComputations);
+    _pubSub = PubSub<K, V>(changes, snapshot);
   }
 
   void _onCancel() {
@@ -137,28 +123,16 @@ class MapComputedMap<K, V, KParent, VParent>
   Computed<bool> containsValue(V value) => _pubSub.containsValue(value);
 
   @override
-  void fix(IMap<K, V> value) => _mm.fix(value);
+  late final Computed<IMap<K, V>> snapshot;
 
   @override
-  void fixThrow(Object e) => _mm.fixThrow(e);
+  late final Computed<ChangeEvent<K, V>> changes;
 
   @override
-  void mock(IComputedMap<K, V> mock) => _mm.mock(mock);
+  Computed<bool> get isEmpty => _parent.isEmpty;
+  @override
+  Computed<bool> get isNotEmpty => _parent.isNotEmpty;
 
   @override
-  void unmock() => _mm.unmock();
-
-  @override
-  Computed<IMap<K, V>> get snapshot => _mm.snapshot;
-
-  @override
-  Computed<ChangeEvent<K, V>> get changes => _mm.changes;
-
-  @override
-  Computed<bool> get isEmpty => _mm.isEmpty;
-  @override
-  Computed<bool> get isNotEmpty => _mm.isNotEmpty;
-
-  @override
-  Computed<int> get length => _mm.length;
+  Computed<int> get length => $(() => snapshot.use.length);
 }

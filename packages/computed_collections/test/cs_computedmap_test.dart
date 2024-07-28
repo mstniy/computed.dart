@@ -256,4 +256,11 @@ void main() {
 
     await testCoherenceInt(m, <int, int>{}.lock);
   });
+
+  test('attributes are coherent', () async {
+    final s = ValueStream<ChangeEvent<int, int>>.seeded(
+        ChangeEventReplace({1: 2}.lock));
+    final m = IComputedMap.fromChangeStream($(() => s.use));
+    await testCoherenceInt(m, {1: 2}.lock);
+  });
 }

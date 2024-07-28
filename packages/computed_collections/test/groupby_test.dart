@@ -3,6 +3,7 @@ import 'package:computed/utils/streams.dart';
 import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/icomputedmap.dart';
 import 'package:computed_collections/src/const_computedmap.dart';
+import 'package:computed_collections/src/ss_computedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:test/test.dart';
 
@@ -219,14 +220,15 @@ void main() {
     expect((await getValue(m2.snapshot)).keys, unorderedEquals([0, 1, 2]));
   });
   test('operator[] works', () async {
-    final m1 = ConstComputedMap({0: 1, 1: 2, 2: 3, 3: 4}.lock);
+    final s = ValueStream.seeded({0: 1, 1: 2, 2: 3, 3: 4}.lock);
+    final m1 = SnapshotStreamComputedMap($(() => s.use));
     final m2 = m1.groupBy((key, value) => key % 3);
     final group0 = m2[0];
     expect(
         (await getValue($(() => group0.use!.snapshot.use))), {0: 1, 3: 4}.lock);
-    m1.mock(ConstComputedMap({0: 1, 1: 2, 2: 3}.lock));
+    s.add({0: 1, 1: 2, 2: 3}.lock);
     expect((await getValue($(() => group0.use!.snapshot.use))), {0: 1}.lock);
-    m1.mock(ConstComputedMap({1: 2, 2: 3}.lock));
+    s.add({1: 2, 2: 3}.lock);
     expect((await getValue($(() => group0.use))), null);
   });
 
@@ -254,27 +256,5 @@ void main() {
         false);
 
     sub.cancel();
-  });
-
-  test('fix/mock works', () async {
-    final m1 = ConstComputedMap(<int, int>{}.lock);
-    final m2 = m1.groupBy((key, value) => 0);
-
-    final group = ConstComputedMap({1: 2}.lock);
-
-    m2.fix({0: group}.lock);
-
-    await testCoherence(
-        m2, {0: group}.lock, 1, ConstComputedMap(<int, int>{}.lock));
-
-    m2.mock(ConstComputedMap({1: group}.lock));
-
-    await testCoherence(
-        m2, {1: group}.lock, 0, ConstComputedMap(<int, int>{}.lock));
-
-    m2.unmock();
-
-    await testCoherence(m2, <int, IComputedMap<int, int>>{}.lock, 0,
-        ConstComputedMap(<int, int>{}.lock));
   });
 }

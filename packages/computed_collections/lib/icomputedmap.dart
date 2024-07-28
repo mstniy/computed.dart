@@ -3,8 +3,6 @@ import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/src/const_computedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
-import 'package:meta/meta.dart';
-
 import 'src/cs_computedmap.dart';
 import 'src/ss_computedmap.dart';
 
@@ -19,18 +17,6 @@ abstract class IComputedMap<K, V> {
   factory IComputedMap.fromSnapshotStream(Computed<IMap<K, V>> stream) =>
       SnapshotStreamComputedMap(stream);
   Computed<ChangeEvent<K, V>> get changes;
-
-  @visibleForTesting
-  void fix(IMap<K, V> value);
-
-  @visibleForTesting
-  void fixThrow(Object e);
-
-  @visibleForTesting
-  void mock(IComputedMap<K, V> mock);
-
-  @visibleForTesting
-  void unmock();
 
   Computed<IMap<K, V>> get snapshot;
 
