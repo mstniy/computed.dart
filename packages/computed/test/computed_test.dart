@@ -265,57 +265,11 @@ void main() {
       expectation = 1;
       controller.add(1);
       expect(cCnt, 6);
-      source.mockEmit(1);
+      controller.add(1);
       expect(cCnt, 6);
       expectation = 2;
-      source.mockEmit(2);
+      controller.add(2);
       expect(cCnt, 8);
-
-      sub.cancel();
-    });
-
-    test('mockEmit[Error] works', () async {
-      final source = Stream.empty();
-
-      int ctr = 0;
-      bool? lastWasError;
-      int? lastRes;
-      Object? lastError;
-
-      final sub = Computed(() => source.use).listen((event) {
-        ctr++;
-        lastWasError = false;
-        lastRes = event;
-      }, (e) {
-        ctr++;
-        lastWasError = true;
-        lastError = e;
-      });
-
-      source.mockEmit(0);
-      expect(ctr, 1);
-      expect(lastWasError, false);
-      expect(lastRes, 0);
-      source.mockEmit(0);
-      expect(ctr, 1);
-      source.mockEmit(1);
-      expect(ctr, 2);
-      expect(lastWasError, false);
-      expect(lastRes, 1);
-      source.mockEmitError(1);
-      expect(ctr, 3);
-      expect(lastWasError, true);
-      expect(lastError, 1);
-      source.mockEmitError(2);
-      expect(ctr, 4);
-      expect(lastWasError, true);
-      expect(lastError, 2);
-      source.mockEmitError(2);
-      expect(ctr, 4);
-      source.mockEmit(3);
-      expect(ctr, 5);
-      expect(lastWasError, false);
-      expect(lastRes, 3);
 
       sub.cancel();
     });

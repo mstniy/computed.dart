@@ -49,14 +49,6 @@ class StreamComputedExtensionImpl<T> {
     final caller = GlobalCtx.currentComputation;
     return caller.dataSourcePrevOr(s, or);
   }
-
-  void mockEmit(T value) {
-    GlobalCtx.routerFor(s)?.onDataSourceData(value);
-  }
-
-  void mockEmitError(Object e) {
-    GlobalCtx.routerFor(s)?.onDataSourceError(e);
-  }
 }
 
 class _StreamDataSourceSubscription<T> implements DataSourceSubscription<T> {

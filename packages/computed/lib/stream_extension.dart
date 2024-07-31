@@ -1,5 +1,3 @@
-import 'package:meta/meta.dart';
-
 import 'computed.dart';
 import 'src/computed_stream.dart';
 import 'src/stream_extension.dart';
@@ -57,16 +55,4 @@ extension StreamComputedExtension<T> on Stream<T> {
 
   /// As [prev], but returns [or] instead of throwing [NoValueException].
   T prevOr(T or) => StreamComputedExtensionImpl<T>(this).prevOr(or);
-
-  /// Makes computations listening on this stream behave as if it emmitted the given value.
-  @visibleForTesting
-  void mockEmit(T value) {
-    StreamComputedExtensionImpl<T>(this).mockEmit(value);
-  }
-
-  /// Makes computations listening on this stream behave as if it emmitted the given error.
-  @visibleForTesting
-  void mockEmitError(Object e) {
-    StreamComputedExtensionImpl<T>(this).mockEmitError(e);
-  }
 }
