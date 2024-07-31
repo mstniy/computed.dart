@@ -1,5 +1,3 @@
-import 'package:meta/meta.dart';
-
 import 'src/computed.dart';
 export 'future_extension.dart';
 export 'stream_extension.dart';
@@ -78,33 +76,6 @@ class Computed<T> {
   ComputedSubscription<T> listen(
           void Function(T event)? onData, Function? onError) =>
       _impl.listen(onData, onError);
-
-  /// Fixes the result of this computation to the given value.
-  ///
-  /// See [mock].
-  @visibleForTesting
-  void fix(T value) {
-    mock(() => value);
-  }
-
-  /// Fixes this computation to throw the given object.
-  ///
-  /// See [mock].
-  @visibleForTesting
-  void fixThrow(Object e) {
-    mock(() => throw e);
-  }
-
-  /// Replaces the original [f] with [mock].
-  ///
-  /// This will trigger a re-computation.
-  @visibleForTesting
-  void mock(T Function() mock) => _impl.mock(mock);
-
-  /// Replaces [f] with the original, undoing [fix], [fixThrow] and [mock].
-  /// If this computations has not already been mocked, does nothing.
-  @visibleForTesting
-  void unmock() => _impl.unmock();
 
   /// Returns the current value of this computation, if one exists, and subscribes to it.
   ///

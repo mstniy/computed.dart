@@ -168,8 +168,7 @@ class ComputedImpl<T> {
   // If mapped to false -> not notified yet
   final _listeners = <_ComputedSubscriptionImpl<T>, bool>{};
 
-  T Function() _f;
-  final T Function() _origF;
+  final T Function() _f;
 
   final void Function()? _onCancel;
   final void Function(T value)? _dispose;
@@ -235,8 +234,7 @@ class ComputedImpl<T> {
   }
 
   ComputedImpl(this._f, this._memoized, this._assertIdempotent, this._async,
-      this._dispose, this._onCancel)
-      : _origF = _f;
+      this._dispose, this._onCancel);
 
   static ComputedImpl<T> withPrev<T>(
       T Function(T prev) f,
@@ -371,28 +369,6 @@ class ComputedImpl<T> {
     assert(rvoe._router != this);
 
     rvoe._router._react(onData, onError);
-  }
-
-  void mock(T Function() mock) {
-    _f = mock;
-    if (_listeners.isNotEmpty ||
-        _nonMemoizedDownstreamComputations.isNotEmpty ||
-        _memoizedDownstreamComputations.isNotEmpty) {
-      GlobalCtx._currentUpdate = _Token();
-      _rerunGraph();
-    }
-  }
-
-  void unmock() {
-    if (identical(_f, _origF)) return; // Already not mocked
-    _f = _origF;
-    _lastResult = null; // Invalid
-    if (_listeners.isNotEmpty ||
-        _nonMemoizedDownstreamComputations.isNotEmpty ||
-        _memoizedDownstreamComputations.isNotEmpty) {
-      GlobalCtx._currentUpdate = _Token();
-      _rerunGraph();
-    }
   }
 
   // This is public so that it can be customized by subclasses

@@ -180,7 +180,8 @@ void main() {
       int? expectation2;
       var cCnt = 0;
 
-      final c2 = Computed(() => 42);
+      final s = ValueStream.seeded(42, sync: true);
+      final c2 = Computed(() => s.use);
 
       final c = Computed(() {
         // Subscribe to both sources and c2
@@ -203,27 +204,30 @@ void main() {
       final sub = c.listen(null, (e) => fail(e.toString()));
 
       expect(cCnt, 2);
+      await Future.value(); // Await for Computed to subscribe to [s]
+      expect(cCnt, 4);
+
       expectation1 = 0;
       controller1.add(0);
-      expect(cCnt, 4);
-      controller1.add(0);
       expect(cCnt, 6);
+      controller1.add(0);
+      expect(cCnt, 8);
       expectation1 = null;
       expectation2 = 1;
       controller2.add(1);
-      expect(cCnt, 8);
-      controller2.add(1);
       expect(cCnt, 10);
+      controller2.add(1);
+      expect(cCnt, 12);
       expectation2 = 2;
       controller2.add(2);
-      expect(cCnt, 12);
+      expect(cCnt, 14);
       expectation1 = 2;
       expectation2 = null;
       controller1.add(2);
-      expect(cCnt, 14);
-      expectation1 = null;
-      c2.fix(43);
       expect(cCnt, 16);
+      expectation1 = null;
+      s.add(43);
+      expect(cCnt, 18);
 
       sub.cancel();
     });
@@ -237,48 +241,35 @@ void main() {
 
       final c2 = Computed(() => 42);
 
-      var expectation1 = 42;
-      int? expectation2; // If null, expect NoValueException
+      int? expectation; // If null, expect NoValueException
 
       final c = Computed(() {
         cCnt++;
         // Subscribe to the sources and c2
-        expect(c2.use, expectation1);
+        expect(c2.use, 42);
         try {
-          expect(source.use, expectation2);
+          expect(source.use, expectation);
         } on NoValueException {
-          expect(expectation2, null);
+          expect(expectation, null);
         }
       });
 
       final sub = c.listen(null, (e) => fail(e.toString()));
 
       expect(cCnt, 2);
-      expectation2 = 0;
+      expectation = 0;
       controller.add(0);
       expect(cCnt, 4);
       controller.add(0);
       expect(cCnt, 4);
-      expectation2 = 1;
+      expectation = 1;
       controller.add(1);
       expect(cCnt, 6);
-      c2.fix(42);
-      expect(cCnt, 6);
-      c2.unmock();
-      expect(cCnt, 8);
-      expectation1 = 43;
-      c2.fix(43);
-      expect(cCnt, 10);
-      c2.fix(43);
-      expect(cCnt, 10);
-      expectation1 = 42;
-      c2.unmock();
-      expect(cCnt, 12);
       source.mockEmit(1);
-      expect(cCnt, 12);
-      expectation2 = 2;
+      expect(cCnt, 6);
+      expectation = 2;
       source.mockEmit(2);
-      expect(cCnt, 14);
+      expect(cCnt, 8);
 
       sub.cancel();
     });
@@ -1986,105 +1977,6 @@ void main() {
     expect(flag, true);
 
     sub.cancel();
-  });
-
-  group('mocks', () {
-    test('fix and unmock works', () async {
-      final controller = StreamController<int>.broadcast(
-          sync: true); // Use a broadcast stream to make debugging easier
-      final source = controller.stream;
-
-      final c = Computed(() {
-        return source.use;
-      });
-
-      var listenerCallCnt = 0;
-      var expectation = 42;
-
-      final sub = c.listen((output) {
-        listenerCallCnt++;
-        expect(output, expectation);
-      }, (e) => fail(e.toString()));
-
-      c.fix(42);
-      expect(listenerCallCnt, 1);
-      c.fix(42);
-      expect(listenerCallCnt, 1);
-      expectation = 43;
-      c.fix(43);
-      expect(listenerCallCnt, 2);
-
-      controller.add(0);
-      // Does not trigger a re-computation, as c has already been fixed
-      expect(listenerCallCnt, 2);
-
-      c.unmock();
-      // Does not trigger a call of the listener,
-      // as the source has not produced any value yet.
-      expect(listenerCallCnt, 2);
-
-      expectation = 1;
-      controller.add(1);
-      expect(listenerCallCnt, 3);
-
-      sub.cancel();
-    });
-
-    test('(regression) calling unmock on a non-mocked computation is noop',
-        () async {
-      var cCnt = 0;
-      final c = $(() {
-        cCnt++;
-      });
-      final sub = c.listen(null, null);
-      await Future.value();
-      expect(cCnt, 2);
-      c.unmock();
-      expect(cCnt, 2);
-      sub.cancel();
-    });
-
-    test(
-        '(regression) calling mock and unmock on an unused computation does not run it',
-        () {
-      var cCnt = 0;
-      final c = $(() => cCnt++);
-      c.mock(() => cCnt++);
-      c.unmock();
-      expect(cCnt, 0);
-    });
-
-    test('fixThrow works', () async {
-      final c1 = Computed(() {
-        return 0;
-      });
-
-      var callCnt = 0;
-      var mustThrow = false;
-
-      final c2 = Computed(() {
-        callCnt++;
-        if (mustThrow) {
-          try {
-            c1.use;
-            fail('c1 must throw');
-          } catch (e) {
-            expect(e, 42);
-          }
-        } else {
-          c1.use;
-        }
-      });
-
-      final sub = c2.listen((output) {}, (e) => fail(e.toString()));
-
-      mustThrow = true;
-      c1.fixThrow(42);
-
-      expect(callCnt, 4);
-
-      sub.cancel();
-    });
   });
 
   test('computations can use and return null', () {
