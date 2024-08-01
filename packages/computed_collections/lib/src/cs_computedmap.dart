@@ -16,7 +16,6 @@ class ChangeStreamComputedMap<K, V>
       Computed<IMap<K, V>>? snapshotStream}) {
     snapshot =
         snapshotStream ?? snapshotComputation(changes, initialValueComputer);
-    // Passing _changeStreamWrapped to KeyPub allows it to be consistent with mocks
     _keyPubSub = PubSub(changes, snapshot);
   }
 
