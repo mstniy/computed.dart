@@ -69,6 +69,23 @@ class _ComputedSubscriptionImpl<T> implements ComputedSubscription<T> {
   }
 }
 
+void _validateOnError(Function? onError) {
+  if (onError != null &&
+      onError is! Function(Object, StackTrace) &&
+      onError is! Function(Object)) {
+    throw ArgumentError.value(onError, "onError",
+        "onError must accept one Object or one Object and a StackTrace as arguments");
+  }
+}
+
+void _dispatchOnError(Function onError, Object o, StackTrace st) {
+  if (onError is Function(Object, StackTrace)) {
+    onError(o, st);
+  } else {
+    onError(o);
+  }
+}
+
 class _WeakMemoizedValueOrException<T> {
   final bool _weak;
   final bool _memoized;
@@ -289,6 +306,7 @@ class ComputedImpl<T> {
 
   ComputedSubscription<T> listen(
       void Function(T event)? onData, Function? onError) {
+    _validateOnError(onError);
     final sub = _ComputedSubscriptionImpl<T>(this, onData, onError);
     if (_novalue) {
       try {
@@ -315,9 +333,9 @@ class ComputedImpl<T> {
         // No need to set the value of _listeners here, it will never be used again
         if (!_novalue) {
           if (!_lastResult!._isValue) {
-            final lastError = _lastResult!._exc!;
             if (sub._onError != null) {
-              sub._onError!(lastError);
+              _dispatchOnError(
+                  sub._onError!, _lastResult!._exc!, _lastResult!._st!);
             }
           } else if (_lastResult!._isValue && sub._onData != null) {
             final lastResult = _lastResult!._value as T;
@@ -580,7 +598,8 @@ class ComputedImpl<T> {
           _listeners[listener] = true;
           if (listener._onError != null) {
             onErrorNotified = true;
-            listener._onError!(_lastResult!._exc!);
+            _dispatchOnError(
+                listener._onError!, _lastResult!._exc!, _lastResult!._st!);
           }
         }
       }
@@ -701,7 +720,7 @@ class ComputedImpl<T> {
       if (_lastResult!._isValue) {
         onData(_lastResult!._value as T);
       } else if (onError != null) {
-        onError(_lastResult!._exc as Object);
+        onError(_lastResult!._exc!);
       } else {
         // Do not throw the exception here,
         // as this might cause other .react/.use-s to get skipped

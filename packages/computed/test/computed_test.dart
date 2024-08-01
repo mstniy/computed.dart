@@ -666,6 +666,46 @@ void main() {
     sub2.cancel();
   });
 
+  test('listen propagates stack traces', () async {
+    final s = ValueStream<int>(sync: true);
+    final x = $(() {
+      void myTag() {
+        throw s.useOr(42);
+      }
+
+      myTag();
+    });
+    var cnt = 0;
+    Object? e;
+    StackTrace? st;
+    x.listen((event) => fail('Must not be called'), (e_, st_) {
+      cnt++;
+      e = e_;
+      st = st_;
+    });
+    await Future.value();
+    expect(cnt, 1);
+    expect(e, 42);
+    expect(st.toString(), contains('myTag'));
+    s.add(1);
+    expect(cnt, 2);
+    expect(e, 1);
+    expect(st.toString(), contains('myTag'));
+  });
+
+  test('listen rejects invalid error handlers', () async {
+    final x = $(() => 0);
+    try {
+      x.listen(null, (a, b, c) => null);
+      fail('Must have throwns');
+    } catch (e) {
+      expect(e, isA<ArgumentError>());
+      expect((e as ArgumentError).name, 'onError');
+      expect(e.message,
+          'onError must accept one Object or one Object and a StackTrace as arguments');
+    }
+  });
+
   test('(regression) listeners can cancel themselves', () async {
     final s = ValueStream.seeded(0, sync: true);
     final c = $(() => s.use);

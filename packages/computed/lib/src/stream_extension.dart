@@ -28,7 +28,7 @@ class StreamComputedExtensionImpl<T> {
     }
   }
 
-  void react(void Function(T) onData, void Function(Object)? onError) {
+  void react(void Function(T) onData, [void Function(Object e)? onError]) {
     final caller = GlobalCtx.currentComputation;
     caller.dataSourceReact<T>(
         s,

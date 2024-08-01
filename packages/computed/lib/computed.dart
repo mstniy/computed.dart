@@ -73,8 +73,9 @@ class Computed<T> {
   /// for non-idempotency.
   /// For memoized computations, the listener will be called only
   /// when the result of the computation changes.
-  ComputedSubscription<T> listen(
-          void Function(T event)? onData, Function? onError) =>
+  /// [onError] has the same semantics as in [Future.listen]
+  ComputedSubscription<T> listen(void Function(T event)? onData,
+          [Function? onError]) =>
       _impl.listen(onData, onError);
 
   /// Returns the current value of this computation, if one exists, and subscribes to it.
