@@ -1,6 +1,6 @@
 import 'package:computed/computed.dart';
-import 'package:computed/utils/computation_cache.dart';
 import 'package:computed_collections/change_event.dart';
+import 'package:computed_collections/src/utils/pubsub.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import '../icomputedmap.dart';
@@ -10,13 +10,8 @@ class SnapshotStreamComputedMap<K, V>
     with OperatorsMixin<K, V>
     implements IComputedMap<K, V> {
   Computed<IMap<K, V>> _snapshotStream;
-  SnapshotStreamComputedMap(this._snapshotStream);
-
-  @override
-  Computed<V?> operator [](K key) => $(() => _snapshotStream.use[key]);
-
-  @override
-  Computed<ChangeEvent<K, V>> get changes {
+  late final PubSub<K, V> _pubSub;
+  SnapshotStreamComputedMap(this._snapshotStream) {
     final snapshotPrev = $(() {
       _snapshotStream.use;
       try {
@@ -25,7 +20,7 @@ class SnapshotStreamComputedMap<K, V>
         return (<K, V>{}.lock, false);
       }
     });
-    return $(() {
+    changes = $(() {
       final (prev, prevExists) = snapshotPrev.use;
       if (!prevExists) {
         return ChangeEventReplace(_snapshotStream.use);
@@ -41,17 +36,29 @@ class SnapshotStreamComputedMap<K, V>
                   : ChangeRecordDelete<V>())));
       return KeyChanges(changes);
     });
+    _pubSub = PubSub(changes, _snapshotStream);
   }
 
   @override
-  Computed<bool> containsKey(K key) =>
-      $(() => _snapshotStream.use.containsKey(key));
-
-  final _containsValueCache = ComputationCache<V, bool>();
+  Computed<V?> operator [](K key) {
+    final sub = _pubSub.subKey(key);
+    return $(() {
+      final used = sub.use;
+      return used.is_ ? used.value : null;
+    });
+  }
 
   @override
-  Computed<bool> containsValue(V value) => _containsValueCache.wrap(
-      value, () => _snapshotStream.use.containsValue(value));
+  late final Computed<ChangeEvent<K, V>> changes;
+
+  @override
+  Computed<bool> containsKey(K key) {
+    final sub = _pubSub.subKey(key);
+    return $(() => sub.use.is_);
+  }
+
+  @override
+  Computed<bool> containsValue(V value) => _pubSub.containsValue(value);
 
   @override
   Computed<bool> get isEmpty => $(() => _snapshotStream.use.isEmpty);
