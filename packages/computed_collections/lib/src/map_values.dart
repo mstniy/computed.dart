@@ -15,7 +15,6 @@ class MapValuesComputedMap<K, V, VParent>
   final V Function(K key, VParent value) _convert;
 
   final _keyComputations = ComputationCache<K, V?>();
-  final _containsKeyComputations = ComputationCache<K, bool>();
 
   late final PubSub<K, V> _pubSub;
 
@@ -47,10 +46,7 @@ class MapValuesComputedMap<K, V, VParent>
   }
 
   @override
-  Computed<bool> containsKey(K key) {
-    final parentContainsKey = _parent.containsKey(key);
-    return _containsKeyComputations.wrap(key, () => parentContainsKey.use);
-  }
+  Computed<bool> containsKey(K key) => _parent.containsKey(key);
 
   @override
   Computed<V?> operator [](K key) {
