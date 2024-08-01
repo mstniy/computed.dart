@@ -10,9 +10,7 @@ class SnapshotStreamComputedMap<K, V>
     with OperatorsMixin<K, V>
     implements IComputedMap<K, V> {
   Computed<IMap<K, V>> _snapshotStream;
-  SnapshotStreamComputedMap(Computed<IMap<K, V>> snapshotStream)
-      // Wrap the given computation so that we can mock it
-      : _snapshotStream = $(() => snapshotStream.use);
+  SnapshotStreamComputedMap(this._snapshotStream);
 
   @override
   Computed<V?> operator [](K key) => $(() => _snapshotStream.use[key]);

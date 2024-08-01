@@ -129,9 +129,6 @@ class MapValuesComputedComputedMap<K, V, VParent>
       }
       return null;
     }, assertIdempotent: false);
-    // We could mock this cache also, but it would be extra code for likely little gain.
-    // So `operator[]` and `containsKey` further wraps it to separate caches and let
-    // the [MockMixin] handle it.
     return _keyOptionComputations.wrap(key, () {
       try {
         final s = snapshot.useWeak;

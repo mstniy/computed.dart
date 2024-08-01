@@ -11,7 +11,6 @@ class ChangeStreamComputedMap<K, V>
     with OperatorsMixin<K, V>
     implements IComputedMap<K, V> {
   late final PubSub<K, V> _keyPubSub;
-  // Note that the instance may mock the given snapshot stream
   ChangeStreamComputedMap(this.changes,
       {IMap<K, V> Function()? initialValueComputer,
       Computed<IMap<K, V>>? snapshotStream}) {
