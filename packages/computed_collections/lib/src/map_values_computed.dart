@@ -16,9 +16,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
   final IComputedMap<K, VParent> _parent;
   final Computed<V> Function(K key, VParent value) _convert;
 
-  final _keyComputations = ComputationCache<K, V?>();
   final _keyOptionComputations = ComputationCache<K, Option<V>>();
-  final _containsKeyComputations = ComputationCache<K, bool>();
 
   late final PubSub<K, V> _pubSub;
 
@@ -154,29 +152,25 @@ class MapValuesComputedComputedMap<K, V, VParent>
   @override
   Computed<V?> operator [](K key) {
     final keyOptionComputation = _getKeyOptionComputation(key);
-    final resultComputation = _keyComputations.wrap(key, () {
+    return $(() {
       final option = keyOptionComputation.use;
       if (!option.is_)
         return null; // The key does not exist in the parent or the mapped computations has no value yet
       // The key exists in the parent and the mapped computation has a value
       return option.value;
     });
-
-    return resultComputation;
   }
 
   @override
   Computed<bool> containsKey(K key) {
     final keyOptionComputation = _getKeyOptionComputation(key);
-    final resultComputation = _containsKeyComputations.wrap(key, () {
+    return $(() {
       final option = keyOptionComputation.use;
       if (!option.is_)
         return false; // The key does not exist in the parent or the mapped computations has no value yet
       // The key exists in the parent and the mapped computation has a value
       return true;
     });
-
-    return resultComputation;
   }
 
   @override
