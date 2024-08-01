@@ -1,5 +1,4 @@
 import 'package:computed/computed.dart';
-import 'package:computed/utils/computation_cache.dart';
 import 'package:computed_collections/src/utils/pubsub.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
@@ -13,9 +12,6 @@ class MapComputedMap<K, V, KParent, VParent>
     implements IComputedMap<K, V> {
   final IComputedMap<KParent, VParent> _parent;
   final MapEntry<K, V> Function(KParent key, VParent value) _convert;
-
-  final _keyComputations = ComputationCache<K, V?>();
-  final _containsKeyComputations = ComputationCache<K, bool>();
 
   final _mappedKeys = <KParent, K>{};
   final _mappedKeysReverse = <K, Map<KParent, V>>{};
@@ -107,13 +103,13 @@ class MapComputedMap<K, V, KParent, VParent>
   @override
   Computed<bool> containsKey(K key) {
     final sub = _pubSub.subKey(key);
-    return _containsKeyComputations.wrap(key, () => sub.use.is_);
+    return $(() => sub.use.is_);
   }
 
   @override
   Computed<V?> operator [](K key) {
     final sub = _pubSub.subKey(key);
-    return _keyComputations.wrap(key, () {
+    return $(() {
       final opt = sub.use;
       return opt.is_ ? opt.value as V : null;
     });
