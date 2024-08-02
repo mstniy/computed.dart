@@ -65,6 +65,7 @@ class _ComputedSubscriptionImpl<T> implements ComputedSubscription<T> {
 
   @override
   void onError(Function? handleError) {
+    _validateOnError(handleError);
     _onError = handleError;
   }
 }
@@ -125,7 +126,8 @@ class GlobalCtx {
             if (rvoe!._voe == null) {
               throw NoValueException();
             }
-            return rvoe._voe!.value;
+            if (rvoe._voe!._isValue) return rvoe._voe!._value as T;
+            Error.throwWithStackTrace(rvoe._voe!._exc!, rvoe._voe!._st!);
           }, true, false, false, null, null),
           currentValue != null
               ? _ValueOrException.value(currentValue())
@@ -219,6 +221,9 @@ class ComputedImpl<T> {
 
     if (_lastResult == null) throw NoValueException();
 
+    // We don't use Error.throwWithStackTrace here - even if we are a router
+    // As this might make it more difficult to pinpoint where exceptions
+    // are actually coming from.
     return _lastResult!.value;
   }
 
@@ -287,7 +292,7 @@ class ComputedImpl<T> {
     _rerunGraph();
   }
 
-  void onDataSourceError(Object err) {
+  void onDataSourceError(Object err, StackTrace st) {
     if (_dss == null) return;
     GlobalCtx._currentUpdate = _Token();
 
@@ -296,7 +301,7 @@ class ComputedImpl<T> {
         GlobalCtx._routerExpando[_dss!._ds] as _RouterValueOrException<T>;
     if (rvoe._voe == null || rvoe._voe!._isValue || rvoe._voe!._exc != err) {
       // Update the global last value cache
-      rvoe._voe = _ValueOrException<T>.exc(err, StackTrace.current);
+      rvoe._voe = _ValueOrException<T>.exc(err, st);
     } else if (_nonMemoizedDownstreamComputations.isEmpty) {
       return;
     }
@@ -379,7 +384,8 @@ class ComputedImpl<T> {
       DataSourceSubscription<DT> Function(ComputedImpl<DT> router) dss,
       DT Function()? currentValue,
       void Function(DT) onData,
-      void Function(Object)? onError) {
+      Function? onError) {
+    _validateOnError(onError);
     final rvoe =
         GlobalCtx._maybeCreateRouterFor<DT>(dataSource, dss, currentValue);
 
@@ -698,7 +704,7 @@ class ComputedImpl<T> {
     }
   }
 
-  void _react(void Function(T) onData, void Function(Object)? onError) {
+  void _react(void Function(T) onData, Function? onError) {
     // Only routers can be .react-ed to
     // As otherwise the meaning of .prev becomes ambiguous
     assert(_dss != null);
@@ -720,7 +726,7 @@ class ComputedImpl<T> {
       if (_lastResult!._isValue) {
         onData(_lastResult!._value as T);
       } else if (onError != null) {
-        onError(_lastResult!._exc!);
+        _dispatchOnError(onError, _lastResult!._exc!, _lastResult!._st!);
       } else {
         // Do not throw the exception here,
         // as this might cause other .react/.use-s to get skipped

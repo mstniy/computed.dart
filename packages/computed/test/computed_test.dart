@@ -232,6 +232,51 @@ void main() {
       sub.cancel();
     });
 
+    test('.react propagates error stack traces', () async {
+      final s = StreamController.broadcast(sync: true);
+      final stream = s.stream;
+      var cnt = 0;
+      Object? e;
+      StackTrace? st;
+      final c = $(() {
+        stream.react((p0) => fail('Must not be called'), (e_, st_) {
+          cnt++;
+          e = e_;
+          st = st_;
+        });
+      });
+      final sub = c.listen(null);
+      await Future.value();
+      await Future.value();
+      expect(cnt, 0);
+      final myST = StackTrace.current;
+      s.addError(1, myST);
+      expect(cnt, 2);
+      expect(e, 1);
+      expect(st, same(myST));
+      sub.cancel();
+    });
+
+    test('.react rejects invalid onError', () async {
+      final s = StreamController.broadcast(sync: true);
+      final stream = s.stream;
+      final c = $(() =>
+          stream.react((p0) => fail('Must not be called'), (a, b, c) => null));
+      var cnt = 0;
+      Object? e;
+      final sub = c.listen((event) => fail('Must not be called'), (e_) {
+        cnt++;
+        e = e_;
+      });
+      await Future.value();
+      expect(cnt, 1);
+      expect(e, isA<ArgumentError>());
+      expect((e as ArgumentError).name, 'onError');
+      expect((e as ArgumentError).message,
+          'onError must accept one Object or one Object and a StackTrace as arguments');
+      sub.cancel();
+    });
+
     test('(regression) can subscribe to constant computations', () async {
       final controller = StreamController<int>.broadcast(
           sync: true); // Use a broadcast stream to make debugging easier
@@ -693,17 +738,25 @@ void main() {
     expect(st.toString(), contains('myTag'));
   });
 
-  test('listen rejects invalid error handlers', () async {
+  test('listen rejects invalid onError', () async {
     final x = $(() => 0);
-    try {
-      x.listen(null, (a, b, c) => null);
+    void checkThrows(void Function() f) {
+      try {
+        f();
+      } catch (e) {
+        expect(e, isA<ArgumentError>());
+        expect((e as ArgumentError).name, 'onError');
+        expect(e.message,
+            'onError must accept one Object or one Object and a StackTrace as arguments');
+        return;
+      }
       fail('Must have throwns');
-    } catch (e) {
-      expect(e, isA<ArgumentError>());
-      expect((e as ArgumentError).name, 'onError');
-      expect(e.message,
-          'onError must accept one Object or one Object and a StackTrace as arguments');
     }
+
+    checkThrows(() => x.listen(null, (a, b, c) => null));
+    final sub = x.listen(null, null);
+    checkThrows(() => sub.onError((a, b, c) => null));
+    sub.cancel();
   });
 
   test('(regression) listeners can cancel themselves', () async {

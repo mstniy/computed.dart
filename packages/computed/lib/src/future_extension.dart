@@ -25,7 +25,11 @@ class FutureComputedExtensionImpl<T> {
 class _FutureDataSourceSubscription<T> implements DataSourceSubscription<T> {
   _FutureDataSourceSubscription(Future<T> f, ComputedImpl<T> router) {
     f.then((value) => router.onDataSourceData(value),
-        onError: (e) => router.onDataSourceError(e));
+        // Note that although we capture the stack trace here,
+        // there is no way for the user to actually access it,
+        // as Future does not support .react
+        // and .use does not preserve the origin stack trace
+        onError: (e, st) => router.onDataSourceError(e, st));
   }
 
   @override

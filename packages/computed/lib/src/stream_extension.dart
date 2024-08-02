@@ -16,7 +16,7 @@ class StreamComputedExtensionImpl<T> {
         s,
         (router) => _StreamDataSourceSubscription(s.listen(
             (data) => router.onDataSourceData(data),
-            onError: (e) => router.onDataSourceError(e))),
+            onError: (e, st) => router.onDataSourceError(e, st))),
         null);
   }
 
@@ -28,13 +28,13 @@ class StreamComputedExtensionImpl<T> {
     }
   }
 
-  void react(void Function(T) onData, [void Function(Object e)? onError]) {
+  void react(void Function(T) onData, [Function? onError]) {
     final caller = GlobalCtx.currentComputation;
     caller.dataSourceReact<T>(
         s,
         (router) => _StreamDataSourceSubscription(s.listen(
             (data) => router.onDataSourceData(data),
-            onError: (e) => router.onDataSourceError(e))),
+            onError: (e, st) => router.onDataSourceError(e, st))),
         null,
         onData,
         onError);
