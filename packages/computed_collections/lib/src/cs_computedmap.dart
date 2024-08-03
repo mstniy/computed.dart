@@ -10,22 +10,22 @@ import 'computedmap_mixins.dart';
 class ChangeStreamComputedMap<K, V>
     with OperatorsMixin<K, V>
     implements IComputedMap<K, V> {
-  late final CSTracker<K, V> _keyPubSub;
+  late final CSTracker<K, V> _tracker;
   ChangeStreamComputedMap(this.changes,
       {IMap<K, V> Function()? initialValueComputer,
       Computed<IMap<K, V>>? snapshotStream}) {
     snapshot =
         snapshotStream ?? snapshotComputation(changes, initialValueComputer);
-    _keyPubSub = CSTracker(changes, snapshot);
+    _tracker = CSTracker(changes, snapshot);
   }
 
-  Computed<V?> operator [](K key) => _keyPubSub[key];
+  Computed<V?> operator [](K key) => _tracker[key];
 
   @override
-  Computed<bool> containsKey(K key) => _keyPubSub.containsKey(key);
+  Computed<bool> containsKey(K key) => _tracker.containsKey(key);
 
   @override
-  Computed<bool> containsValue(V value) => _keyPubSub.containsValue(value);
+  Computed<bool> containsValue(V value) => _tracker.containsValue(value);
 
   @override
   Computed<ChangeEvent<K, V>> changes;
