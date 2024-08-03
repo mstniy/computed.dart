@@ -190,19 +190,10 @@ class GroupByComputedMap<K, V, KParent>
   }
 
   @override
-  Computed<bool> containsKey(K key) {
-    final sub = _tracker.subKey(key);
-    return $(() => sub.use.is_);
-  }
+  Computed<bool> containsKey(K key) => _tracker.containsKey(key);
 
   @override
-  Computed<IComputedMap<KParent, V>?> operator [](K key) {
-    final sub = _tracker.subKey(key);
-    return $(() {
-      final used = sub.use;
-      return used.is_ ? used.value : null;
-    });
-  }
+  Computed<IComputedMap<KParent, V>?> operator [](K key) => _tracker[key];
 
   @override
   Computed<bool> containsValue(IComputedMap<KParent, V> value) =>

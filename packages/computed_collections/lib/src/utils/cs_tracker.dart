@@ -99,32 +99,43 @@ class CSTracker<K, V> {
     }
   }
 
-  Computed<Option<V>> subKey(K key) {
+  ValueStream<Option<V>> _maybeInitKeyStream(K key) {
     void onCancel_() {
       final removed = _keyStreams.remove(key);
       assert(removed != null);
       _maybeCancelSubs();
     }
 
-    return Computed.async(() {
-      final leaderStream = _keyStreams.putIfAbsent(key, () {
-        _maybeCreateSubs();
-        // This key gained its first listener - get its value from the snapshot, if there is one
-        final s = ValueStream<Option<V>>(onCancel: onCancel_);
-        if (_snapshot != null) {
-          if (_snapshot!.isValue) {
-            if (_snapshot!.value_!.containsKey(key)) {
-              s.add(Option.some(_snapshot!.value_![key] as V));
-            } else {
-              s.add(Option.none());
-            }
+    return _keyStreams.putIfAbsent(key, () {
+      _maybeCreateSubs();
+      // This key gained its first listener - get its value from the snapshot, if there is one
+      final s = ValueStream<Option<V>>(onCancel: onCancel_);
+      if (_snapshot != null) {
+        if (_snapshot!.isValue) {
+          if (_snapshot!.value_!.containsKey(key)) {
+            s.add(Option.some(_snapshot!.value_![key] as V));
           } else {
-            s.addError(_snapshot!.exc_!);
+            s.add(Option.none());
           }
+        } else {
+          s.addError(_snapshot!.exc_!);
         }
-        return s;
-      });
-      return leaderStream.use;
+      }
+      return s;
+    });
+  }
+
+  Computed<bool> containsKey(K key) {
+    return Computed.async(() {
+      final leaderStream = _maybeInitKeyStream(key);
+      return leaderStream.use.is_;
+    });
+  }
+
+  Computed<V?> operator [](K key) {
+    return Computed.async(() {
+      final leaderStream = _maybeInitKeyStream(key);
+      return leaderStream.use.value;
     });
   }
 

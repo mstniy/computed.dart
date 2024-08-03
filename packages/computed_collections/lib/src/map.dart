@@ -101,19 +101,10 @@ class MapComputedMap<K, V, KParent, VParent>
   }
 
   @override
-  Computed<bool> containsKey(K key) {
-    final sub = _tracker.subKey(key);
-    return $(() => sub.use.is_);
-  }
+  Computed<bool> containsKey(K key) => _tracker.containsKey(key);
 
   @override
-  Computed<V?> operator [](K key) {
-    final sub = _tracker.subKey(key);
-    return $(() {
-      final opt = sub.use;
-      return opt.is_ ? opt.value as V : null;
-    });
-  }
+  Computed<V?> operator [](K key) => _tracker[key];
 
   @override
   Computed<bool> containsValue(V value) => _tracker.containsValue(value);

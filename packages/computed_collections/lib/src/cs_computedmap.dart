@@ -19,23 +19,10 @@ class ChangeStreamComputedMap<K, V>
     _keyPubSub = CSTracker(changes, snapshot);
   }
 
-  Computed<V?> operator [](K key) {
-    final keySub = _keyPubSub.subKey(key);
-    return $(() {
-      final keyOption = keySub.use;
-      if (keyOption.is_) return keyOption.value;
-      return null;
-    });
-  }
+  Computed<V?> operator [](K key) => _keyPubSub[key];
 
   @override
-  Computed<bool> containsKey(K key) {
-    final keySub = _keyPubSub.subKey(key);
-    return $(() {
-      final keyOption = keySub.use;
-      return keyOption.is_;
-    });
-  }
+  Computed<bool> containsKey(K key) => _keyPubSub.containsKey(key);
 
   @override
   Computed<bool> containsValue(V value) => _keyPubSub.containsValue(value);

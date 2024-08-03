@@ -40,22 +40,13 @@ class SnapshotStreamComputedMap<K, V>
   }
 
   @override
-  Computed<V?> operator [](K key) {
-    final sub = _tracker.subKey(key);
-    return $(() {
-      final used = sub.use;
-      return used.is_ ? used.value : null;
-    });
-  }
+  Computed<V?> operator [](K key) => _tracker[key];
 
   @override
   late final Computed<ChangeEvent<K, V>> changes;
 
   @override
-  Computed<bool> containsKey(K key) {
-    final sub = _tracker.subKey(key);
-    return $(() => sub.use.is_);
-  }
+  Computed<bool> containsKey(K key) => _tracker.containsKey(key);
 
   @override
   Computed<bool> containsValue(V value) => _tracker.containsValue(value);
