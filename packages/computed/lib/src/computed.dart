@@ -574,11 +574,18 @@ class ComputedImpl<T> {
           if (!down._computing) down._dirty = true;
         }
         if (shouldNotify) {
-          for (var down in [
-            ..._memoizedDownstreamComputations,
-            ..._weakDownstreamComputations
-          ]) {
+          for (var down in _memoizedDownstreamComputations) {
             if (!down._computing) down._dirty = true;
+          }
+          // As a special case, if we are gaining value, do not consider
+          // weak downstream "dirty". The reasoning is that they
+          // likely have done an alternative, lighter-weight computation
+          // already, which is still valid, unless some other computation
+          // they depend on changes meaningfully.
+          if (_prevResult != null) {
+            for (var down in _weakDownstreamComputations) {
+              if (!down._computing) down._dirty = true;
+            }
           }
         }
       }

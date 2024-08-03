@@ -1531,6 +1531,32 @@ void main() {
       sub1.cancel();
       sub2.cancel();
     });
+
+    test('does not recompute the user if upstream gains listeners/value',
+        () async {
+      final s = ValueStream<int>.seeded(1, sync: true);
+      final c1 = $(() => s.use);
+      var cnt = 0;
+      final c2 = $(() {
+        cnt++;
+        try {
+          return c1.useWeak;
+        } on NoStrongUserException {
+          return 42;
+        }
+      });
+      final sub1 = c2.listen(null);
+      expect(cnt, 2);
+      final sub2 = c1.listen(null);
+      await Future.value();
+      await Future.value();
+      expect(cnt, 2);
+      s.add(0);
+      expect(cnt, 4);
+
+      sub1.cancel();
+      sub2.cancel();
+    });
   });
 
   group('react', () {
