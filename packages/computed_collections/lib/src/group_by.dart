@@ -8,7 +8,7 @@ import '../change_event.dart';
 import '../icomputedmap.dart';
 import 'computedmap_mixins.dart';
 import 'cs_computedmap.dart';
-import 'utils/pubsub.dart';
+import 'utils/cs_tracker.dart';
 import 'utils/snapshot_computation.dart';
 import 'utils/group_by.dart';
 
@@ -18,7 +18,7 @@ class GroupByComputedMap<K, V, KParent>
   final IComputedMap<KParent, V> _parent;
   final K Function(KParent key, V value) _convert;
 
-  late final PubSub<K, IComputedMap<KParent, V>> _pubSub;
+  late final CSTracker<K, IComputedMap<KParent, V>> _tracker;
 
   var _mappedKeys = <KParent, K>{};
   var _m = <K,
@@ -181,7 +181,7 @@ class GroupByComputedMap<K, V, KParent>
       return _setM(s);
     });
 
-    _pubSub = PubSub(changes, snapshot);
+    _tracker = CSTracker(changes, snapshot);
   }
 
   void _onCancel() {
@@ -191,13 +191,13 @@ class GroupByComputedMap<K, V, KParent>
 
   @override
   Computed<bool> containsKey(K key) {
-    final sub = _pubSub.subKey(key);
+    final sub = _tracker.subKey(key);
     return $(() => sub.use.is_);
   }
 
   @override
   Computed<IComputedMap<KParent, V>?> operator [](K key) {
-    final sub = _pubSub.subKey(key);
+    final sub = _tracker.subKey(key);
     return $(() {
       final used = sub.use;
       return used.is_ ? used.value : null;
@@ -206,7 +206,7 @@ class GroupByComputedMap<K, V, KParent>
 
   @override
   Computed<bool> containsValue(IComputedMap<KParent, V> value) =>
-      _pubSub.containsValue(value);
+      _tracker.containsValue(value);
 
   @override
   late final Computed<IMap<K, IComputedMap<KParent, V>>> snapshot;

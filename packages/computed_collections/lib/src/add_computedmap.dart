@@ -4,7 +4,7 @@ import 'package:computed_collections/icomputedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import 'computedmap_mixins.dart';
-import 'utils/pubsub.dart';
+import 'utils/cs_tracker.dart';
 
 class AddComputedMap<K, V>
     with OperatorsMixin<K, V>
@@ -12,7 +12,7 @@ class AddComputedMap<K, V>
   K _key;
   V _value;
   final IComputedMap<K, V> _parent;
-  late final PubSub<K, V> _pubSub;
+  late final CSTracker<K, V> _tracker;
   AddComputedMap(this._parent, this._key, this._value) {
     final parentContainsKey = _parent.containsKey(_key);
     length = $(() => _parent.length.use + (parentContainsKey.use ? 0 : 1));
@@ -34,7 +34,7 @@ class AddComputedMap<K, V>
           return KeyChanges(IMap.fromEntries(changes));
       }
     });
-    _pubSub = PubSub(changes, snapshot);
+    _tracker = CSTracker(changes, snapshot);
   }
 
   Computed<V?> operator [](K key) {
@@ -61,7 +61,7 @@ class AddComputedMap<K, V>
   Computed<bool> containsValue(V value) {
     if (value == _value) return $(() => true);
     // Cannot just return _parent.containsValue(value) here - we might overwrite it
-    return _pubSub.containsValue(value);
+    return _tracker.containsValue(value);
   }
 
   late final Computed<ChangeEvent<K, V>> changes;

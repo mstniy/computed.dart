@@ -6,7 +6,7 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import '../../change_event.dart';
 
-class PubSub<K, V> {
+class CSTracker<K, V> {
   ValueOrException<IMap<K, V>>? _snapshot;
   final Computed<ChangeEvent<K, V>> _changeStream;
   late final Computed<IMap<K, V>> _snapshotStream;
@@ -16,7 +16,7 @@ class PubSub<K, V> {
   final _keyStreams = <K, ValueStream<Option<V>>>{};
   final _valueStreams = <V, ValueStream<bool>>{};
 
-  PubSub(this._changeStream, this._snapshotStream);
+  CSTracker(this._changeStream, this._snapshotStream);
 
   void _pubAll(IMap<K, V> m) {
     _snapshot = ValueOrException.value(m);

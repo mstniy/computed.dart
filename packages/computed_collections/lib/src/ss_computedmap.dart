@@ -1,6 +1,6 @@
 import 'package:computed/computed.dart';
 import 'package:computed_collections/change_event.dart';
-import 'package:computed_collections/src/utils/pubsub.dart';
+import 'package:computed_collections/src/utils/cs_tracker.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import '../icomputedmap.dart';
@@ -10,7 +10,7 @@ class SnapshotStreamComputedMap<K, V>
     with OperatorsMixin<K, V>
     implements IComputedMap<K, V> {
   Computed<IMap<K, V>> _snapshotStream;
-  late final PubSub<K, V> _pubSub;
+  late final CSTracker<K, V> _tracker;
   SnapshotStreamComputedMap(this._snapshotStream) {
     final snapshotPrev = $(() {
       _snapshotStream.use;
@@ -36,12 +36,12 @@ class SnapshotStreamComputedMap<K, V>
                   : ChangeRecordDelete<V>())));
       return KeyChanges(changes);
     });
-    _pubSub = PubSub(changes, _snapshotStream);
+    _tracker = CSTracker(changes, _snapshotStream);
   }
 
   @override
   Computed<V?> operator [](K key) {
-    final sub = _pubSub.subKey(key);
+    final sub = _tracker.subKey(key);
     return $(() {
       final used = sub.use;
       return used.is_ ? used.value : null;
@@ -53,12 +53,12 @@ class SnapshotStreamComputedMap<K, V>
 
   @override
   Computed<bool> containsKey(K key) {
-    final sub = _pubSub.subKey(key);
+    final sub = _tracker.subKey(key);
     return $(() => sub.use.is_);
   }
 
   @override
-  Computed<bool> containsValue(V value) => _pubSub.containsValue(value);
+  Computed<bool> containsValue(V value) => _tracker.containsValue(value);
 
   @override
   Computed<bool> get isEmpty => $(() => _snapshotStream.use.isEmpty);

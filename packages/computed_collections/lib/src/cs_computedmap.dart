@@ -1,7 +1,7 @@
 import 'package:computed/computed.dart';
 import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/icomputedmap.dart';
-import 'package:computed_collections/src/utils/pubsub.dart';
+import 'package:computed_collections/src/utils/cs_tracker.dart';
 import 'package:computed_collections/src/utils/snapshot_computation.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
@@ -10,13 +10,13 @@ import 'computedmap_mixins.dart';
 class ChangeStreamComputedMap<K, V>
     with OperatorsMixin<K, V>
     implements IComputedMap<K, V> {
-  late final PubSub<K, V> _keyPubSub;
+  late final CSTracker<K, V> _keyPubSub;
   ChangeStreamComputedMap(this.changes,
       {IMap<K, V> Function()? initialValueComputer,
       Computed<IMap<K, V>>? snapshotStream}) {
     snapshot =
         snapshotStream ?? snapshotComputation(changes, initialValueComputer);
-    _keyPubSub = PubSub(changes, snapshot);
+    _keyPubSub = CSTracker(changes, snapshot);
   }
 
   Computed<V?> operator [](K key) {

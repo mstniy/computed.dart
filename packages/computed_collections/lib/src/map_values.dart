@@ -2,7 +2,7 @@ import 'package:computed/computed.dart';
 import 'package:computed/utils/computation_cache.dart';
 import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/icomputedmap.dart';
-import 'package:computed_collections/src/utils/pubsub.dart';
+import 'package:computed_collections/src/utils/cs_tracker.dart';
 import 'package:computed_collections/src/utils/snapshot_computation.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
@@ -16,7 +16,7 @@ class MapValuesComputedMap<K, V, VParent>
 
   final _keyComputations = ComputationCache<K, V?>();
 
-  late final PubSub<K, V> _pubSub;
+  late final CSTracker<K, V> _tracker;
 
   MapValuesComputedMap(this._parent, this._convert) {
     changes = Computed(() {
@@ -42,7 +42,7 @@ class MapValuesComputedMap<K, V, VParent>
         () => _parent.snapshot.use
             .map(((key, value) => MapEntry(key, _convert(key, value)))));
 
-    _pubSub = PubSub(changes, snapshot);
+    _tracker = CSTracker(changes, snapshot);
   }
 
   @override
@@ -68,7 +68,7 @@ class MapValuesComputedMap<K, V, VParent>
   }
 
   @override
-  Computed<bool> containsValue(V value) => _pubSub.containsValue(value);
+  Computed<bool> containsValue(V value) => _tracker.containsValue(value);
 
   @override
   late final Computed<ChangeEvent<K, V>> changes;

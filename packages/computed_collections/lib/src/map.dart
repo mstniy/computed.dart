@@ -1,5 +1,5 @@
 import 'package:computed/computed.dart';
-import 'package:computed_collections/src/utils/pubsub.dart';
+import 'package:computed_collections/src/utils/cs_tracker.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import '../change_event.dart';
@@ -16,7 +16,7 @@ class MapComputedMap<K, V, KParent, VParent>
   final _mappedKeys = <KParent, K>{};
   final _mappedKeysReverse = <K, Map<KParent, V>>{};
 
-  late final PubSub<K, V> _pubSub;
+  late final CSTracker<K, V> _tracker;
 
   IMap<K, V> _setUpstream(IMap<KParent, VParent> up) {
     _mappedKeys.clear();
@@ -92,7 +92,7 @@ class MapComputedMap<K, V, KParent, VParent>
     snapshot =
         snapshotComputation(changes, () => _setUpstream(_parent.snapshot.use));
 
-    _pubSub = PubSub<K, V>(changes, snapshot);
+    _tracker = CSTracker<K, V>(changes, snapshot);
   }
 
   void _onCancel() {
@@ -102,13 +102,13 @@ class MapComputedMap<K, V, KParent, VParent>
 
   @override
   Computed<bool> containsKey(K key) {
-    final sub = _pubSub.subKey(key);
+    final sub = _tracker.subKey(key);
     return $(() => sub.use.is_);
   }
 
   @override
   Computed<V?> operator [](K key) {
-    final sub = _pubSub.subKey(key);
+    final sub = _tracker.subKey(key);
     return $(() {
       final opt = sub.use;
       return opt.is_ ? opt.value as V : null;
@@ -116,7 +116,7 @@ class MapComputedMap<K, V, KParent, VParent>
   }
 
   @override
-  Computed<bool> containsValue(V value) => _pubSub.containsValue(value);
+  Computed<bool> containsValue(V value) => _tracker.containsValue(value);
 
   @override
   late final Computed<IMap<K, V>> snapshot;

@@ -8,7 +8,7 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import 'computedmap_mixins.dart';
 import 'utils/option.dart';
-import 'utils/pubsub.dart';
+import 'utils/cs_tracker.dart';
 
 class MapValuesComputedComputedMap<K, V, VParent>
     with OperatorsMixin<K, V>
@@ -18,7 +18,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
 
   final _keyOptionComputations = ComputationCache<K, Option<V>>();
 
-  late final PubSub<K, V> _pubSub;
+  late final CSTracker<K, V> _tracker;
 
   MapValuesComputedComputedMap(this._parent, this._convert) {
     final _computedChanges = Computed(() {
@@ -113,7 +113,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
       return unwrapped;
     });
 
-    _pubSub = PubSub(changes, snapshot);
+    _tracker = CSTracker(changes, snapshot);
   }
 
   Computed<Option<V>> _getKeyOptionComputation(K key) {
@@ -174,7 +174,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
   }
 
   @override
-  Computed<bool> containsValue(V value) => _pubSub.containsValue(value);
+  Computed<bool> containsValue(V value) => _tracker.containsValue(value);
 
   @override
   late final Computed<ChangeEvent<K, V>> changes;
