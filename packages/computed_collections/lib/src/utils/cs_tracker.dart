@@ -19,10 +19,26 @@ class CSTracker<K, V> {
   CSTracker(this._changeStream, this._snapshotStream);
 
   void _pubAll(IMap<K, V> m) {
+    final oldSnapshot = _snapshot;
     _snapshot = ValueOrException.value(m);
-    for (var e in _keyStreams.entries) {
-      e.value.add(
-          m.containsKey(e.key) ? Option.some(m[e.key] as V) : Option.none());
+    // If we are changing from one well-behaved snapshot to another,
+    // iterate over either the set of streams or the set of keys
+    // in both the old and the new snapshots, whichever is smaller.
+    if (!(oldSnapshot?.isValue ?? false) ||
+        _keyStreams.length <= oldSnapshot!.value.length + m.length) {
+      for (var e in _keyStreams.entries) {
+        e.value.add(
+            m.containsKey(e.key) ? Option.some(m[e.key] as V) : Option.none());
+      }
+    } else {
+      for (var key in oldSnapshot.value.keys) {
+        if (!m.containsKey(key)) {
+          _keyStreams[key]?.add(Option.none());
+        }
+      }
+      for (var e in m.entries) {
+        _keyStreams[e.key]?.add(Option.some(e.value));
+      }
     }
     for (var e in _valueStreams.entries) {
       e.value.add(m.containsValue(e.key));
