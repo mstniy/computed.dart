@@ -24,7 +24,7 @@ class KeyChanges<K, V> extends ChangeEvent<K, V> {
   int get hashCode => changes.hashCode;
 
   @override
-  String toString() => changes.toString();
+  String toString() => 'KeyChanges(${changes.toString()})';
 }
 
 @immutable
@@ -40,7 +40,7 @@ class ChangeRecordValue<V> extends ChangeRecord<V> {
   int get hashCode => value.hashCode;
 
   @override
-  String toString() => value.toString();
+  String toString() => 'ChangeRecordValue(${value.toString()})';
 }
 
 @immutable
@@ -66,7 +66,7 @@ class ChangeEventReplace<K, V> extends ChangeEvent<K, V> {
   int get hashCode => newCollection.hashCode;
 
   @override
-  String toString() => newCollection.toString();
+  String toString() => 'ChangeEventReplace(${newCollection.toString()})';
 }
 
 extension ChangeEventApplication<K, V> on IMap<K, V> {
