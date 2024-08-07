@@ -6,6 +6,7 @@ import 'package:computed_collections/src/utils/snapshot_computation.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import 'computedmap_mixins.dart';
+import 'expandos.dart';
 
 class ChangeStreamComputedMap<K, V>
     with OperatorsMixin<K, V>
@@ -31,13 +32,16 @@ class ChangeStreamComputedMap<K, V>
   Computed<ChangeEvent<K, V>> changes;
 
   @override
-  Computed<bool> get isEmpty => $(() => snapshot.use.isEmpty);
+  Computed<bool> get isEmpty =>
+      isEmptyExpando[this] ??= $(() => snapshot.use.isEmpty);
 
   @override
-  Computed<bool> get isNotEmpty => $(() => snapshot.use.isNotEmpty);
+  Computed<bool> get isNotEmpty =>
+      isNotEmptyExpando[this] ??= $(() => snapshot.use.isNotEmpty);
 
   @override
-  Computed<int> get length => $(() => snapshot.use.length);
+  Computed<int> get length =>
+      lengthExpando[this] ??= $(() => snapshot.use.length);
 
   @override
   late final Computed<IMap<K, V>> snapshot;

@@ -7,6 +7,7 @@ import 'package:computed_collections/src/utils/snapshot_computation.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import 'computedmap_mixins.dart';
+import 'expandos.dart';
 import 'utils/option.dart';
 import 'utils/cs_tracker.dart';
 
@@ -185,12 +186,15 @@ class MapValuesComputedComputedMap<K, V, VParent>
   // TODO: We can be slightly smarter about this by not evaluating any computation as soon as
   //  one of them gains a value. PubSub can likely do that
   @override
-  Computed<bool> get isEmpty => $(() => snapshot.use.isEmpty);
+  Computed<bool> get isEmpty =>
+      isEmptyExpando[this] ??= $(() => snapshot.use.isEmpty);
   @override
-  Computed<bool> get isNotEmpty => $(() => snapshot.use.isNotEmpty);
+  Computed<bool> get isNotEmpty =>
+      isNotEmptyExpando[this] ??= $(() => snapshot.use.isNotEmpty);
   // To know the length of the collection we do indeed need to compute the values for all the keys
   // as just because a key exists on the parent does not mean it also exists in us
   // because the corresponding computation might not have a value yet
   @override
-  Computed<int> get length => $(() => snapshot.use.length);
+  Computed<int> get length =>
+      lengthExpando[this] ??= $(() => snapshot.use.length);
 }

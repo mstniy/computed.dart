@@ -1,4 +1,5 @@
 import 'package:computed/computed.dart';
+import 'package:computed_collections/src/expandos.dart';
 import 'package:computed_collections/src/utils/cs_tracker.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
@@ -13,14 +14,14 @@ class MapComputedComputedMap<K, V, KParent, VParent>
     with OperatorsMixin<K, V>
     implements IComputedMap<K, V> {
   final IComputedMap<KParent, VParent> _parent;
-  final Computed<(K, V)> Function(KParent key, VParent value) _convert;
+  final Computed<Entry<K, V>> Function(KParent key, VParent value) _convert;
 
   late final MergingChangeStream<K, V> _changes;
 
   late final CSTracker<K, V> _tracker;
 
   final _mappedKeysSubs =
-      <KParent, (Option<K>, ComputedSubscription<(K, V)>)>{};
+      <KParent, (Option<K>, ComputedSubscription<Entry<K, V>>)>{};
   final _mappedKeysReverse = <K, Map<KParent, V>>{};
 
   void _onConvertEntry(KParent parentKey, V value, K key) {
@@ -75,7 +76,7 @@ class MapComputedComputedMap<K, V, KParent, VParent>
       _mappedKeysSubs[e.key] = (
         Option.none(),
         res.listen(
-            (ce) => _onConvertEntry(e.key, ce.$2, ce.$1), _changes.addError)
+            (ce) => _onConvertEntry(e.key, ce.value, ce.key), _changes.addError)
       );
     }
   }
@@ -96,7 +97,7 @@ class MapComputedComputedMap<K, V, KParent, VParent>
               case ChangeRecordValue<VParent>(value: final value):
                 final converted = _convert(e.key, value);
                 final sub = converted.listen(
-                    (event) => _onConvertEntry(e.key, event.$2, event.$1),
+                    (event) => _onConvertEntry(e.key, event.value, event.key),
                     _changes.addError);
                 late final Option<K> oldKeyMaybe;
                 _mappedKeysSubs.update(e.key, (ks) {
@@ -198,10 +199,14 @@ class MapComputedComputedMap<K, V, KParent, VParent>
   late final Computed<ChangeEvent<K, V>> changes;
 
   @override
-  Computed<bool> get isEmpty => $(() => snapshot.use.isEmpty);
-  @override
-  Computed<bool> get isNotEmpty => $(() => snapshot.use.isNotEmpty);
+  Computed<bool> get isEmpty =>
+      isEmptyExpando[this] ??= $(() => snapshot.use.isEmpty);
 
   @override
-  Computed<int> get length => $(() => snapshot.use.length);
+  Computed<bool> get isNotEmpty =>
+      isNotEmptyExpando[this] ??= $(() => snapshot.use.isNotEmpty);
+
+  @override
+  Computed<int> get length =>
+      lengthExpando[this] ??= $(() => snapshot.use.length);
 }

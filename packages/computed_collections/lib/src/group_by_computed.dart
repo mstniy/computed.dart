@@ -6,6 +6,7 @@ import '../change_event.dart';
 import '../icomputedmap.dart';
 import 'computedmap_mixins.dart';
 import 'cs_computedmap.dart';
+import 'expandos.dart';
 import 'utils/option.dart';
 import 'utils/cs_tracker.dart';
 import 'utils/snapshot_computation.dart';
@@ -240,10 +241,13 @@ class GroupByComputedComputedMap<K, V, KParent>
   late final Computed<ChangeEvent<K, IComputedMap<KParent, V>>> changes;
 
   @override
-  Computed<bool> get isEmpty => $(() => snapshot.use.isEmpty);
+  Computed<bool> get isEmpty =>
+      isEmptyExpando[this] ??= $(() => snapshot.use.isEmpty);
   @override
-  Computed<bool> get isNotEmpty => $(() => snapshot.use.isNotEmpty);
+  Computed<bool> get isNotEmpty =>
+      isNotEmptyExpando[this] ??= $(() => snapshot.use.isNotEmpty);
 
   @override
-  Computed<int> get length => $(() => snapshot.use.length);
+  Computed<int> get length =>
+      lengthExpando[this] ??= $(() => snapshot.use.length);
 }

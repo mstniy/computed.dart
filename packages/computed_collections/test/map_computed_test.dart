@@ -14,7 +14,7 @@ void main() {
     late (int, int) kv1, kv2;
     final m2 = m1.mapComputed((k, v) {
       expect((k, v), kv1);
-      return $(() => kv2);
+      return $(() => Entry(kv2.$1, kv2.$2));
     });
     IMap<int, int>? lastRes;
     final sub = m2.snapshot.listen((event) {
@@ -68,7 +68,7 @@ void main() {
     final m1 = IComputedMap({0: 1, 1: 2, 2: 3, 3: 4}.lock);
 
     final m2 = m1.mapComputed((k, v) {
-      return $(() => (k % 3, v));
+      return $(() => Entry(k % 3, v));
     });
 
     await testCoherenceInt(m2, {1: 2, 2: 3, 0: 4}.lock);

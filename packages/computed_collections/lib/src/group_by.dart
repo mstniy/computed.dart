@@ -11,6 +11,7 @@ import 'cs_computedmap.dart';
 import 'utils/cs_tracker.dart';
 import 'utils/snapshot_computation.dart';
 import 'utils/group_by.dart';
+import 'expandos.dart';
 
 class GroupByComputedMap<K, V, KParent>
     with OperatorsMixin<K, IComputedMap<KParent, V>>
@@ -211,5 +212,6 @@ class GroupByComputedMap<K, V, KParent>
   Computed<bool> get isNotEmpty => _parent.isNotEmpty;
 
   @override
-  Computed<int> get length => $(() => snapshot.use.length);
+  Computed<int> get length =>
+      lengthExpando[this] ??= $(() => snapshot.use.length);
 }

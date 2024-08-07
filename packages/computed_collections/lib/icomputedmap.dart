@@ -39,7 +39,7 @@ abstract class IComputedMap<K, V> {
   Computed<bool> containsValue(
       V value); // Not that the computed variant is trivial
   IComputedMap<K2, V2> mapComputed<K2, V2>(
-      Computed<(K2, V2)> Function(K key, V value) convert);
+      Computed<Entry<K2, V2>> Function(K key, V value) convert);
   IComputedMap<K2, V2> map<K2, V2>(
       MapEntry<K2, V2> Function(K key, V value) convert);
   IComputedMap<K, V2> mapValuesComputed<V2>(

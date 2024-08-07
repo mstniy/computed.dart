@@ -1,4 +1,5 @@
 import 'package:computed/computed.dart';
+import 'package:computed_collections/src/expandos.dart';
 import 'package:computed_collections/src/utils/cs_tracker.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
@@ -121,5 +122,6 @@ class MapComputedMap<K, V, KParent, VParent>
   Computed<bool> get isNotEmpty => _parent.isNotEmpty;
 
   @override
-  Computed<int> get length => $(() => snapshot.use.length);
+  Computed<int> get length =>
+      lengthExpando[this] ??= $(() => snapshot.use.length);
 }

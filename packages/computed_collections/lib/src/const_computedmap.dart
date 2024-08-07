@@ -4,6 +4,7 @@ import 'package:computed_collections/icomputedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import 'computedmap_mixins.dart';
+import 'expandos.dart';
 
 class ConstComputedMap<K, V>
     with OperatorsMixin<K, V>
@@ -18,13 +19,16 @@ class ConstComputedMap<K, V>
   @override
   Computed<bool> containsValue(V value) => $(() => m.containsValue(value));
   @override
-  Computed<ChangeEvent<K, V>> get changes => $(() => throw NoValueException());
+  Computed<ChangeEvent<K, V>> get changes => (changesExpando[this] ??=
+      $(() => throw NoValueException())) as Computed<ChangeEvent<K, V>>;
   @override
-  Computed<IMap<K, V>> get snapshot => $(() => m);
+  Computed<IMap<K, V>> get snapshot =>
+      (snapshotExpando[this] ??= $(() => m)) as Computed<IMap<K, V>>;
   @override
-  Computed<bool> get isEmpty => $(() => m.isEmpty);
+  Computed<bool> get isEmpty => isEmptyExpando[this] ??= $(() => m.isEmpty);
   @override
-  Computed<bool> get isNotEmpty => $(() => m.isNotEmpty);
+  Computed<bool> get isNotEmpty =>
+      isNotEmptyExpando[this] ??= $(() => m.isNotEmpty);
   @override
-  Computed<int> get length => $(() => m.length);
+  Computed<int> get length => lengthExpando[this] ??= $(() => m.length);
 }

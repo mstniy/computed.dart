@@ -5,6 +5,7 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import '../icomputedmap.dart';
 import 'computedmap_mixins.dart';
+import 'expandos.dart';
 
 class SnapshotStreamComputedMap<K, V>
     with OperatorsMixin<K, V>
@@ -52,14 +53,17 @@ class SnapshotStreamComputedMap<K, V>
   Computed<bool> containsValue(V value) => _tracker.containsValue(value);
 
   @override
-  Computed<bool> get isEmpty => $(() => _snapshotStream.use.isEmpty);
+  Computed<bool> get isEmpty =>
+      isEmptyExpando[this] ??= $(() => _snapshotStream.use.isEmpty);
 
   @override
-  Computed<bool> get isNotEmpty => $(() => _snapshotStream.use.isNotEmpty);
+  Computed<bool> get isNotEmpty =>
+      isNotEmptyExpando[this] ??= $(() => _snapshotStream.use.isNotEmpty);
 
   @override
-  Computed<int> get length => $(() => _snapshotStream.use.length);
+  Computed<int> get length =>
+      lengthExpando[this] ??= $(() => _snapshotStream.use.length);
 
   @override
-  Computed<IMap<K, V>> get snapshot => $(() => _snapshotStream.use);
+  Computed<IMap<K, V>> get snapshot => _snapshotStream;
 }

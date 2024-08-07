@@ -34,7 +34,7 @@ mixin OperatorsMixin<K, V> {
       MapComputedMap(this as IComputedMap<K, V>, convert);
 
   IComputedMap<K2, V2> mapComputed<K2, V2>(
-          Computed<(K2, V2)> Function(K key, V value) convert) =>
+          Computed<Entry<K2, V2>> Function(K key, V value) convert) =>
       MapComputedComputedMap(this as IComputedMap<K, V>, convert);
 
   IComputedMap<K, V2> mapValues<V2>(V2 Function(K key, V value) convert) =>
