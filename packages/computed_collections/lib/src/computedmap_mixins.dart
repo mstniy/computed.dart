@@ -2,6 +2,7 @@ import 'package:computed/computed.dart';
 import 'package:computed_collections/src/group_by.dart';
 import 'package:computed_collections/src/group_by_computed.dart';
 import 'package:computed_collections/src/map.dart';
+import 'package:computed_collections/src/map_computed.dart';
 import 'package:computed_collections/src/map_values.dart';
 import 'package:computed_collections/src/map_values_computed.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
@@ -33,10 +34,8 @@ mixin OperatorsMixin<K, V> {
       MapComputedMap(this as IComputedMap<K, V>, convert);
 
   IComputedMap<K2, V2> mapComputed<K2, V2>(
-      Computed<MapEntry<K2, V2>> Function(K key, V value) convert) {
-    // TODO: implement mapComputed
-    throw UnimplementedError();
-  }
+          Computed<(K2, V2)> Function(K key, V value) convert) =>
+      MapComputedComputedMap(this as IComputedMap<K, V>, convert);
 
   IComputedMap<K, V2> mapValues<V2>(V2 Function(K key, V value) convert) =>
       MapValuesComputedMap(this as IComputedMap<K, V>, convert);
