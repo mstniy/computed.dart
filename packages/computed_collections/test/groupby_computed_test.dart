@@ -448,11 +448,11 @@ void main() {
     final m1 = IComputedMap.fromChangeStream($(() => s1stream.use));
     final m2 = m1.groupByComputed((k, v) => cs[v]);
     IMap<int, IComputedMap<int, int>>? lastRes1;
-    var sub1 = m2.snapshot.listen((event) {
+    final sub1 = m2.snapshot.listen((event) {
       lastRes1 = event;
     }, null);
     IMap<int, int>? lastRes2;
-    var sub2 = $(() => m2.snapshot.use[42]?.snapshot.use).listen((event) {
+    final sub2 = $(() => m2.snapshot.use[42]?.snapshot.use).listen((event) {
       lastRes2 = event;
     }, null);
 

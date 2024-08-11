@@ -40,7 +40,8 @@ class MapComputedComputedMap<K, V, KParent, VParent>
       return {parentKey: value};
     });
     if (oldValue != value) {
-      _changes.add(KeyChanges({key: ChangeRecordValue(value)}.lock));
+      _changes.add(
+          KeyChanges(<K, ChangeRecord<V>>{key: ChangeRecordValue(value)}.lock));
     }
 
     if (maybeOldKey.is_ && maybeOldKey.value != key) {
@@ -48,17 +49,19 @@ class MapComputedComputedMap<K, V, KParent, VParent>
       late final V oldKeyOldValue;
       final oldKeyNewEntires = _mappedKeysReverse.update(oldKey, (entries) {
         oldKeyOldValue = entries.values.last;
-        entries.remove(oldKey);
+        entries.remove(parentKey);
         return entries;
       });
       if (oldKeyNewEntires.isEmpty) {
         _mappedKeysReverse.remove(oldKey);
-        _changes.add(KeyChanges({oldKey: ChangeRecordDelete<V>()}.lock));
+        _changes.add(KeyChanges(
+            <K, ChangeRecord<V>>{oldKey: ChangeRecordDelete<V>()}.lock));
       } else {
         final oldKeyNewValue = oldKeyNewEntires.values.last;
         if (oldKeyOldValue != oldKeyNewValue) {
-          _changes.add(
-              KeyChanges({oldKey: ChangeRecordValue(oldKeyNewValue)}.lock));
+          _changes.add(KeyChanges(<K, ChangeRecord<V>>{
+            oldKey: ChangeRecordValue(oldKeyNewValue)
+          }.lock));
         }
       }
     }
@@ -131,7 +134,7 @@ class MapComputedComputedMap<K, V, KParent, VParent>
                   // Duplicate deletion from upstream
                   continue;
                 }
-                final mks = _mappedKeysSubs[e.key]!;
+                final mks = _mappedKeysSubs.remove(e.key)!;
                 mks.$2.cancel();
                 if (mks.$1.is_) {
                   final oldKey = mks.$1.value as K;
