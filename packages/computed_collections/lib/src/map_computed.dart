@@ -30,25 +30,25 @@ class MapComputedComputedMap<K, V, KParent, VParent>
       maybeOldKey = mks.$1;
       return (Option.some(key), mks.$2);
     });
-    late final Option<V> oldValue;
+    late final bool keyValueChanged;
     _mappedKeysReverse.update(key, (entries) {
-      oldValue = Option.some(entries.values.last);
+      keyValueChanged = parentKey == entries.keys.first;
       entries[parentKey] = value;
       return entries;
     }, ifAbsent: () {
-      oldValue = Option.none();
+      keyValueChanged = true;
       return {parentKey: value};
     });
-    if (oldValue != value) {
+    if (keyValueChanged) {
       _changes.add(
           KeyChanges(<K, ChangeRecord<V>>{key: ChangeRecordValue(value)}.lock));
     }
 
     if (maybeOldKey.is_ && maybeOldKey.value != key) {
       final oldKey = maybeOldKey.value as K;
-      late final V oldKeyOldValue;
+      late final bool oldKeyValueChanged;
       final oldKeyNewEntires = _mappedKeysReverse.update(oldKey, (entries) {
-        oldKeyOldValue = entries.values.last;
+        oldKeyValueChanged = parentKey == entries.keys.first;
         entries.remove(parentKey);
         return entries;
       });
@@ -57,10 +57,9 @@ class MapComputedComputedMap<K, V, KParent, VParent>
         _changes.add(KeyChanges(
             <K, ChangeRecord<V>>{oldKey: ChangeRecordDelete<V>()}.lock));
       } else {
-        final oldKeyNewValue = oldKeyNewEntires.values.last;
-        if (oldKeyOldValue != oldKeyNewValue) {
+        if (oldKeyValueChanged) {
           _changes.add(KeyChanges(<K, ChangeRecord<V>>{
-            oldKey: ChangeRecordValue(oldKeyNewValue)
+            oldKey: ChangeRecordValue(oldKeyNewEntires.values.first)
           }.lock));
         }
       }
@@ -114,19 +113,19 @@ class MapComputedComputedMap<K, V, KParent, VParent>
                 // TODO: Code duplication between this one and the ChangeRecordDelete case
                 if (oldKeyMaybe.is_) {
                   final oldKey = oldKeyMaybe.value as K;
-                  late final V oldKeyOldValue;
+                  late final bool oldKeyValueChanged;
                   final oldKeyNewEntries =
                       _mappedKeysReverse.update(oldKey, (m) {
-                    oldKeyOldValue = m.values.last;
+                    oldKeyValueChanged = e.key == m.keys.first;
                     m.remove(e.key);
                     return m;
                   });
                   if (oldKeyNewEntries.isEmpty) {
                     keyChanges[oldKey] = ChangeRecordDelete();
                     _mappedKeysReverse.remove(oldKey);
-                  } else if (oldKeyOldValue != oldKeyNewEntries.values.last) {
+                  } else if (oldKeyValueChanged) {
                     keyChanges[oldKey] =
-                        ChangeRecordValue(oldKeyNewEntries.values.last);
+                        ChangeRecordValue(oldKeyNewEntries.values.first);
                   }
                 }
               case ChangeRecordDelete<VParent>():
@@ -138,19 +137,19 @@ class MapComputedComputedMap<K, V, KParent, VParent>
                 mks.$2.cancel();
                 if (mks.$1.is_) {
                   final oldKey = mks.$1.value as K;
-                  late final V oldKeyOldValue;
+                  late final bool oldKeyValueChanged;
                   final oldKeyNewEntries =
                       _mappedKeysReverse.update(oldKey, (m) {
-                    oldKeyOldValue = m.values.last;
+                    oldKeyValueChanged = e.key == m.keys.first;
                     m.remove(e.key);
                     return m;
                   });
                   if (oldKeyNewEntries.isEmpty) {
                     keyChanges[oldKey] = ChangeRecordDelete();
                     _mappedKeysReverse.remove(oldKey);
-                  } else if (oldKeyOldValue != oldKeyNewEntries.values.last) {
+                  } else if (oldKeyValueChanged) {
                     keyChanges[oldKey] =
-                        ChangeRecordValue(oldKeyNewEntries.values.last);
+                        ChangeRecordValue(oldKeyNewEntries.values.first);
                   }
                 }
             }

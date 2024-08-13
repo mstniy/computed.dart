@@ -13,6 +13,7 @@ void main() {
   test('incremental update works', () async {
     final s1 = ValueStream<ChangeEvent<int, int>>(sync: true);
     final m1 = IComputedMap.fromChangeStream($(() => s1.use));
+
     // Make different elements depend on different data sources, because why not
     final lookups =
         List.generate(2, (_) => ValueStream<IList<int>>(sync: true));
@@ -84,17 +85,18 @@ void main() {
     s1.add(KeyChanges({4: ChangeRecordValue(0), 7: ChangeRecordValue(3)}.lock));
     await Future.value();
     await Future.value();
-    // Note that the new entry takes priority
-    expect(snapshot, {0: 3}.lock);
+    // Note that the old entry takes priority
+    expect(snapshot, {0: 1}.lock);
     expect(
         change,
         KeyChanges({
-          0: ChangeRecordValue(3),
-        }.lock));
+          0: ChangeRecordValue(1),
+          2: ChangeRecordDelete<int>(),
+        }.lock)); // No change
 
     // Remove an entry from an existing key, which has other entries,
     //  triggering a change in value.
-    s1.add(KeyChanges({7: ChangeRecordDelete<int>()}.lock));
+    s1.add(KeyChanges({1: ChangeRecordDelete<int>()}.lock));
     await Future.value();
     await Future.value();
     expect(snapshot!, {0: 0}.lock);
@@ -106,7 +108,7 @@ void main() {
 
     // Remove an entry from an existing key, which has other entries,
     //  without triggering a change in value.
-    s1.add(KeyChanges({1: ChangeRecordDelete<int>()}.lock));
+    s1.add(KeyChanges({7: ChangeRecordDelete<int>()}.lock));
     await Future.value();
     await Future.value();
     expect(snapshot!, {0: 0}.lock);
@@ -119,70 +121,63 @@ void main() {
     // Upstream replacement
     s1.add(ChangeEventReplace({0: 0, 1: 1, 3: 2, 4: 0}.lock));
     await Future.value();
-    expect(snapshot, {0: 0, 1: 0, 2: 2}.lock);
-    expect(change, ChangeEventReplace({0: 0, 1: 0, 2: 2}.lock));
+    expect(snapshot, {0: 1, 1: 0, 2: 2}.lock);
+    expect(change, ChangeEventReplace({0: 1, 1: 0, 2: 2}.lock));
 
     // Change the mapped key of a non-leader entry
-    s1.add(KeyChanges({1: ChangeRecordValue(5)}.lock));
+    s1.add(KeyChanges({4: ChangeRecordValue(5)}.lock));
     await Future.value();
     await Future.value();
-    expect(snapshot, {0: 0, 1: 0, 2: 5}.lock);
+    expect(snapshot, {0: 1, 1: 0, 2: 2}.lock);
+    expect(change, ChangeEventReplace({0: 1, 1: 0, 2: 2}.lock)); // No change
+
+    // Change the mapped key of a leader entry, while keeping its former key populated
+    s1.add(KeyChanges({3: ChangeRecordValue(0)}.lock));
+    await Future.value();
+    await Future.value();
+    expect(snapshot, {0: 1, 1: 0, 2: 5}.lock);
     expect(
         change,
         KeyChanges({
           2: ChangeRecordValue(5),
         }.lock));
 
-    // Change the mapped key of a leader entry, while keeping its former key populated
-    s1.add(KeyChanges({1: ChangeRecordValue(1)}.lock));
-    await Future.value();
-    await Future.value();
-    expect(snapshot, {0: 1, 1: 0, 2: 2}.lock);
-    expect(
-        change,
-        KeyChanges({
-          0: ChangeRecordValue(1),
-          2: ChangeRecordValue(2),
-        }.lock));
-
     // Delete an upstream key, removing a key, but a new entry immediately re-creates it
     s1.add(KeyChanges(
-        {3: ChangeRecordDelete<int>(), 6: ChangeRecordValue(5)}.lock));
+        {1: ChangeRecordDelete<int>(), 4: ChangeRecordValue(4)}.lock));
     await Future.value();
     await Future.value();
-    expect(snapshot, {0: 1, 1: 0, 2: 5}.lock);
-    expect(change, KeyChanges({2: ChangeRecordValue(5)}.lock));
+    expect(snapshot, {0: 4, 1: 0}.lock);
+    expect(
+        change,
+        KeyChanges(
+            {0: ChangeRecordValue(4), 2: ChangeRecordDelete<int>()}.lock));
 
     // Make multiple changes to groups in one upstream change
     s1.add(KeyChanges({
       1: ChangeRecordValue(2),
       3: ChangeRecordValue(3),
       4: ChangeRecordDelete<int>(),
-      6: ChangeRecordDelete<int>(),
       7: ChangeRecordValue(2),
       9: ChangeRecordValue(1)
     }.lock));
     await Future.value();
     await Future.value();
-    expect(snapshot, {1: 3, 2: 1}.lock);
+    expect(snapshot, {1: 0, 2: 2}.lock);
     expect(
         change,
-        KeyChanges({
-          0: ChangeRecordDelete<int>(),
-          1: ChangeRecordValue(3),
-          2: ChangeRecordValue(1)
-        }.lock));
+        KeyChanges(
+            {0: ChangeRecordDelete<int>(), 2: ChangeRecordValue(2)}.lock));
 
     // Change the mapping
     lookups[0].add([0, 1, 2].lock);
     await Future.value();
-    expect(snapshot, {0: 3, 1: 1, 2: 2}.lock);
+    expect(snapshot, {0: 0, 1: 1, 2: 2}.lock);
     expect(
         change,
         KeyChanges({
-          0: ChangeRecordValue(3),
+          0: ChangeRecordValue(0),
           1: ChangeRecordValue(1),
-          2: ChangeRecordValue(2)
         }.lock));
 
     sub1.cancel();
@@ -298,7 +293,7 @@ void main() {
     }.lock));
     await Future.value();
     await Future.value();
-    expect(snapshot, {42: 1}.lock);
+    expect(snapshot, {42: 0}.lock);
 
     s1.add(KeyChanges({1: ChangeRecordValue(0)}.lock));
     await Future.value();
@@ -320,6 +315,6 @@ void main() {
       return $(() => Entry(k % 3, v));
     });
 
-    await testCoherenceInt(m2, {1: 2, 2: 3, 0: 4}.lock);
+    await testCoherenceInt(m2, {1: 2, 2: 3, 0: 1}.lock);
   });
 }
