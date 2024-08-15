@@ -94,6 +94,25 @@ class MapComputedComputedMap<K, V, KParent, VParent>
         case KeyChanges<KParent, VParent>(changes: final changes):
           final keyChanges = <K, ChangeRecord<V>>{};
 
+          void removeKey(KParent kparent, Option<K> maybeKey) {
+            if (maybeKey.is_) {
+              final key = maybeKey.value as K;
+              late final bool oldKeyValueChanged;
+              final oldKeyNewEntries = _mappedKeysReverse.update(key, (m) {
+                oldKeyValueChanged = kparent == m.keys.first;
+                m.remove(kparent);
+                return m;
+              });
+              if (oldKeyNewEntries.isEmpty) {
+                keyChanges[key] = ChangeRecordDelete();
+                _mappedKeysReverse.remove(key);
+              } else if (oldKeyValueChanged) {
+                keyChanges[key] =
+                    ChangeRecordValue(oldKeyNewEntries.values.first);
+              }
+            }
+          }
+
           for (var e in changes.entries) {
             switch (e.value) {
               case ChangeRecordValue<VParent>(value: final value):
@@ -110,24 +129,8 @@ class MapComputedComputedMap<K, V, KParent, VParent>
                   oldKeyMaybe = Option.none();
                   return (Option.none(), sub);
                 });
-                // TODO: Code duplication between this one and the ChangeRecordDelete case
-                if (oldKeyMaybe.is_) {
-                  final oldKey = oldKeyMaybe.value as K;
-                  late final bool oldKeyValueChanged;
-                  final oldKeyNewEntries =
-                      _mappedKeysReverse.update(oldKey, (m) {
-                    oldKeyValueChanged = e.key == m.keys.first;
-                    m.remove(e.key);
-                    return m;
-                  });
-                  if (oldKeyNewEntries.isEmpty) {
-                    keyChanges[oldKey] = ChangeRecordDelete();
-                    _mappedKeysReverse.remove(oldKey);
-                  } else if (oldKeyValueChanged) {
-                    keyChanges[oldKey] =
-                        ChangeRecordValue(oldKeyNewEntries.values.first);
-                  }
-                }
+                removeKey(e.key, oldKeyMaybe);
+
               case ChangeRecordDelete<VParent>():
                 if (!_mappedKeysSubs.containsKey(e.key)) {
                   // Duplicate deletion from upstream
@@ -135,23 +138,7 @@ class MapComputedComputedMap<K, V, KParent, VParent>
                 }
                 final mks = _mappedKeysSubs.remove(e.key)!;
                 mks.$2.cancel();
-                if (mks.$1.is_) {
-                  final oldKey = mks.$1.value as K;
-                  late final bool oldKeyValueChanged;
-                  final oldKeyNewEntries =
-                      _mappedKeysReverse.update(oldKey, (m) {
-                    oldKeyValueChanged = e.key == m.keys.first;
-                    m.remove(e.key);
-                    return m;
-                  });
-                  if (oldKeyNewEntries.isEmpty) {
-                    keyChanges[oldKey] = ChangeRecordDelete();
-                    _mappedKeysReverse.remove(oldKey);
-                  } else if (oldKeyValueChanged) {
-                    keyChanges[oldKey] =
-                        ChangeRecordValue(oldKeyNewEntries.values.first);
-                  }
-                }
+                removeKey(e.key, mks.$1);
             }
           }
 
