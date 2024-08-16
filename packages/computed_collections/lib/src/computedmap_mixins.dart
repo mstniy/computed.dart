@@ -5,6 +5,7 @@ import 'package:computed_collections/src/map.dart';
 import 'package:computed_collections/src/map_computed.dart';
 import 'package:computed_collections/src/map_values.dart';
 import 'package:computed_collections/src/map_values_computed.dart';
+import 'package:computed_collections/src/remove.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import '../icomputedmap.dart';
@@ -49,10 +50,8 @@ mixin OperatorsMixin<K, V> {
     throw UnimplementedError();
   }
 
-  IComputedMap<K, V> remove(K key) {
-    // TODO: implement remove
-    throw UnimplementedError();
-  }
+  IComputedMap<K, V> remove(K key) =>
+      RemoveComputedMap(this as IComputedMap<K, V>, key);
 
   IComputedMap<K, V> removeWhere(bool Function(K key, V value) test) {
     // TODO: implement removeWhere
