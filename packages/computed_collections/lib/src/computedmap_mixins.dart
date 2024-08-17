@@ -6,6 +6,7 @@ import 'package:computed_collections/src/map_computed.dart';
 import 'package:computed_collections/src/map_values.dart';
 import 'package:computed_collections/src/map_values_computed.dart';
 import 'package:computed_collections/src/remove.dart';
+import 'package:computed_collections/src/remove_where.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import '../icomputedmap.dart';
@@ -53,16 +54,18 @@ mixin OperatorsMixin<K, V> {
   IComputedMap<K, V> remove(K key) =>
       RemoveComputedMap(this as IComputedMap<K, V>, key);
 
-  IComputedMap<K, V> removeWhere(bool Function(K key, V value) test) {
-    // TODO: implement removeWhere
-    throw UnimplementedError();
-  }
+  IComputedMap<K, V> removeWhere(bool Function(K key, V value) test) =>
+      RemoveWhereComputedMap(this as IComputedMap<K, V>, test);
 
   IComputedMap<K, V> removeWhereComputed(
-      Computed<bool> Function(K key, V value) test) {
-    // TODO: implement removeWhereComputed
-    throw UnimplementedError();
-  }
+          Computed<bool> Function(K key, V value) test) =>
+      (this as IComputedMap<K, V>)
+          .mapValuesComputed((key, value) {
+            final c = test(key, value);
+            return $(() => (value, c.use));
+          })
+          .removeWhere((_, v) => v.$2)
+          .mapValues((_, value) => value.$1);
 
   IComputedMap<K, V> update(K key, V Function(V value) update,
       {V Function()? ifAbsent}) {

@@ -181,7 +181,7 @@ void main() {
     s.addError(42);
     expect(callCnt1, 2);
     expect(lastExc1, 42);
-    await Future.value(); // Await the microtask lag of PubSub
+    await Future.value(); // Await the microtask lag of CSTracker
     expect(callCnt2, 2);
     expect(lastExc2, 42);
     s.add(KeyChanges({0: ChangeRecordValue(1)}.lock));

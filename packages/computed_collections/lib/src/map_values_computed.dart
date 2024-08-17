@@ -132,7 +132,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
       try {
         final s = snapshot.useWeak;
         // useWeak returned - means there is an existing non-weak listener on the snapshot
-        if (s.containsKey(key)) return Option.some(s[key]);
+        if (s.containsKey(key)) return Option.some(s[key] as V);
         return Option.none();
       } on NoStrongUserException {
         // Pass
@@ -184,7 +184,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
   late final Computed<IMap<K, V>> snapshot;
 
   // TODO: We can be slightly smarter about this by not evaluating any computation as soon as
-  //  one of them gains a value. PubSub can likely do that
+  //  one of them gains a value. Cannot think of an easy way to do this, though.
   @override
   Computed<bool> get isEmpty =>
       isEmptyExpando[this] ??= $(() => snapshot.use.isEmpty);

@@ -6,7 +6,9 @@ class Option<T> {
   final bool is_;
   final T? value;
 
-  Option.some(this.value) : is_ = true;
+  Option.some(T value_)
+      : value = value_,
+        is_ = true;
   Option.none()
       : is_ = false,
         value = null;
