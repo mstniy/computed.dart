@@ -28,7 +28,7 @@ class ComputationCache<K, V> {
         final removed = _m.remove(key);
         assert(removed != null);
       }
-      if (_onCancel != null) _onCancel!();
+      if (_onCancel != null) _onCancel();
     }
 
     newComputation = Computed(() {

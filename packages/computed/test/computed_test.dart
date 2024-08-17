@@ -1557,6 +1557,74 @@ void main() {
       sub1.cancel();
       sub2.cancel();
     });
+
+    test('recomputes the user if upstream loses all strong listeners',
+        () async {
+      final c1 = $(() => 42);
+      var cnt = 0;
+      final c2 = $(() {
+        cnt++;
+        try {
+          return c1.useWeak;
+        } on NoStrongUserException {}
+      });
+      final sub2 = c1.listen(null);
+      final sub1 = c2.listen(null);
+      expect(cnt, 2);
+      sub2.cancel();
+      expect(cnt, 2);
+      await Future.value();
+      expect(cnt, 4);
+
+      sub1.cancel();
+    });
+
+    test(
+        'does not recompute the user if upstream loses all strong listeners but downstream has lost all its listeners since',
+        () async {
+      final c1 = $(() => 42);
+      var cnt = 0;
+      final c2 = $(() {
+        cnt++;
+        try {
+          return c1.useWeak;
+        } on NoStrongUserException {}
+      });
+      final sub2 = c1.listen(null);
+      final sub1 = c2.listen(null);
+      expect(cnt, 2);
+      sub2.cancel();
+      sub1.cancel();
+      expect(cnt, 2);
+      await Future.value();
+      expect(cnt, 2); // And not 4
+    });
+
+    test(
+        'does not recompute the user if upstream loses all strong listeners but downstream has been re-computed since',
+        () async {
+      final s = ValueStream<int>(sync: true);
+      final c1 = $(() => 42);
+      var cnt = 0;
+      final c2 = $(() {
+        cnt++;
+        s.useOr(0);
+        try {
+          return c1.useWeak;
+        } on NoStrongUserException {}
+      });
+      final sub2 = c1.listen(null);
+      final sub1 = c2.listen(null);
+      expect(cnt, 2);
+      sub2.cancel();
+      expect(cnt, 2);
+      s.add(0);
+      expect(cnt, 4);
+      await Future.value();
+      expect(cnt, 4); // And not 6
+
+      sub1.cancel();
+    });
   });
 
   group('react', () {

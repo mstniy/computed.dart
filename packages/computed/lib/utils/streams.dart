@@ -120,12 +120,12 @@ class ValueStream<T> extends Stream<T> {
       _controllerAddScheduled = true;
       scheduleMicrotask(_controllerAddMicrotask);
     }
-    if (_userOnListen != null) _userOnListen!();
+    if (_userOnListen != null) _userOnListen();
   }
 
   void _onCancel() {
     _lastNotifiedValue = null;
     _setController(); // The old one is no good anymore
-    if (_userOnCancel != null) _userOnCancel!();
+    if (_userOnCancel != null) _userOnCancel();
   }
 }

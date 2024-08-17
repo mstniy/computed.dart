@@ -77,7 +77,7 @@ void main() async {
     );
   }, initialPrev: await dbStream.first);
 
-  final stateIsInitial = Computed.withPrev(
+  final stateIsInitial = Computed<Tuple2<bool, AppState>?>.withPrev(
       (prev) => Tuple2(prev == null, appState.use),
       initialPrev: null);
 

@@ -157,6 +157,69 @@ class GlobalCtx {
   static var _reacting = false;
 }
 
+void _rerunGraph(Set<ComputedImpl> roots) {
+  // Topologically sort the relevant nodes and re-run them
+
+  // Do a DFS rooted at [this] to discover the relevant section of the computation graph
+  final nodes = <ComputedImpl, List<ComputedImpl>>{};
+  void _dfs(ComputedImpl c) {
+    if (nodes.containsKey(c)) return;
+    final downs = [
+      ...c._weakDownstreamComputations,
+      ...c._memoizedDownstreamComputations,
+      ...c._nonMemoizedDownstreamComputations
+    ];
+    // Keep a copy of the downstream
+    // As re-running a computation might change its set of dependencies
+    // to change and this will mess up the topological sort
+    nodes[c] = downs;
+    for (var down in downs) {
+      _dfs(down);
+    }
+  }
+
+  for (var node in roots) {
+    node._dirty = true;
+    _dfs(node);
+  }
+
+  // Do not consider dependencies to nodes which are not relevant (they will not be recomputed)
+  final numUnsatDep = Map.fromEntries(nodes.keys.map((c) => MapEntry(
+      c,
+      c._lastUpstreamComputations.keys.fold<int>(
+          0, (nud, down) => nud + (nodes.containsKey(down) ? 1 : 0)))));
+
+  final noUnsatDep = roots
+      .where((c) => !c._lastUpstreamComputations.keys.any(nodes.containsKey))
+      .toSet();
+  final done = <ComputedImpl>{};
+
+  while (noUnsatDep.isNotEmpty) {
+    final cur = noUnsatDep.first;
+    noUnsatDep.remove(cur);
+    if (done.contains(cur)) continue;
+    done.add(cur);
+    // It is possible that this node has been forced to be evaluated by another
+    // In this case, do not re-compute it again
+    if (cur._lastUpdate != GlobalCtx._currentUpdate) {
+      try {
+        cur.onDependencyUpdated();
+      } on NoValueException {
+        // Pass. We must still consider the downstream.
+      }
+    }
+
+    // Rely on the copy of downstream computations in [open]
+    for (var down in nodes[cur]!) {
+      assert(!done.contains(down));
+      final nud = numUnsatDep.update(down, (value) => value - 1);
+      if (nud == 0) {
+        noUnsatDep.add(down);
+      }
+    }
+  }
+}
+
 class ComputedImpl<T> {
   _DataSourceAndSubscription<T>? _dss;
 
@@ -289,7 +352,7 @@ class ComputedImpl<T> {
       return;
     }
 
-    _rerunGraph();
+    _rerunGraph({this});
   }
 
   void onDataSourceError(Object err, StackTrace st) {
@@ -306,7 +369,7 @@ class ComputedImpl<T> {
       return;
     }
 
-    _rerunGraph();
+    _rerunGraph({this});
   }
 
   ComputedSubscription<T> listen(
@@ -405,68 +468,6 @@ class ComputedImpl<T> {
       _lastUpdate = GlobalCtx._currentUpdate;
     } else {
       _evalF();
-    }
-  }
-
-  void _rerunGraph() {
-    // Topologically sort the relevant nodes and re-run them
-
-    // Do a DFS rooted at [this] to discover the relevant section of the computation graph
-    final nodes = <ComputedImpl, List<ComputedImpl>>{};
-    void _dfs(ComputedImpl c) {
-      if (nodes.containsKey(c)) return;
-      final downs = [
-        ...c._weakDownstreamComputations,
-        ...c._memoizedDownstreamComputations,
-        ...c._nonMemoizedDownstreamComputations
-      ];
-      // Keep a copy of the downstream
-      // As re-running a computation might change its set of dependencies
-      // to change and this will mess up the topological sort
-      nodes[c] = downs;
-      for (var down in downs) {
-        _dfs(down);
-      }
-    }
-
-    _dfs(this);
-
-    // Do not consider dependencies to nodes which are not relevant (they will not be recomputed)
-    final numUnsatDep = Map.fromEntries(nodes.keys.map((c) => MapEntry(
-        c,
-        c._lastUpstreamComputations.keys.fold<int>(
-            0, (nud, down) => nud + (nodes.containsKey(down) ? 1 : 0)))));
-
-    final noUnsatDep = <ComputedImpl>{this};
-    final done = <ComputedImpl>{};
-
-    while (noUnsatDep.isNotEmpty) {
-      final cur = noUnsatDep.first;
-      noUnsatDep.remove(cur);
-      if (done.contains(cur)) continue;
-      done.add(cur);
-      // It is possible that this node has been forced to be evaluated by another
-      // In this case, do not re-compute it again
-      if (cur._lastUpdate != GlobalCtx._currentUpdate) {
-        try {
-          if (cur == this) {
-            _evalF();
-          } else {
-            cur.onDependencyUpdated();
-          }
-        } on NoValueException {
-          // Pass. We must still consider the downstream.
-        }
-      }
-
-      // Rely on the copy of downstream computations in [open]
-      for (var down in nodes[cur]!) {
-        assert(!done.contains(down));
-        final nud = numUnsatDep.update(down, (value) => value - 1);
-        if (nud == 0) {
-          noUnsatDep.add(down);
-        }
-      }
     }
   }
 
@@ -677,6 +678,27 @@ class ComputedImpl<T> {
       _dss = null;
     }
 
+    if (_weakDownstreamComputations.isNotEmpty) {
+      final weakDownstreamCopy =
+          _weakDownstreamComputations.map((e) => (e, e._lastUpdate)).toSet();
+
+      // Need to notify them, but not until the next microtask
+      // As the caller of ComputedSubscription.cancel might not expect that
+      scheduleMicrotask(() {
+        final oldDownstreamFiltered = weakDownstreamCopy
+            .where((c) =>
+                // Filter out the computations which have been re-computed since
+                // Note that this will also filter out the computations which have
+                // since lost all their listeners, as we also set _lastUpdate = null
+                // in that case.
+                c.$1._lastUpdate == c.$2)
+            .map((e) => e.$1)
+            .toSet();
+        GlobalCtx._currentUpdate = _Token();
+        _rerunGraph(oldDownstreamFiltered);
+      });
+    }
+
     final lastResultBackup = _lastResult;
 
     _lastResult = null; // So that we re-run the next time we are subscribed to
@@ -684,10 +706,10 @@ class ComputedImpl<T> {
 
     if (lastResultBackup != null) {
       if (lastResultBackup._isValue && _dispose != null) {
-        _dispose!(lastResultBackup._value as T);
+        _dispose(lastResultBackup._value as T);
       }
     }
-    if (_onCancel != null) _onCancel!();
+    if (_onCancel != null) _onCancel();
   }
 
   void _removeDownstreamComputation(ComputedImpl c) {
