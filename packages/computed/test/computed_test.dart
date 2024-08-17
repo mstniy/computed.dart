@@ -1580,6 +1580,48 @@ void main() {
     });
 
     test(
+        'users using each other are recomputed in a topologically consistent order if upstream loses all strong listeners',
+        () async {
+      // Test both directions (c2 depending on c3 and vica versa)
+      // to really make sure the evaluation order is topologically consistent
+      for (var direction in [false, true]) {
+        final c1 = $(() => 42);
+        var cnt = [];
+        late final Computed<void> c3;
+        final c2 = $(() {
+          cnt.add(2);
+          try {
+            c1.useWeak;
+          } on NoStrongUserException {}
+          if (direction) c3.use;
+        });
+        c3 = $(() {
+          cnt.add(3);
+          try {
+            c1.useWeak;
+          } on NoStrongUserException {}
+          if (!direction) c2.use;
+        });
+        final sub1 = c1.listen(null);
+        final sub2 = c2.listen(null);
+        final sub3 = c3.listen(null);
+        expect(
+            cnt,
+            direction
+                ? [2, 3, 3, 2]
+                : [2, 2, 3, 3]); // Mind the idempotency-check computations
+        sub1.cancel();
+        expect(cnt, hasLength(4)); // No re-computations
+        cnt.clear();
+        await Future.value();
+        expect(cnt, direction ? [3, 3, 2, 2] : [2, 2, 3, 3]);
+
+        sub2.cancel();
+        sub3.cancel();
+      }
+    });
+
+    test(
         'does not recompute the user if upstream loses all strong listeners but downstream has lost all its listeners since',
         () async {
       final c1 = $(() => 42);
