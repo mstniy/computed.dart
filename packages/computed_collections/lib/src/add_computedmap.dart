@@ -10,8 +10,8 @@ import 'utils/cs_tracker.dart';
 class AddComputedMap<K, V>
     with OperatorsMixin<K, V>
     implements IComputedMap<K, V> {
-  K _key;
-  V _value;
+  final K _key;
+  final V _value;
   final IComputedMap<K, V> _parent;
   late final CSTracker<K, V> _tracker;
   AddComputedMap(this._parent, this._key, this._value) {

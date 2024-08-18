@@ -2,6 +2,7 @@ import 'package:computed/computed.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import '../icomputedmap.dart';
+import 'add_all_computed.dart';
 import 'group_by.dart';
 import 'group_by_computed.dart';
 import 'map.dart';
@@ -20,10 +21,8 @@ mixin OperatorsMixin<K, V> {
   IComputedMap<K, V> addAll(IMap<K, V> other) =>
       AddAllComputedMap(this as IComputedMap<K, V>, other);
 
-  IComputedMap<K, V> addAllComputed(IComputedMap<K, V> other) {
-    // TODO: implement addAllComputed
-    throw UnimplementedError();
-  }
+  IComputedMap<K, V> addAllComputed(IComputedMap<K, V> other) =>
+      AddAllComputedComputedMap(this as IComputedMap<K, V>, other);
 
   IComputedMap<RK, RV> cast<RK, RV>() {
     // TODO: implement cast

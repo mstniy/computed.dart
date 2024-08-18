@@ -11,7 +11,7 @@ import 'utils/cs_tracker.dart';
 class AddAllComputedMap<K, V>
     with OperatorsMixin<K, V>
     implements IComputedMap<K, V> {
-  IMap<K, V> _m;
+  final IMap<K, V> _m;
   final IComputedMap<K, V> _parent;
   late final CSTracker<K, V> _tracker;
   AddAllComputedMap(this._parent, this._m) {
