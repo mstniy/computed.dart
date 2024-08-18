@@ -1,25 +1,24 @@
 import 'package:computed/computed.dart';
-import 'package:computed_collections/src/group_by.dart';
-import 'package:computed_collections/src/group_by_computed.dart';
-import 'package:computed_collections/src/map.dart';
-import 'package:computed_collections/src/map_computed.dart';
-import 'package:computed_collections/src/map_values.dart';
-import 'package:computed_collections/src/map_values_computed.dart';
-import 'package:computed_collections/src/remove.dart';
-import 'package:computed_collections/src/remove_where.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import '../icomputedmap.dart';
+import 'group_by.dart';
+import 'group_by_computed.dart';
+import 'map.dart';
+import 'map_computed.dart';
+import 'map_values.dart';
+import 'map_values_computed.dart';
+import 'remove.dart';
+import 'remove_where.dart';
+import 'add_all.dart';
 import 'add_computedmap.dart';
 
 mixin OperatorsMixin<K, V> {
   IComputedMap<K, V> add(K key, V value) =>
       AddComputedMap(this as IComputedMap<K, V>, key, value);
 
-  IComputedMap<K, V> addAll(IMap<K, V> other) {
-    // TODO: implement addAll
-    throw UnimplementedError();
-  }
+  IComputedMap<K, V> addAll(IMap<K, V> other) =>
+      AddAllComputedMap(this as IComputedMap<K, V>, other);
 
   IComputedMap<K, V> addAllComputed(IComputedMap<K, V> other) {
     // TODO: implement addAllComputed
