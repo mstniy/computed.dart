@@ -7,15 +7,17 @@ import 'package:test/expect.dart';
 
 Future<List<T>> getValuesWhile<T>(Computed<T> c, void Function() f) async {
   final values = <T>[];
+  Object? exc;
   final sub = c.listen((event) {
     values.add(event);
-  }, null);
+  }, (e) => exc = e);
   f();
   for (var i = 0; i < 5; i++) {
     // Wait for several microtasks to make sure the value assumes its value
     await Future.value();
   }
   sub.cancel();
+  if (exc != null) throw exc!;
 
   return values;
 }

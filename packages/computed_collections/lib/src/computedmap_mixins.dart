@@ -25,10 +25,8 @@ mixin OperatorsMixin<K, V> {
   IComputedMap<K, V> addAllComputed(IComputedMap<K, V> other) =>
       AddAllComputedComputedMap(this as IComputedMap<K, V>, other);
 
-  IComputedMap<RK, RV> cast<RK, RV>() {
-    // TODO: implement cast
-    throw UnimplementedError();
-  }
+  IComputedMap<RK, RV> cast<RK, RV>() => (this as IComputedMap<K, V>)
+      .map((key, value) => MapEntry(key as RK, value as RV));
 
   IComputedMap<K2, V2> map<K2, V2>(
           MapEntry<K2, V2> Function(K key, V value) convert) =>
@@ -45,10 +43,8 @@ mixin OperatorsMixin<K, V> {
           Computed<V2> Function(K key, V value) convert) =>
       MapValuesComputedComputedMap(this as IComputedMap<K, V>, convert);
 
-  IComputedMap<K, V> putIfAbsent(K key, V Function() ifAbsent) {
-    // TODO: implement putIfAbsent
-    throw UnimplementedError();
-  }
+  IComputedMap<K, V> putIfAbsent(K key, V Function() ifAbsent) =>
+      (this as IComputedMap<K, V>).update(key, (v) => v, ifAbsent: ifAbsent);
 
   IComputedMap<K, V> remove(K key) =>
       RemoveComputedMap(this as IComputedMap<K, V>, key);
@@ -70,16 +66,14 @@ mixin OperatorsMixin<K, V> {
           {V Function()? ifAbsent}) =>
       UpdateComputedMap(this as IComputedMap<K, V>, key, update, ifAbsent);
 
-  IComputedMap<K, V> updateAll(V Function(K key, V value) update) {
-    // TODO: implement updateAll
-    throw UnimplementedError();
-  }
+  IComputedMap<K, V> updateAll(V Function(K key, V value) update) =>
+      // This is basically a special case of mapValues where V2==V
+      MapValuesComputedMap(this as IComputedMap<K, V>, update);
 
   IComputedMap<K, V> updateAllComputed(
-      Computed<V> Function(K key, V value) update) {
-    // TODO: implement updateAllComputed
-    throw UnimplementedError();
-  }
+          Computed<V> Function(K key, V value) update) =>
+      // This is basically a special case of mapValuesComputed where V2==V
+      MapValuesComputedComputedMap(this as IComputedMap<K, V>, update);
 
   IComputedMap<K2, IComputedMap<K, V>> groupBy<K2>(
           K2 Function(K key, V value) key) =>
