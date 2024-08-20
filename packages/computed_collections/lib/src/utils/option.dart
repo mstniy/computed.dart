@@ -1,7 +1,6 @@
 import 'package:meta/meta.dart';
 
 @immutable
-// TODO: Refactor this to be a sealed class with Some and None subclasses
 class Option<T> {
   final bool is_;
   final T? value;
