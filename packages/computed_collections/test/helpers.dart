@@ -38,25 +38,28 @@ Future<void> testCoherenceInt(
 
 Future<void> testCoherence<K, V>(IComputedMap<K, V> map, IMap<K, V> expected,
     K nonExistentKey, V nonExistentValue) async {
-  expect(await getValues(map.snapshot),
-      anyOf(equals([expected]), [{}.lock, expected]));
-  expect(await getValue(map[nonExistentKey]), null);
-  for (var e in expected.entries) {
-    expect(
-        await getValues(map[e.key]), anyOf(equals([null, e.value]), [e.value]));
-    expect(await getValues(map.containsKey(e.key)),
-        anyOf(equals([false, true]), [true]));
-    expect(await getValues(map.containsValue(e.value)),
-        anyOf(equals([false, true]), [true]));
+  // Test them twice for good measure
+  for (var i = 0; i < 2; i++) {
+    expect(await getValues(map.snapshot),
+        anyOf(equals([expected]), [{}.lock, expected]));
+    expect(await getValue(map[nonExistentKey]), null);
+    for (var e in expected.entries) {
+      expect(await getValues(map[e.key]),
+          anyOf(equals([null, e.value]), [e.value]));
+      expect(await getValues(map.containsKey(e.key)),
+          anyOf(equals([false, true]), [true]));
+      expect(await getValues(map.containsValue(e.value)),
+          anyOf(equals([false, true]), [true]));
+    }
+    expect(await getValue(map.containsKey(nonExistentKey)), false);
+
+    expect(await getValue(map.containsValue(nonExistentValue)), false);
+
+    expect(await getValues(map.isEmpty),
+        anyOf(equals([true, expected.isEmpty]), [expected.isEmpty]));
+    expect(await getValues(map.isNotEmpty),
+        anyOf(equals([false, expected.isNotEmpty]), [expected.isNotEmpty]));
+    expect(await getValues(map.length),
+        anyOf(equals([0, expected.length]), [expected.length]));
   }
-  expect(await getValue(map.containsKey(nonExistentKey)), false);
-
-  expect(await getValue(map.containsValue(nonExistentValue)), false);
-
-  expect(await getValues(map.isEmpty),
-      anyOf(equals([true, expected.isEmpty]), [expected.isEmpty]));
-  expect(await getValues(map.isNotEmpty),
-      anyOf(equals([false, expected.isNotEmpty]), [expected.isNotEmpty]));
-  expect(await getValues(map.length),
-      anyOf(equals([0, expected.length]), [expected.length]));
 }

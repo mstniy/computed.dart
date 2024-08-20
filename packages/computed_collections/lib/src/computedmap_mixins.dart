@@ -13,6 +13,7 @@ import 'remove.dart';
 import 'remove_where.dart';
 import 'add_all.dart';
 import 'add_computedmap.dart';
+import 'update.dart';
 
 mixin OperatorsMixin<K, V> {
   IComputedMap<K, V> add(K key, V value) =>
@@ -66,10 +67,8 @@ mixin OperatorsMixin<K, V> {
           .mapValues((_, value) => value.$1);
 
   IComputedMap<K, V> update(K key, V Function(V value) update,
-      {V Function()? ifAbsent}) {
-    // TODO: implement update
-    throw UnimplementedError();
-  }
+          {V Function()? ifAbsent}) =>
+      UpdateComputedMap(this as IComputedMap<K, V>, key, update, ifAbsent);
 
   IComputedMap<K, V> updateAll(V Function(K key, V value) update) {
     // TODO: implement updateAll
