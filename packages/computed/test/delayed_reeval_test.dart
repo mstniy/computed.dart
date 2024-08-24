@@ -9,6 +9,13 @@ class _DelayedComputedImpl<T> extends ComputedImpl<T> {
       : super(build, false, false, false, null, null);
 
   @override
+  // Cannot subscribe to delayed computations
+  T get use => throw UnimplementedError();
+
+  @override
+  T get useWeak => throw UnimplementedError();
+
+  @override
   void onDependencyUpdated() {
     // Delay until reeval() is called
     _onDependencyUpdated();

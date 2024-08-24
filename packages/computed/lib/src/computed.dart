@@ -153,70 +153,43 @@ class GlobalCtx {
   static final _routerExpando = Expando<_RouterValueOrException>('computed');
 
   static var _currentUpdate = _Token(); // Guaranteed to be unique thanks to GC
+  static Set<ComputedImpl> _currentUpdateNodes = {};
 
   static var _reacting = false;
 }
 
 void _rerunGraph(Set<ComputedImpl> roots) {
-  // Topologically sort the relevant nodes and re-run them
-
-  // Do a DFS rooted at [this] to discover the relevant section of the computation graph
-  final nodes = <ComputedImpl, List<ComputedImpl>>{};
-  void _dfs(ComputedImpl c) {
-    if (nodes.containsKey(c)) return;
-    final downs = [
-      ...c._weakDownstreamComputations,
-      ...c._memoizedDownstreamComputations,
-      ...c._nonMemoizedDownstreamComputations
-    ];
-    // Keep a copy of the downstream
-    // As re-running a computation might change its set of dependencies
-    // to change and this will mess up the topological sort
-    nodes[c] = downs;
-    for (var down in downs) {
-      _dfs(down);
-    }
-  }
-
+  GlobalCtx._currentUpdateNodes = roots;
   for (var node in roots) {
     node._dirty = true;
-    _dfs(node);
   }
 
-  // Do not consider dependencies to nodes which are not relevant (they will not be recomputed)
-  final numUnsatDep = Map.fromEntries(nodes.keys.map((c) => MapEntry(
-      c,
-      c._lastUpstreamComputations.keys.fold<int>(
-          0, (nud, down) => nud + (nodes.containsKey(down) ? 1 : 0)))));
-
-  final noUnsatDep = roots
-      .where((c) => !c._lastUpstreamComputations.keys.any(nodes.containsKey))
-      .toSet();
-  final done = <ComputedImpl>{};
-
-  while (noUnsatDep.isNotEmpty) {
-    final cur = noUnsatDep.first;
-    noUnsatDep.remove(cur);
-    if (done.contains(cur)) continue;
-    done.add(cur);
+  void _evalAfterEnsureUpstreamEvald(ComputedImpl node) {
+    node._lastUpstreamComputations.keys.forEach((c) {
+      if (c._lastUpdate != GlobalCtx._currentUpdate) {
+        _evalAfterEnsureUpstreamEvald(c);
+      }
+    });
     // It is possible that this node has been forced to be evaluated by another
     // In this case, do not re-compute it again
-    if (cur._lastUpdate != GlobalCtx._currentUpdate) {
+    if (node._lastUpdate != GlobalCtx._currentUpdate) {
       try {
-        cur.onDependencyUpdated();
+        node.onDependencyUpdated();
       } on NoValueException {
         // Pass. We must still consider the downstream.
       }
     }
+  }
 
-    // Rely on the copy of downstream computations in [open]
-    for (var down in nodes[cur]!) {
-      assert(!done.contains(down));
-      final nud = numUnsatDep.update(down, (value) => value - 1);
-      if (nud == 0) {
-        noUnsatDep.add(down);
-      }
-    }
+  final done =
+      <ComputedImpl>{}; // TODO: Do we need this? It seems redundant wrt. node._lastUpdate == _curentUpdate
+
+  while (GlobalCtx._currentUpdateNodes.isNotEmpty) {
+    final cur = GlobalCtx._currentUpdateNodes.first;
+    GlobalCtx._currentUpdateNodes.remove(cur);
+    if (done.contains(cur)) continue;
+    done.add(cur);
+    _evalAfterEnsureUpstreamEvald(cur);
   }
 }
 
@@ -504,6 +477,8 @@ class ComputedImpl<T> {
   }
 
   // Also notifies the listeners (but not downstream computations) if necessary
+  // Adds the set of downstream nodes that need recomputation to GlobalCtx._currentUpdateNodes.
+  // Can throw [NoValueException].
   void _evalF() {
     const idempotencyFailureMessage =
         "Computed expressions must be purely functional. Please use listeners for side effects. For computations creating asynchronous operations, make sure to use `Computed.async`.";
@@ -571,24 +546,25 @@ class ComputedImpl<T> {
       if (gotNVE) {
         Error.throwWithStackTrace(newResult._exc!, newResult._st!);
       } else {
-        for (var down in _nonMemoizedDownstreamComputations) {
-          if (!down._computing) down._dirty = true;
-        }
+        final downstream = <ComputedImpl>{};
+        downstream.addAll(
+            _nonMemoizedDownstreamComputations.where((c) => !c._computing));
         if (shouldNotify) {
-          for (var down in _memoizedDownstreamComputations) {
-            if (!down._computing) down._dirty = true;
-          }
-          // As a special case, if we are gaining value, do not consider
-          // weak downstream "dirty". The reasoning is that they
-          // likely have done an alternative, lighter-weight computation
-          // already, which is still valid, unless some other computation
-          // they depend on changes meaningfully.
-          if (_prevResult != null) {
-            for (var down in _weakDownstreamComputations) {
-              if (!down._computing) down._dirty = true;
-            }
+          downstream.addAll(
+              _memoizedDownstreamComputations.where((c) => !c._computing));
+          // As a special case, if we are gaining our first strong user,
+          // do not consider weak downstream "dirty".
+          // The reasoning is that they likely have done an alternative,
+          // lighter-weight computation already, which is still valid,
+          // unless some other computation they depend on changes meaningfully.
+          if (_lastUpdate != null) {
+            downstream.addAll(
+                _weakDownstreamComputations.where((c) => !c._computing));
           }
         }
+        downstream.forEach((c) => c._dirty =
+            true); // TODO: Do we still need _dirty as a member field?
+        GlobalCtx._currentUpdateNodes.addAll(downstream);
       }
     } finally {
       assert(_lastUpdate == GlobalCtx._currentUpdate);

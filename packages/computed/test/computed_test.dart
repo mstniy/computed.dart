@@ -1532,9 +1532,11 @@ void main() {
       sub2.cancel();
     });
 
-    test('does not recompute the user if upstream gains listeners/value',
-        () async {
+    test('does not recompute the user if upstream gains listeners', () async {
       final s = ValueStream<int>.seeded(1, sync: true);
+      final suser = $(() => s.use); // To keep Computed subscribed to [s]
+      final sub3 = suser.listen(null);
+      await Future.value(); // Wait for Computed to subscribe to [s]
       final c1 = $(() => s.use);
       var cnt = 0;
       final c2 = $(() {
@@ -1556,6 +1558,7 @@ void main() {
 
       sub1.cancel();
       sub2.cancel();
+      sub3.cancel();
     });
 
     test('recomputes the user if upstream loses all strong listeners',
