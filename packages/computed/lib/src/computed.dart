@@ -181,14 +181,10 @@ void _rerunGraph(Set<ComputedImpl> roots) {
     }
   }
 
-  final done =
-      <ComputedImpl>{}; // TODO: Do we need this? It seems redundant wrt. node._lastUpdate == _curentUpdate
-
   while (GlobalCtx._currentUpdateNodes.isNotEmpty) {
     final cur = GlobalCtx._currentUpdateNodes.first;
     GlobalCtx._currentUpdateNodes.remove(cur);
-    if (done.contains(cur)) continue;
-    done.add(cur);
+    if (cur._lastUpdate == GlobalCtx._currentUpdate) continue;
     _evalAfterEnsureUpstreamEvald(cur);
   }
 }
@@ -562,8 +558,7 @@ class ComputedImpl<T> {
                 _weakDownstreamComputations.where((c) => !c._computing));
           }
         }
-        downstream.forEach((c) => c._dirty =
-            true); // TODO: Do we still need _dirty as a member field?
+        downstream.forEach((c) => c._dirty = true);
         GlobalCtx._currentUpdateNodes.addAll(downstream);
       }
     } finally {
