@@ -172,7 +172,7 @@ void _rerunGraph(Set<ComputedImpl> roots) {
     });
     // It is possible that this node has been forced to be evaluated by another
     // In this case, do not re-compute it again
-    if (node._lastUpdate != GlobalCtx._currentUpdate) {
+    if (node._dirty) {
       try {
         node.onDependencyUpdated();
       } on NoValueException {
@@ -429,15 +429,7 @@ class ComputedImpl<T> {
 
   // This is public so that it can be customized by subclasses
   void onDependencyUpdated() {
-    if (_lastResult == null || _dss != null) {
-      _evalF();
-      return;
-    }
-    if (!_dirty) {
-      _lastUpdate = GlobalCtx._currentUpdate;
-    } else {
-      _evalF();
-    }
+    _evalF();
   }
 
   T _evalFInZone() {
