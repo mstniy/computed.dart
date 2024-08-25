@@ -196,7 +196,7 @@ void _rerunGraph(Set<ComputedImpl> roots) {
   }
 }
 
-class ComputedImpl<T> {
+class ComputedImpl<T> implements Computed<T> {
   _DataSourceAndSubscription<T>? _dss;
 
   // Whether this node is memoized.
@@ -250,6 +250,7 @@ class ComputedImpl<T> {
     });
   }
 
+  @override
   T get use {
     _use(false);
     if (_lastUpdate != GlobalCtx._currentUpdate && _lastResult == null) {
@@ -265,6 +266,16 @@ class ComputedImpl<T> {
     return _lastResult!.value;
   }
 
+  @override
+  T useOr(T value) {
+    try {
+      return use;
+    } on NoValueException {
+      return value;
+    }
+  }
+
+  @override
   T get useWeak {
     _use(true);
     if (_lastResult == null) {
@@ -278,6 +289,7 @@ class ComputedImpl<T> {
     return _lastResult!.value;
   }
 
+  @override
   T get prev {
     final caller = GlobalCtx.currentComputation;
     if (caller == this) {
@@ -347,8 +359,9 @@ class ComputedImpl<T> {
     _rerunGraph({this});
   }
 
-  ComputedSubscription<T> listen(
-      void Function(T event)? onData, Function? onError) {
+  @override
+  ComputedSubscription<T> listen(void Function(T event)? onData,
+      [Function? onError]) {
     _validateOnError(onError);
     final sub = _ComputedSubscriptionImpl<T>(this, onData, onError);
     if (_novalue) {

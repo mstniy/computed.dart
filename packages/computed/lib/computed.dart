@@ -10,7 +10,7 @@ Computed<T> $<T>(T Function() f, {bool memoized = true}) =>
 ///
 /// Note that the equality operator [==] should be meaningful for [T],
 /// as it is used for memoization.
-class Computed<T> {
+abstract interface class Computed<T> {
   /// Creates a reactive computation whose value is computed by the given function.
   ///
   /// If [memoized] is set to false, listeners of this computation as well as
@@ -28,29 +28,29 @@ class Computed<T> {
   /// If [onCancel] is set, it will be called when the computation loses all of its listeners
   /// and downstream computations.
   /// [onCancel] is called after [dispose].
-  Computed(
+  factory Computed(
     T Function() f, {
     bool memoized = true,
     bool assertIdempotent = true,
     void Function(T value)? dispose,
     void Function()? onCancel,
-  }) : _impl = ComputedImpl(
-            f, memoized, assertIdempotent, false, dispose, onCancel);
+  }) =>
+      ComputedImpl(f, memoized, assertIdempotent, false, dispose, onCancel);
 
   /// Creates an "async" computation, which is allowed to run asynchronous operations.
   /// This implicitly disables the idempotency assertion.
-  Computed.async(T Function() f,
-      {bool memoized = true,
-      void Function(T value)? dispose,
-      void Function()? onCancel})
-      : _impl = ComputedImpl(f, memoized, false, true, dispose, onCancel);
+  factory Computed.async(T Function() f,
+          {bool memoized = true,
+          void Function(T value)? dispose,
+          void Function()? onCancel}) =>
+      ComputedImpl(f, memoized, false, true, dispose, onCancel);
 
   /// As [Computed], but calls the given function with its last value.
   ///
   /// If the computation has no value yet, [prev] is set to [initialPrev].
   ///
   /// Note that setting [async] disables the idempotency check.
-  Computed.withPrev(
+  factory Computed.withPrev(
     T Function(T prev) f, {
     required T initialPrev,
     bool memoized = true,
@@ -58,8 +58,9 @@ class Computed<T> {
     bool async = false,
     void Function(T value)? dispose,
     void Function()? onCancel,
-  }) : _impl = ComputedImpl.withPrev(f, initialPrev, memoized, assertIdempotent,
-            async, dispose, onCancel);
+  }) =>
+      ComputedImpl.withPrev(
+          f, initialPrev, memoized, assertIdempotent, async, dispose, onCancel);
 
   /// Defines an "effect", which is a computation meant to have side effects.
   static ComputedSubscription<void> effect(void Function() f) =>
@@ -75,8 +76,7 @@ class Computed<T> {
   /// when the result of the computation changes.
   /// [onError] has the same semantics as in [Future.listen]
   ComputedSubscription<T> listen(void Function(T event)? onData,
-          [Function? onError]) =>
-      _impl.listen(onData, onError);
+      [Function? onError]);
 
   /// Returns the current value of this computation, if one exists, and subscribes to it.
   ///
@@ -85,22 +85,16 @@ class Computed<T> {
   /// Throws [NoValueException] if a data source [use]d by this
   /// computation or another computation [use]d by it has no value yet.
   /// Throws [CyclicUseException] if this usage would cause a cyclic dependency.
-  T get use => _impl.use;
+  T get use;
 
   /// Weakly uses this computation.
   ///
   /// Like [use], but throws [NoStrongUserException] instead of running the computation if
   /// there are no non-weak downstream computations or listeners.
-  T get useWeak => _impl.useWeak;
+  T get useWeak;
 
   /// As [use], but returns [value] instead of throwing [NoValueException].
-  T useOr(T value) {
-    try {
-      return use;
-    } on NoValueException {
-      return value;
-    }
-  }
+  T useOr(T value);
 
   /// Returns the result of this computation during the last run of the current computation.
   /// If called on the current computation, returns its last result.
@@ -110,9 +104,7 @@ class Computed<T> {
   /// Throws [NoValueException] if the current computation did not [use] this computation
   /// during its previous run and this computations is not the current computation.
   /// Note that [prev] does not subscribe to this computation. To do that, see [use].
-  T get prev => _impl.prev;
-
-  final ComputedImpl<T> _impl;
+  T get prev;
 }
 
 /// The result of [Computed.listen].
