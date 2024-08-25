@@ -144,13 +144,11 @@ void main() {
     expect(lastRes1, null);
 
     s.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
-    await Future.value();
-    expect(cCnt, 2);
+    expect(cCnt, 2); // In which s2.use throws NVE
     expect(callCnt1, 1);
     expect(lastRes1, null);
-    await Future.value();
-    // Two runs in which it throws NVE, two runs after subscribing to [s2]
-    expect(cCnt, 4);
+    await Future.value(); // s2 notifies Computed
+    expect(cCnt, 4); // Another two runs after subscribing to s2
     expect(callCnt1, 2);
     expect(lastRes1, 6);
 

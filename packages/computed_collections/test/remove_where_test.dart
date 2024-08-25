@@ -192,20 +192,23 @@ void main() {
     await Future.value(); // The microtask runs
     // The shared computation tries to access the parent, which has since lost its state as it has lost
     // all listeners. Eventually leading Computed to re-subcribe to [s].
+    expect(cCnt, 2);
+    expect(resCache2, [1, null]);
+    expect(resCache3, [true, false]);
     await Future.value(); // [s] notifies Computed
     // [m]'s CSTracker pushes to the key stream
-    await Future
-        .value(); // The CSTracker's internal key stream notifies Computed
     // The shared computation runs on a meaningful parent.containsKey/operator[],
     // and in return calls the user filter.
     expect(cCnt, 4);
+    expect(resCache2, [1, null, 1]);
+    expect(resCache3, [true, false, true]);
 
     // Also test that operator[] and containsKey share the underlying filter computation
     s.add(ChangeEventReplace({0: 0}.lock));
     await Future.value();
     expect(cCnt, 6); // And not 8
-    expect(resCache2, [1, null]);
-    expect(resCache3, [true, false]);
+    expect(resCache2, [1, null, 1, null]);
+    expect(resCache3, [true, false, true, false]);
 
     sub2.cancel();
     sub3.cancel();
