@@ -141,7 +141,7 @@ class GlobalCtx {
       rvoe._router._dss ??= _DataSourceAndSubscription<T>(dataSource,
           currentValue != null ? GlobalCtx._currentUpdate : null, sub);
       GlobalCtx._routerExpando[dataSource] = rvoe;
-      if (currentValue != null) rvoe._router._evalF();
+      if (currentValue != null) rvoe._router.eval();
     }
 
     return rvoe;
@@ -160,12 +160,15 @@ class GlobalCtx {
   static var _reacting = false;
 }
 
+void _injectNodesToDAG(Set<ComputedImpl> nodes) {
+  nodes.forEach((c) => GlobalCtx._currentUpdateNodeDirty[c] = true);
+  GlobalCtx._currentUpdateNodes.addAll(nodes);
+}
+
 void _rerunGraph(Set<ComputedImpl> roots) {
-  GlobalCtx._currentUpdateNodes = roots;
+  GlobalCtx._currentUpdateNodes = {};
   GlobalCtx._currentUpdateNodeDirty = Expando('computed_dag_runner_node_dirty');
-  for (var node in roots) {
-    GlobalCtx._currentUpdateNodeDirty[node] = true;
-  }
+  _injectNodesToDAG(roots);
 
   void _evalAfterEnsureUpstreamEvald(ComputedImpl node) {
     node._lastUpstreamComputations.keys.forEach((c) {
@@ -177,7 +180,8 @@ void _rerunGraph(Set<ComputedImpl> roots) {
     // In this case, do not re-compute it again
     if (GlobalCtx._currentUpdateNodeDirty[node] == true) {
       try {
-        node.onDependencyUpdated();
+        final downstream = node.onDependencyUpdated();
+        _injectNodesToDAG(downstream);
       } on NoValueException {
         // Pass. We must still consider the downstream.
       }
@@ -249,7 +253,8 @@ class ComputedImpl<T> {
   T get use {
     _use(false);
     if (_lastUpdate != GlobalCtx._currentUpdate && _lastResult == null) {
-      _evalF();
+      final downstream = eval();
+      _injectNodesToDAG(downstream);
     }
 
     if (_lastResult == null) throw NoValueException();
@@ -348,7 +353,7 @@ class ComputedImpl<T> {
     final sub = _ComputedSubscriptionImpl<T>(this, onData, onError);
     if (_novalue) {
       try {
-        _evalF();
+        eval();
         // Might set lastResult, won't notify the listener just yet (as that is against the Stream contract)
       } on NoValueException {
         // It is fine if we don't have a value yet
@@ -428,9 +433,10 @@ class ComputedImpl<T> {
     rvoe._router._react(onData, onError);
   }
 
+  // Returns the set of downstream nodes to be re-computed.
   // This is public so that it can be customized by subclasses
-  void onDependencyUpdated() {
-    _evalF();
+  Set<ComputedImpl> onDependencyUpdated() {
+    return eval();
   }
 
   T _evalFInZone() {
@@ -466,9 +472,10 @@ class ComputedImpl<T> {
   }
 
   // Also notifies the listeners (but not downstream computations) if necessary
-  // Adds the set of downstream nodes that need recomputation to GlobalCtx._currentUpdateNodes.
   // Can throw [NoValueException].
-  void _evalF() {
+  // Returns the set of downstream nodes to be re-computed.
+  // This is public so that it can be customized by subclasses
+  Set<ComputedImpl> eval() {
     const idempotencyFailureMessage =
         "Computed expressions must be purely functional. Please use listeners for side effects. For computations creating asynchronous operations, make sure to use `Computed.async`.";
     GlobalCtx._currentUpdateNodeDirty[this] = null;
@@ -551,8 +558,7 @@ class ComputedImpl<T> {
                 _weakDownstreamComputations.where((c) => !c._computing));
           }
         }
-        downstream.forEach((c) => GlobalCtx._currentUpdateNodeDirty[c] = true);
-        GlobalCtx._currentUpdateNodes.addAll(downstream);
+        return downstream;
       }
     } finally {
       assert(_lastUpdate == GlobalCtx._currentUpdate);

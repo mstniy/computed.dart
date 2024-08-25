@@ -16,9 +16,10 @@ class _DelayedComputedImpl<T> extends ComputedImpl<T> {
   T get useWeak => throw UnimplementedError();
 
   @override
-  void onDependencyUpdated() {
+  Set<ComputedImpl> onDependencyUpdated() {
     // Delay until reeval() is called
     _onDependencyUpdated();
+    return {};
   }
 
   void reeval() {
