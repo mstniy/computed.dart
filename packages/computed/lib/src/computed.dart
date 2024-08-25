@@ -160,9 +160,9 @@ class GlobalCtx {
   static var _reacting = false;
 }
 
-void _injectNodesToDAG(Set<ComputedImpl> nodes) {
+void _injectNodesToDAG(Set<Computed> nodes) {
   nodes.forEach((c) => GlobalCtx._currentUpdateNodeDirty[c] = true);
-  GlobalCtx._currentUpdateNodes.addAll(nodes);
+  GlobalCtx._currentUpdateNodes.addAll(nodes.cast<ComputedImpl>());
 }
 
 void _rerunGraph(Set<ComputedImpl> roots) {
@@ -448,7 +448,7 @@ class ComputedImpl<T> implements Computed<T> {
 
   // Returns the set of downstream nodes to be re-computed.
   // This is public so that it can be customized by subclasses
-  Set<ComputedImpl> onDependencyUpdated() {
+  Set<Computed> onDependencyUpdated() {
     return eval();
   }
 
@@ -488,7 +488,7 @@ class ComputedImpl<T> implements Computed<T> {
   // Can throw [NoValueException].
   // Returns the set of downstream nodes to be re-computed.
   // This is public so that it can be customized by subclasses
-  Set<ComputedImpl> eval() {
+  Set<Computed> eval() {
     const idempotencyFailureMessage =
         "Computed expressions must be purely functional. Please use listeners for side effects. For computations creating asynchronous operations, make sure to use `Computed.async`.";
     GlobalCtx._currentUpdateNodeDirty[this] = null;
