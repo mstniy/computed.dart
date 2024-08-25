@@ -154,14 +154,17 @@ class GlobalCtx {
 
   static var _currentUpdate = _Token(); // Guaranteed to be unique thanks to GC
   static Set<ComputedImpl> _currentUpdateNodes = {};
+  static Expando<bool> _currentUpdateNodeDirty =
+      Expando('computed_dag_runner_node_dirty');
 
   static var _reacting = false;
 }
 
 void _rerunGraph(Set<ComputedImpl> roots) {
   GlobalCtx._currentUpdateNodes = roots;
+  GlobalCtx._currentUpdateNodeDirty = Expando('computed_dag_runner_node_dirty');
   for (var node in roots) {
-    node._dirty = true;
+    GlobalCtx._currentUpdateNodeDirty[node] = true;
   }
 
   void _evalAfterEnsureUpstreamEvald(ComputedImpl node) {
@@ -172,7 +175,7 @@ void _rerunGraph(Set<ComputedImpl> roots) {
     });
     // It is possible that this node has been forced to be evaluated by another
     // In this case, do not re-compute it again
-    if (node._dirty) {
+    if (GlobalCtx._currentUpdateNodeDirty[node] == true) {
       try {
         node.onDependencyUpdated();
       } on NoValueException {
@@ -223,8 +226,6 @@ class ComputedImpl<T> {
 
   final void Function()? _onCancel;
   final void Function(T value)? _dispose;
-
-  var _dirty = false;
 
   void _use(bool weak) {
     if (_computing) throw CyclicUseException();
@@ -470,7 +471,7 @@ class ComputedImpl<T> {
   void _evalF() {
     const idempotencyFailureMessage =
         "Computed expressions must be purely functional. Please use listeners for side effects. For computations creating asynchronous operations, make sure to use `Computed.async`.";
-    _dirty = false;
+    GlobalCtx._currentUpdateNodeDirty[this] = null;
     final oldComputation = GlobalCtx._currentComputation;
     var gotNVE = false;
     bool shouldNotify = false;
@@ -550,7 +551,7 @@ class ComputedImpl<T> {
                 _weakDownstreamComputations.where((c) => !c._computing));
           }
         }
-        downstream.forEach((c) => c._dirty = true);
+        downstream.forEach((c) => GlobalCtx._currentUpdateNodeDirty[c] = true);
         GlobalCtx._currentUpdateNodes.addAll(downstream);
       }
     } finally {
