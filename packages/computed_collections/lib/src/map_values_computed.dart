@@ -17,7 +17,8 @@ class MapValuesComputedComputedMap<K, V, VParent>
   final IComputedMap<K, VParent> _parent;
   final Computed<V> Function(K key, VParent value) _convert;
 
-  final _keyOptionComputations = ComputationCache<K, Option<V>>();
+  final _keyOptionComputations =
+      ComputationCache<K, Option<V>>(assertIdempotent: false);
 
   late final CSTracker<K, V> _tracker;
 

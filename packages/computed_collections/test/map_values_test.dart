@@ -74,7 +74,7 @@ void main() {
 
     s.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
     await Future.value(); // Await the CSTracker delay
-    expect(cCnt, 2);
+    expect(cCnt, 1);
     expect(callCnt1, 2);
     expect(lastRes1, 2);
     expect(callCnt2, 2);
@@ -143,7 +143,7 @@ void main() {
 
     s.add(ChangeEventReplace({0: 1}.lock));
     await Future.value();
-    expect(cCnt, 2); // And not 4 or 6
+    expect(cCnt, 1); // And not 2 or 3
     expect(resCache2, [2]);
 
     sub1.cancel();

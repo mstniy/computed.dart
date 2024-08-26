@@ -14,7 +14,7 @@ class MapValuesComputedMap<K, V, VParent>
   final IComputedMap<K, VParent> _parent;
   final V Function(K key, VParent value) _convert;
 
-  final _keyComputations = ComputationCache<K, V?>();
+  final _keyComputations = ComputationCache<K, V?>(assertIdempotent: false);
 
   late final CSTracker<K, V> _tracker;
 
@@ -36,7 +36,8 @@ class MapValuesComputedMap<K, V, VParent>
             };
           }))),
       };
-    });
+      // We opt out of the Computed's idempotency check as there is no guarantee that the user function returns a comparable object
+    }, assertIdempotent: false);
     snapshot = snapshotComputation(
         changes,
         () => _parent.snapshot.use
