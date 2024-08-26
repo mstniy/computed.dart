@@ -4,7 +4,6 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import '../icomputedmap.dart';
 import 'add_all_computed.dart';
 import 'group_by.dart';
-import 'group_by_computed.dart';
 import 'map.dart';
 import 'map_computed.dart';
 import 'map_values.dart';
@@ -81,5 +80,11 @@ mixin OperatorsMixin<K, V> {
 
   IComputedMap<K2, IComputedMap<K, V>> groupByComputed<K2>(
           Computed<K2> Function(K key, V value) key) =>
-      GroupByComputedComputedMap(this as IComputedMap<K, V>, key);
+      (this as IComputedMap<K, V>)
+          .mapValuesComputed((k, v) {
+            final c = key(k, v);
+            return $(() => (c.use, v));
+          })
+          .groupBy((k, v) => v.$1)
+          .mapValues((_, v1) => v1.mapValues((_, v2) => v2.$2));
 }
