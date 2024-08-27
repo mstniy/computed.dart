@@ -41,10 +41,14 @@ class CSTracker<K, V> {
       Computed<IMap<K, V>> snapshotStream) {
     final downstream = <Computed>{};
 
+    void _pubAll() {
+      downstream.addAll({..._keyStreams.values, ..._valueStreams.values});
+    }
+
     void _onException(Object e) {
       _snapshot = ValueOrException.exc(e);
       // Broadcast the exception to all the key/value streams
-      downstream.addAll({..._keyStreams.values, ..._valueStreams.values});
+      _pubAll();
     }
 
     _pusher = _CustomDownstream(() {
@@ -66,8 +70,12 @@ class CSTracker<K, V> {
       try {
         change = changeStream.use;
       } on NoValueException {
-        // TODO: This logic breaks down when used on eg. a ConstComputedMap
-        throw NoValueException();
+        if (sOld == null) {
+          // TODO: iterate over either the set of streams or the set of keys
+          //  in the snapshot, whichever is smaller.
+          _pubAll();
+        }
+        return;
       } catch (e) {
         _onException(e);
         return;
@@ -77,8 +85,8 @@ class CSTracker<K, V> {
         KeyChanges<K, V>(changes: final changes) => sOld == null
             ? {..._keyStreams.values, ..._valueStreams.values}
             : {
-                // iterate over either the set of streams or the set of keys
-                // in both the old and the new snapshots, whichever is smaller.
+                // TODO: iterate over either the set of streams or the set of keys
+                //  in both the old and the new snapshots, whichever is smaller.
                 ...changes.entries
                     .where((e) =>
                         _keyStreams.containsKey(e.key) &&
