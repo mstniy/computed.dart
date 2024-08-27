@@ -105,13 +105,13 @@ class GroupByComputedMap<K, V, KParent>
                         e.key: ChangeRecordValue(e.value.$2)
                       }.lock));
             }
+            final hasOldGroup = _mappedKeys.containsKey(parentKey);
             final oldGroupKey = _mappedKeys[parentKey];
             _mappedKeys[parentKey] = groupKey;
-            if (oldGroupKey != null) {
-              // TODO: Use containsKey instead, as K might be nullable
+            if (hasOldGroup) {
               if (oldGroupKey != groupKey) {
-                final oldGroup = _m.update(
-                    oldGroupKey, (g) => (g.$1, g.$2.remove(parentKey), g.$3));
+                final oldGroup = _m.update(oldGroupKey as K,
+                    (g) => (g.$1, g.$2.remove(parentKey), g.$3));
                 if (oldGroup.$2.isEmpty) {
                   keyChanges[oldGroupKey] = ChangeRecordDelete();
                   _m.remove(oldGroupKey);
