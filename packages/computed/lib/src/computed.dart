@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:meta/meta.dart';
+
 import '../computed.dart';
 import 'data_source_subscription.dart';
 import 'sync_zone.dart';
@@ -488,6 +490,7 @@ class ComputedImpl<T> implements Computed<T> {
   // Can throw [NoValueException].
   // Returns the set of downstream nodes to be re-computed.
   // This is public so that it can be customized by subclasses
+  @mustCallSuper
   Set<Computed> eval() {
     const idempotencyFailureMessage =
         "Computed expressions must be purely functional. Please use listeners for side effects. For computations creating asynchronous operations, make sure to use `Computed.async`.";
