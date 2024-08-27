@@ -146,8 +146,7 @@ class GroupByComputedMap<K, V, KParent>
                     )); // Not passing `ifAbsent` as the key has to be present (ow/ we have a corrupt internal state)
             if (oldGroup.$2.isEmpty) {
               keyChanges[oldGroupKey] = ChangeRecordDelete();
-              _m.remove(
-                  oldGroupKey); // TODO: Have a regression test for this -> delete an upstream key, removing a group, re-add that group, whiile not subbed to it -> breaks, the re-introduction of the group is never announced on the main CS
+              _m.remove(oldGroupKey);
               batchedChanges.remove(oldGroupKey);
             } else {
               if (!oldGroup.$1.hasListener) {

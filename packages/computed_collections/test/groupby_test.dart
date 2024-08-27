@@ -113,6 +113,17 @@ void main() {
     expect(lastRes6,
         KeyChanges({2: ChangeRecordDelete<IComputedMap<int, int>>()}.lock));
 
+    // Re-introduce a previously removed group
+    s.add(KeyChanges({0: ChangeRecordValue(2)}.lock));
+    expect(lastRes1!.keys, [0, 2]);
+    await Future.value();
+    expect(lastRes2, {1: 3}.lock);
+    expect(lastRes3, null);
+    expect(lastRes4, {0: 2}.lock);
+    // No change
+    expect(lastRes5, KeyChanges({0: ChangeRecordDelete<int>()}.lock));
+    expect(lastRes6, KeyChanges({2: ChangeRecordValue(lastRes1![2])}.lock));
+
     // Upstream replacement
     s.add(ChangeEventReplace({0: 0, 1: 1, 2: 3}.lock));
     await Future.value();
