@@ -12,16 +12,6 @@ class _CustomDownstream extends ComputedImpl<void> {
       : super(f, false, false, false, null, null);
 
   @override
-  // Cannot subscribe to this - it will "push" updates instead
-  void get use => throw UnsupportedError('cannot use');
-
-  @override
-  void get useWeak => throw UnsupportedError('cannot useWeak');
-
-  @override
-  void get prev => throw UnsupportedError('cannot prev');
-
-  @override
   Set<Computed> eval() {
     super.eval();
     return _downstream;
@@ -32,7 +22,6 @@ class CSTracker<K, V> {
   ValueOrException<IMap<K, V>>? _snapshot;
 
   late final _CustomDownstream _pusher;
-  ComputedSubscription<void>? _pusherSub;
 
   final _keyStreams = <K, Computed<Option<V>>>{};
   final _valueStreams = <V, Computed<bool>>{};
@@ -121,14 +110,7 @@ class CSTracker<K, V> {
   void _maybeCancelSub() {
     if (_keyStreams.isEmpty && _valueStreams.isEmpty) {
       _snapshot = null;
-      _pusherSub!.cancel();
-      _pusherSub = null;
     }
-  }
-
-  void _maybeCreateSub() {
-    _pusherSub ??= _pusher.listen(null,
-        (e) {}); // Swallow the exceptions here, as key/value streams handle it themselves
   }
 
   Computed<Option<V>> _maybeInitKeyStream(K key) {
@@ -140,7 +122,7 @@ class CSTracker<K, V> {
 
     return _keyStreams.putIfAbsent(key, () {
       final s = Computed<Option<V>>.async(() {
-        _maybeCreateSub();
+        _pusher.use;
         // Note that this computation does not .use anything
         //  it is instead ran by the snapshot computation using "push" semantics
         if (_snapshot == null) {
@@ -180,7 +162,7 @@ class CSTracker<K, V> {
       final leaderStream = _valueStreams.putIfAbsent(
           value,
           () => Computed.async(() {
-                _maybeCreateSub();
+                _pusher.use;
                 // Note that this computation does not .use anything
                 //  it is instead ran by the snapshot computation using "push" semantics
                 // Note that this could be further optimized by keeping a set of keys
