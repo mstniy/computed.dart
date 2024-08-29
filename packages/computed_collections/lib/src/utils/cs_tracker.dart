@@ -1,27 +1,15 @@
 import 'package:computed/computed.dart';
-import 'package:computed/src/computed.dart';
 import 'package:computed_collections/src/utils/option.dart';
 import 'package:computed_collections/src/utils/value_or_exception.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import '../../change_event.dart';
-
-class _CustomDownstream extends ComputedImpl<void> {
-  Set<Computed> _downstream;
-  _CustomDownstream(void Function() f, this._downstream)
-      : super(f, false, false, false, null, null);
-
-  @override
-  Set<Computed> eval() {
-    super.eval();
-    return _downstream;
-  }
-}
+import 'custom_downstream.dart';
 
 class CSTracker<K, V> {
   ValueOrException<IMap<K, V>>? _snapshot;
 
-  late final _CustomDownstream _pusher;
+  late final CustomDownstream _pusher;
 
   final _keyStreams = <K, Computed<Option<V>>>{};
   final _valueStreams = <V, Computed<bool>>{};
@@ -30,18 +18,14 @@ class CSTracker<K, V> {
       Computed<IMap<K, V>> snapshotStream) {
     final downstream = <Computed>{};
 
-    void _pubAll() {
-      downstream.addAll({..._keyStreams.values, ..._valueStreams.values});
-    }
+    Set<Computed> _allStreams() =>
+        {..._keyStreams.values, ..._valueStreams.values};
 
     void _onException(Object e) {
       _snapshot = ValueOrException.exc(e);
-      // Broadcast the exception to all the key/value streams
-      _pubAll();
     }
 
-    _pusher = _CustomDownstream(() {
-      downstream.clear();
+    _pusher = CustomDownstream(() {
       if (_snapshot != null && !_snapshot!.isValue) {
         // "cancelOnError" semantics
         throw NoValueException();
@@ -53,7 +37,7 @@ class CSTracker<K, V> {
         rethrow; // Not much to do if we don't have a snapshot
       } catch (e) {
         _onException(e);
-        return;
+        return _allStreams();
       }
       final ChangeEvent<K, V> change;
       try {
@@ -62,15 +46,15 @@ class CSTracker<K, V> {
         if (sOld == null) {
           // TODO: iterate over either the set of streams or the set of keys
           //  in the snapshot, whichever is smaller.
-          _pubAll();
+          return _allStreams();
         }
-        return;
+        return {};
       } catch (e) {
         _onException(e);
-        return;
+        return _allStreams();
       }
       // "push" the update to the relevant streams by returning them as our downstream
-      downstream.addAll(switch (change) {
+      return switch (change) {
         KeyChanges<K, V>(changes: final changes) => sOld == null
             ? {..._keyStreams.values, ..._valueStreams.values}
             : {
@@ -103,7 +87,7 @@ class CSTracker<K, V> {
             ..._keyStreams.values,
             ..._valueStreams.values
           }
-      });
+      };
     }, downstream);
   }
 

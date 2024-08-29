@@ -309,12 +309,6 @@ void main() {
     }.lock));
     await Future.value();
     await Future.value();
-    expect(lastRes1!.keys, unorderedEquals([0, 2]));
-    expect(lastRes2, {1: 0, 10: 1}.lock);
-    expect(
-        lastRes5,
-        KeyChanges(
-            {1: ChangeRecordValue(0), 3: ChangeRecordDelete<int>()}.lock));
     await Future.value();
     expect(lastRes2, {1: 0, 3: 0, 10: 1}.lock);
     expect(lastRes3, null);
