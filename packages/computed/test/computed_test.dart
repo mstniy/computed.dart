@@ -2554,9 +2554,9 @@ void main() {
       expect(subCnt, 0);
       controller1.add(0);
       expect(subCnt, 0);
+      expectation1 = 0;
       controller2.add(1);
       expect(subCnt, 1);
-      expectation1 = 0;
       expectation2 = 1;
       controller1.add(1);
       expect(subCnt, 2);
@@ -2841,6 +2841,22 @@ void main() {
       controller2.add(5);
       expect(subCnt, 5);
 
+      sub.cancel();
+    });
+
+    test('can be used even if the last computation threw NVE', () async {
+      final s = ValueStream.seeded(42, sync: true);
+      int? res;
+      final c2 = $(() {
+        s.use;
+        res = s.prev;
+        throw NoValueException();
+      });
+      final sub = c2.listen(null);
+      await Future.value(); // For [s] to notify Computed
+      expect(res, null);
+      s.add(43);
+      expect(res, 42);
       sub.cancel();
     });
   });

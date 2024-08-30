@@ -298,7 +298,6 @@ class ComputedImpl<T> implements Computed<T> {
       if (_prevResult == null && _initialPrev == null) throw NoValueException();
       return (_prevResult?.value ?? _initialPrev)!;
     } else {
-      if (caller._lastResult == null) throw NoValueException();
       final mvoe = caller._lastUpstreamComputations[this];
       if (mvoe?._voe == null) {
         throw NoValueException();
