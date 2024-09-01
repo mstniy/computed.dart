@@ -18,8 +18,9 @@ final class _GroupInfo<KParent, V> {
   IMap<KParent, V> snapshot;
   Computed<IMap<KParent, V>> ss;
   bool ssHasSubscribers = false;
+  IComputedMap<KParent, V> m;
 
-  _GroupInfo(this.snapshot, this.cs, this.ss);
+  _GroupInfo(this.snapshot, this.cs, this.ss, this.m);
 }
 
 class GroupByComputedMap<K, V, KParent>
@@ -111,13 +112,13 @@ class GroupByComputedMap<K, V, KParent>
     _m = grouped.map((k, v) {
       final cs = _makeCS(k);
       final ss = _makeSS(k);
-      return MapEntry(k, _GroupInfo(v.lock, cs, ss));
+      final map = ChangeStreamComputedMap(cs, snapshotStream: ss);
+      return MapEntry(k, _GroupInfo(v.lock, cs, ss, map));
     });
     _mappedKeys = mappedKeys;
 
     return _m!.map((k, v) {
-      return MapEntry<K, IComputedMap<KParent, V>>(
-          k, ChangeStreamComputedMap(v.cs, snapshotStream: v.ss));
+      return MapEntry<K, IComputedMap<KParent, V>>(k, v.m);
     }).lock;
   }
 
@@ -191,9 +192,9 @@ class GroupByComputedMap<K, V, KParent>
                 final snapshot = {parentKey: value}.lock;
                 final cs = _makeCS(groupKey);
                 final ss = _makeSS(groupKey);
-                keyChanges[groupKey] = ChangeRecordValue(
-                    ChangeStreamComputedMap(cs, snapshotStream: ss));
-                return _GroupInfo(snapshot, cs, ss);
+                final m = ChangeStreamComputedMap(cs, snapshotStream: ss);
+                keyChanges[groupKey] = ChangeRecordValue(m);
+                return _GroupInfo(snapshot, cs, ss, m);
               },
             );
             if (!keyChanges.containsKey(groupKey)) {
@@ -302,8 +303,15 @@ class GroupByComputedMap<K, V, KParent>
     }, downstream);
 
     snapshot = snapshotComputation(changes, () {
-      final s = _parent.snapshot.use;
-      return _setM(s);
+      // There might already be a subscriber to .changes,
+      // so check the internal fields first.
+      if (_exc != null) throw _exc!;
+      return switch (_m) {
+        Map<K, _GroupInfo<KParent, V>>() =>
+          _m!.map((k, g) => MapEntry(k, g.m)).lock,
+        // No subscriber yet - kick things off
+        null => _setM(_parent.snapshot.use),
+      };
     });
 
     _tracker = CSTracker(changes, snapshot);
