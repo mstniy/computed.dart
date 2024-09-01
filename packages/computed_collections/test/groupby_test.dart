@@ -268,4 +268,27 @@ void main() {
 
     sub.cancel();
   });
+
+  test('propagates exceptions', () async {
+    final s = ValueStream<ChangeEvent<int, int>>.seeded(
+        ChangeEventReplace({0: 1}.lock),
+        sync: true);
+    final m1 = IComputedMap.fromChangeStream($(() => s.use));
+    final m2 = m1.groupBy((key, value) => key);
+
+    List<Object?> res = [null, null, null, null];
+    final x = [
+      m2.changes.listen((e) => null, (o) => res[0] = o),
+      m2.snapshot.listen((e) => null, (o) => res[1] = o),
+      $(() => m2[0].use?.changes.use).listen((e) => null, (o) => res[2] = o),
+      $(() => m2[0].use?.snapshot.use).listen((e) => null, (o) => res[3] = o),
+    ];
+    await Future.value();
+    s.addError(42);
+    res.forEach((o) => expect(o, 42));
+    s.addError(43); // Has no effect due to the "cancelOnError" semantics
+    for (var i = 0; i < 5; i++) await Future.value();
+    res.forEach((o) => expect(o, 42)); // And not 43
+    x.forEach((sub) => sub.cancel());
+  });
 }
