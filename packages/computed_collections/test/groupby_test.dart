@@ -269,6 +269,19 @@ void main() {
     sub.cancel();
   });
 
+  test('is(Not)Empty/length works', () async {
+    final m1 = ConstComputedMap({0: 1, 1: 2, 2: 3}.lock)
+        .groupBy((key, value) => key % 2);
+    expect(await getValue(m1.length), 2);
+    expect(await getValue(m1.isEmpty), false);
+    expect(await getValue(m1.isNotEmpty), true);
+
+    final m2 = ConstComputedMap({}.lock).groupBy((key, value) => key % 2);
+    expect(await getValue(m2.length), 0);
+    expect(await getValue(m2.isEmpty), true);
+    expect(await getValue(m2.isNotEmpty), false);
+  });
+
   test('propagates exceptions', () async {
     final s = ValueStream<ChangeEvent<int, int>>.seeded(
         ChangeEventReplace({0: 1}.lock),
@@ -290,5 +303,98 @@ void main() {
     for (var i = 0; i < 5; i++) await Future.value();
     res.forEach((o) => expect(o, 42)); // And not 43
     x.forEach((sub) => sub.cancel());
+  });
+
+  test('listening on snapshot when there already are listeners and groups',
+      () async {
+    final m =
+        IComputedMap({0: 1, 1: 2, 2: 3}.lock).groupBy((key, value) => key % 2);
+
+    final sub = m.changes.listen(null);
+    await Future.value();
+
+    expect((await getValue(m.snapshot)).keys, [0, 1]);
+
+    sub.cancel();
+  });
+
+  test(
+      'listening on snapshot when there already are listeners and upstream has reported an exception',
+      () async {
+    final s = ValueStream<ChangeEvent<int, int>>(sync: true);
+    final m1 = IComputedMap.fromChangeStream($(() => s.use));
+    final m2 = m1.groupBy((key, value) => key);
+
+    Object? exc1;
+    int cnt1 = 0;
+    final sub1 = m2.changes.listen((e) => fail('Must never be called'), (o) {
+      cnt1++;
+      exc1 = o;
+    });
+    await Future.value();
+    s.addError(42);
+    expect(cnt1, 1);
+    expect(exc1, 42);
+
+    Object? exc2;
+    int cnt2 = 0;
+    final sub2 = m2.snapshot.listen((e) => fail('Must never be called'), (o) {
+      cnt2++;
+      exc2 = o;
+    });
+    await Future.value();
+    expect(cnt1, 1);
+    expect(cnt2, 1);
+    expect(exc2, 42);
+
+    sub1.cancel();
+    sub2.cancel();
+  });
+
+  test('defunct computations stop computing', () async {
+    final s = ValueStream<IMap<int, int>>.seeded({0: 1}.lock, sync: true);
+    final m1 = IComputedMap.fromSnapshotStream($(() => s.use));
+    final m2 = m1.groupBy((key, value) => key);
+    final defunct = (await getValue(m2[0]))!;
+    expect(await getValues(defunct.snapshot), []);
+    expect(await getValues(defunct.changes), []);
+    expect(
+        await getValuesWhile(defunct.snapshot, () async {
+          final sub = m2.snapshot.listen(null);
+          await Future.value();
+          sub.cancel();
+        }),
+        []);
+    expect(
+        await getValuesWhile(defunct.changes, () async {
+          final sub = m2.snapshot.listen(null);
+          await Future.value();
+          sub.cancel();
+        }),
+        []);
+  });
+
+  test('handles upstream extraneous deletions', () async {
+    final s = ValueStream<ChangeEvent<int, int>>(sync: true);
+    final m1 = IComputedMap.fromChangeStream($(() => s.use));
+    final m2 = m1.groupBy((key, value) => key);
+
+    IMap<int, IComputedMap<int, int>>? snap;
+    final sub = m2.snapshot.listen((event) => snap = event);
+    await Future.value();
+    s.add(ChangeEventReplace({0: 1, 1: 2, 2: 3}.lock));
+    expect(snap!.keys, [0, 1, 2]);
+    s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
+    expect(snap!.keys, [1, 2]);
+    s.add(KeyChanges({1: ChangeRecordDelete<int>()}.lock));
+    expect(snap!.keys, [2]);
+    // Send an extraneous deletion
+    s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
+    expect(snap!.keys, [2]);
+    // Still reactive
+    s.add(KeyChanges({2: ChangeRecordDelete<int>()}.lock));
+    expect(snap!.keys, []);
+
+    sub.cancel();
   });
 }

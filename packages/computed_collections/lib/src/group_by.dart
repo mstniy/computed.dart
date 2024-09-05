@@ -232,8 +232,9 @@ class GroupByComputedMap<K, V, KParent>
           }
 
           for (var deletedKey in deletedKeys) {
-            if (!_mappedKeys.containsKey(deletedKey))
+            if (!_mappedKeys.containsKey(deletedKey)) {
               continue; // Extraneous deletion from upstream?
+            }
             final oldGroupKey = _mappedKeys.remove(deletedKey) as K;
             final oldGroup = _m![oldGroupKey]!;
             oldGroup.snapshot = oldGroup.snapshot.remove(deletedKey);
@@ -289,10 +290,11 @@ class GroupByComputedMap<K, V, KParent>
       final Set<Computed> downstream;
       try {
         downstream = _keyChangesAndDownstream.use.$2;
-      } on NoValueException {
-        // Not much to do.
-        throw NoValueException();
       } catch (e) {
+        // _keyChangesAndDownstream must have already assumed a value,
+        // as otherwise there would be no groups and we would have no
+        // users and not be computed.
+        assert(e is! NoValueException);
         // Broadcast the exception to all the streams
         return _m!.values
             .map((g) =>
