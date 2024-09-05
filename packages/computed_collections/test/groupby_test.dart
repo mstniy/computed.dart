@@ -50,7 +50,6 @@ void main() {
     expect(lastRes6, null);
 
     s.add(KeyChanges({0: ChangeRecordValue(1)}.lock)); // Add a new group
-    await Future.value();
     expect(lastRes1!.keys, [1]);
     expect(lastRes2, null);
     expect(lastRes3, {0: 1}.lock);
@@ -61,7 +60,6 @@ void main() {
     // Change the value of an existing item, removing a group
     // + add a new group
     s.add(KeyChanges({0: ChangeRecordValue(2), 1: ChangeRecordValue(0)}.lock));
-    await Future.value();
     expect(lastRes1!.keys, unorderedEquals([0, 2]));
     expect(lastRes2, {1: 0}.lock);
     expect(lastRes3, null);
@@ -92,7 +90,6 @@ void main() {
     // Add a value to an existing group
     s.add(KeyChanges({0: ChangeRecordValue(0)}.lock));
     expect(lastRes1!.keys, [0]);
-    await Future.value();
     expect(lastRes2, {0: 0, 1: 3}.lock);
     expect(lastRes3, null);
     expect(lastRes4, null);
@@ -104,7 +101,6 @@ void main() {
     // Remove a value from an existing group, which has other elements
     s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
     expect(lastRes1!.keys, [0]);
-    await Future.value();
     expect(lastRes2, {1: 3}.lock);
     expect(lastRes3, null);
     expect(lastRes4, null);
@@ -116,7 +112,6 @@ void main() {
     // Re-introduce a previously removed group
     s.add(KeyChanges({0: ChangeRecordValue(2)}.lock));
     expect(lastRes1!.keys, [0, 2]);
-    await Future.value();
     expect(lastRes2, {1: 3}.lock);
     expect(lastRes3, null);
     expect(lastRes4, {0: 2}.lock);
@@ -126,7 +121,6 @@ void main() {
 
     // Upstream replacement
     s.add(ChangeEventReplace({0: 0, 1: 1, 2: 3}.lock));
-    await Future.value();
     expect(lastRes1!.keys, unorderedEquals([0, 1]));
     expect(lastRes2, {0: 0, 2: 3}.lock);
     expect(lastRes3, {1: 1}.lock);
@@ -142,7 +136,6 @@ void main() {
     // Change the group of an item, changing its group, but keeping its former group populated
     s.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
     expect(lastRes1!.keys, unorderedEquals([0, 1]));
-    await Future.value();
     expect(lastRes2, {2: 3}.lock);
     expect(lastRes3, {0: 1, 1: 1}.lock);
     expect(lastRes4, null);
@@ -158,8 +151,6 @@ void main() {
     s.add(KeyChanges(
         {2: ChangeRecordDelete<int>(), 0: ChangeRecordValue(3)}.lock));
     expect(lastRes1!.keys, unorderedEquals([0, 1]));
-    await Future.value();
-    await Future.value();
     expect(lastRes2, {0: 3}.lock);
     expect(lastRes3, {1: 1}.lock);
     expect(lastRes4, null);
@@ -180,7 +171,6 @@ void main() {
       4: ChangeRecordValue(0)
     }.lock));
     expect(lastRes1!.keys, unorderedEquals([0, 1]));
-    await Future.value();
     expect(lastRes2, {1: 3, 3: 0, 4: 0}.lock);
     expect(lastRes3, {0: 1, 2: 1}.lock);
     expect(lastRes4, null);
@@ -204,7 +194,6 @@ void main() {
       3: ChangeRecordDelete<int>(),
     }.lock));
     expect(lastRes1!.keys, unorderedEquals([0]));
-    await Future.value();
     expect(lastRes2, {4: 0}.lock);
     expect(lastRes3, null);
     expect(lastRes4, null);

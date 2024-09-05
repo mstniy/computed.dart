@@ -65,7 +65,6 @@ void main() {
     }, (e) => fail(e.toString()));
 
     await Future.value();
-    await Future.value();
     expect(cCnt, 0);
     expect(callCnt1, 1);
     expect(lastRes1, null);
@@ -73,7 +72,6 @@ void main() {
     expect(lastRes2, null);
 
     s.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
-    await Future.value(); // Await the CSTracker delay
     expect(cCnt, 1);
     expect(callCnt1, 2);
     expect(lastRes1, 2);
@@ -142,8 +140,10 @@ void main() {
     }, null);
 
     s.add(ChangeEventReplace({0: 1}.lock));
-    await Future.value();
     expect(cCnt, 1); // And not 2 or 3
+    expect(resCache2, [2]);
+    for (var i = 0; i < 5; i++) await Future.value();
+    expect(cCnt, 1); // Still
     expect(resCache2, [2]);
 
     sub1.cancel();

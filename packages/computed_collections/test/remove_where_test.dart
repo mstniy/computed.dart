@@ -72,7 +72,6 @@ void main() {
     }, (e) => fail(e.toString()));
 
     await Future.value();
-    await Future.value();
     expect(cCnt, 0);
     expect(callCnt1, 1);
     expect(lastRes1, null);
@@ -82,7 +81,6 @@ void main() {
     expect(lastRes3, null);
 
     s.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
-    await Future.value(); // Await the CSTracker delay
     expect(cCnt, 2);
     expect(callCnt1, 2);
     expect(lastRes1, 1);
@@ -91,14 +89,12 @@ void main() {
     expect(callCnt3, 1);
 
     s.add(KeyChanges({1: ChangeRecordValue(1)}.lock));
-    await Future.value();
     expect(cCnt, 4);
     expect(callCnt1, 2);
     expect(callCnt2, 2);
     expect(callCnt3, 1);
 
     s.add(KeyChanges({0: ChangeRecordValue(2)}.lock));
-    await Future.value(); // Await the CSTracker delay
     expect(cCnt, 6);
     expect(callCnt1, 3);
     expect(lastRes1, 2);
@@ -205,7 +201,6 @@ void main() {
 
     // Also test that operator[] and containsKey share the underlying filter computation
     s.add(ChangeEventReplace({0: 0}.lock));
-    await Future.value();
     expect(cCnt, 6); // And not 8
     expect(resCache2, [1, null, 1, null]);
     expect(resCache3, [true, false, true, false]);

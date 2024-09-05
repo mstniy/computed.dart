@@ -17,23 +17,16 @@ void main() {
       lastRes = event;
     });
     await Future.value();
-    // The extra microtask lags are due to .update subscribing the parent's [key]
-    await Future.value();
     expect(lastRes, {0: 0}.lock);
     s.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
-    await Future.value();
     expect(lastRes, {0: 2}.lock);
     s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
-    await Future.value();
     expect(lastRes, {0: 0}.lock);
     s.add(KeyChanges({1: ChangeRecordValue(1)}.lock));
-    await Future.value();
     expect(lastRes, {0: 0, 1: 1}.lock);
     s.add(ChangeEventReplace({0: 1, 1: 2}.lock));
-    await Future.value();
     expect(lastRes, {0: 2, 1: 2}.lock);
     s.add(ChangeEventReplace({1: 2}.lock));
-    await Future.value();
     expect(lastRes, {0: 0, 1: 2}.lock);
 
     sub.cancel();
@@ -61,7 +54,6 @@ void main() {
         cnt++;
         lastExc = e;
       });
-      await Future.value();
       await Future.value();
 
       expect(cnt, 1);
@@ -94,38 +86,32 @@ void main() {
     expect(callCnt1, 0);
     expect(callCnt2, 0);
     await Future.value();
-    await Future.value();
     expect(callCnt1, 1);
     expect(lastRes1, 0);
     expect(callCnt2, 1);
     expect(lastRes2, null);
 
     s.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
-    await Future.value();
     expect(callCnt1, 2);
     expect(lastRes1, 2);
     expect(callCnt2, 1);
 
     s.add(KeyChanges({1: ChangeRecordValue(2)}.lock));
-    await Future.value();
     expect(callCnt1, 2);
     expect(callCnt2, 2);
     expect(lastRes2, 2);
 
     s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
-    await Future.value();
     expect(callCnt1, 3);
     expect(lastRes1, 0);
     expect(callCnt2, 2);
 
     s.add(ChangeEventReplace({1: 0}.lock));
-    await Future.value();
     expect(callCnt1, 3);
     expect(callCnt2, 3);
     expect(lastRes2, 0);
 
     s.add(ChangeEventReplace({0: 0, 1: 1}.lock));
-    await Future.value();
     expect(callCnt1, 4);
     expect(lastRes1, 1);
     expect(callCnt2, 4);
@@ -154,10 +140,9 @@ void main() {
       cnt++;
       lastExc = e;
     });
-    s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
-    await Future.value();
     await Future.value();
 
+    s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
     expect(cnt, 1);
     expect(lastExc.toString(),
         ArgumentError.value(0, "key", "Key not in map.").toString());
@@ -174,25 +159,18 @@ void main() {
       lastRes = event;
     });
     await Future.value();
-    await Future.value();
     expect(lastRes, null);
     s.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
-    await Future.value();
     expect(lastRes, KeyChanges({0: ChangeRecordValue(2)}.lock));
     s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
-    await Future.value();
     expect(lastRes, KeyChanges({0: ChangeRecordValue(0)}.lock));
     s.add(KeyChanges({1: ChangeRecordValue(1)}.lock));
-    await Future.value();
     expect(lastRes, KeyChanges({1: ChangeRecordValue(1)}.lock));
     s.add(ChangeEventReplace({0: 1, 1: 2}.lock));
-    await Future.value();
     expect(lastRes, ChangeEventReplace({0: 2, 1: 2}.lock));
     s.add(ChangeEventReplace({1: 2}.lock));
-    await Future.value();
     expect(lastRes, ChangeEventReplace({0: 0, 1: 2}.lock));
     s.add(KeyChanges(<int, ChangeRecord<int>>{}.lock));
-    await Future.value();
     expect(lastRes, ChangeEventReplace({0: 0, 1: 2}.lock)); // No change
 
     sub.cancel();

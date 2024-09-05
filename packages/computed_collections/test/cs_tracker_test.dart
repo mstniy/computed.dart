@@ -43,16 +43,13 @@ void main() {
               last[idx] = event;
             }));
     await Future.value();
-    await Future.value();
     expect(cnts, List.generate(5, (index) => 1));
     expect(last, List.generate(5, (index) => null));
     cs.add(ChangeEventReplace({0: 0, 1: 1}.lock));
-    await Future.value();
     expect(cnts, [2, 2, 1, 1, 1]);
     expect(last[0], 0);
     expect(last[1], 1);
     cs.add(ChangeEventReplace({0: 0, 2: 2}.lock));
-    await Future.value();
     expect(cnts, [2, 3, 2, 1, 1]);
     expect(last[1], null);
     expect(last[2], 2);

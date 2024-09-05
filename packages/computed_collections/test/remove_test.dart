@@ -92,7 +92,6 @@ void main() {
     }, (e) => fail(e.toString()));
 
     await Future.value();
-    await Future.value();
     expect(callCnt1, 1);
     expect(callCnt2, 1);
     expect(callCnt3, 0);
@@ -100,34 +99,28 @@ void main() {
     expect(lastRes2, null);
 
     s.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
-    await Future.value();
     expect(callCnt2, 1);
     expect(callCnt3, 0);
 
     s.add(KeyChanges({1: ChangeRecordValue(2)}.lock));
-    await Future.value();
     expect(callCnt2, 2);
     expect(lastRes2, 2);
     expect(callCnt3, 1);
     expect(lastRes3, KeyChanges({1: ChangeRecordValue(2)}.lock));
     s.add(KeyChanges({1: ChangeRecordValue(3)}.lock));
-    await Future.value();
     expect(callCnt2, 3);
     expect(lastRes2, 3);
     expect(callCnt3, 2);
     expect(lastRes3, KeyChanges({1: ChangeRecordValue(3)}.lock));
     s.add(KeyChanges({0: ChangeRecordValue(4)}.lock));
-    await Future.value();
     expect(callCnt2, 3);
     expect(callCnt3, 2);
     s.add(ChangeEventReplace({0: 2, 5: 6}.lock));
-    await Future.value();
     expect(callCnt2, 4);
     expect(lastRes2, null);
     expect(callCnt3, 3);
     expect(lastRes3, ChangeEventReplace({5: 6}.lock));
     s.add(ChangeEventReplace({1: 1, 5: 6}.lock));
-    await Future.value();
     expect(callCnt2, 5);
     expect(lastRes2, 1);
     expect(callCnt3, 4);
