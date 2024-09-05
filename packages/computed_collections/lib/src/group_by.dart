@@ -156,9 +156,10 @@ class GroupByComputedMap<K, V, KParent>
         );
       }
 
+      // If we ended up here, either the upstream snapshot must have changed
+      // or upstream must have broadcast a change. Either way we must have a change.
+      change!;
       switch (change) {
-        case null:
-          throw NoValueException();
         case ChangeEventReplace<KParent, V>():
           // Same reasoning as the initial snapshot case above
           return (
