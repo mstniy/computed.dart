@@ -183,4 +183,12 @@ void main() {
     await testCoherenceInt(a, {0: 2}.lock);
     await testCoherenceInt(b, {0: 2, 1: 42}.lock);
   });
+
+  test('does not assert idempotency on the user function', () async {
+    var cnt = 5;
+    final m = IComputedMap({0: 1}.lock)
+        .update(0, (_) => ++cnt, ifAbsent: () => ++cnt)
+        .update(1, (_) => ++cnt, ifAbsent: () => ++cnt);
+    expect(await getValue(m.snapshot), {0: 6, 1: 7}.lock);
+  });
 }

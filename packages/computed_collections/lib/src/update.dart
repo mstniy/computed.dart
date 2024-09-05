@@ -57,14 +57,14 @@ class UpdateComputedMap<K, V>
           if (changes.isEmpty) throw NoValueException();
           return KeyChanges(IMap.fromEntries(changes));
       }
-    });
+    }, assertIdempotent: false);
     _tracker = CSTracker(changes, snapshot);
   }
 
   Computed<V> _getKeyComputation() {
     final parentContainsKey = _parent.containsKey(_key);
     final parentValue = _parent[_key];
-    return $(() {
+    return Computed(() {
       if (parentContainsKey.use) {
         return _update(parentValue.use as V);
       }
@@ -72,7 +72,7 @@ class UpdateComputedMap<K, V>
         return _ifAbsent!();
       }
       _throwArgError();
-    });
+    }, assertIdempotent: false);
   }
 
   Computed<V?> operator [](K key) {
