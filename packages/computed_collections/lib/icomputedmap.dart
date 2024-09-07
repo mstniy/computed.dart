@@ -64,4 +64,6 @@ abstract class IComputedMap<K, V> {
       K2 Function(K key, V value) key);
   IComputedMap<K2, IComputedMap<K, V>> groupByComputed<K2>(
       Computed<K2> Function(K key, V value) key);
+
+  IComputedMap<K, (V, V2)> join<V2>(IComputedMap<K, V2> other);
 }

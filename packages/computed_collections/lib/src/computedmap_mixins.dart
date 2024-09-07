@@ -1,4 +1,5 @@
 import 'package:computed/computed.dart';
+import 'package:computed_collections/src/join.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import '../icomputedmap.dart';
@@ -87,4 +88,7 @@ mixin OperatorsMixin<K, V> {
           })
           .groupBy((k, v) => v.$1)
           .mapValues((_, v1) => v1.mapValues((_, v2) => v2.$2));
+
+  IComputedMap<K, (V, V2)> join<V2>(IComputedMap<K, V2> other) =>
+      JoinComputedMap(this as IComputedMap<K, V>, other);
 }
