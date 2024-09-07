@@ -350,4 +350,21 @@ void main() {
     final mv = m.mapValuesComputed((key, value) => $(() => value + 1));
     await testCoherenceInt(mv, {0: 2}.lock);
   });
+
+  test('can have inter-key dependencies', () async {
+    final s =
+        ValueStream<IMap<int, int>>.seeded({0: 0, 1: 0, 2: 0}.lock, sync: true);
+    final m1 = IComputedMap.fromSnapshotStream($(() => s.use));
+    late final IComputedMap<int, int> m2;
+
+    final converts = [
+      (int v) => $(() => m2[1].use! * 2),
+      (int v) => $(() => m2[2].use! + 1),
+      (int v) => $(() => v + 2),
+    ];
+
+    m2 = m1.mapValuesComputed((key, value) => converts[key](value));
+
+    expect(await getValue(m2.snapshot), {0: 6, 1: 3, 2: 2}.lock);
+  });
 }

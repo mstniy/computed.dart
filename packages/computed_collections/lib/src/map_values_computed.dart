@@ -137,6 +137,8 @@ class MapValuesComputedComputedMap<K, V, VParent>
         return Option.none();
       } on NoStrongUserException {
         // Pass
+      } on CyclicUseException {
+        // Pass - we get this if the computation of one keys depends on the computation of another key
       }
       final c = computationComputation.use;
       if (c == null) {
