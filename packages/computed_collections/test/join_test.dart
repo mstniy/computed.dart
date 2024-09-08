@@ -76,6 +76,15 @@ void main() {
     expect(callCnt, 4);
     expect(lastRes, ChangeEventReplace({1: (2, 1), 2: (3, 2)}.lock));
 
+    s.add((
+      ChangeEventReplace({0: 1, 1: 2, 2: 3}.lock), // Same as last one
+      KeyChanges(// Note that the deletion on 3 is redundant
+          {1: ChangeRecordDelete<int>(), 3: ChangeRecordDelete<int>()}.lock)
+    ));
+    expect(callCnt, 5);
+    expect(lastRes,
+        KeyChanges({1: ChangeRecordDelete(), 3: ChangeRecordDelete()}.lock));
+
     sub.cancel();
   });
 }

@@ -2,6 +2,7 @@ import 'package:computed/computed.dart';
 import 'package:computed/utils/computation_cache.dart';
 import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/icomputedmap.dart';
+import 'package:computed_collections/src/utils/get_if_changed.dart';
 import 'package:computed_collections/src/utils/snapshot_computation.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
@@ -20,35 +21,22 @@ class JoinComputedMap<K, V1, V2>
     changes = Computed(() {
       final parent1Snapshot = _parent1.snapshot.use;
       final parent2Snapshot = _parent2.snapshot.use;
-      ChangeEvent<K, V1>? parent1ChangeEventPrev, parent1ChangeEventNow;
-      ChangeEvent<K, V2>? parent2ChangeEventPrev, parent2ChangeEventNow;
-      try {
-        parent1ChangeEventPrev = _parent1.changes.prev;
-      } catch (NoValueException) {}
-      try {
-        parent1ChangeEventNow = _parent1.changes.use;
-      } catch (NoValueException) {}
-      try {
-        parent2ChangeEventPrev = _parent2.changes.prev;
-      } catch (NoValueException) {}
-      try {
-        parent2ChangeEventNow = _parent2.changes.use;
-      } catch (NoValueException) {}
+      final parent1Change = getIfChanged(_parent1.changes);
+      final parent2Change = getIfChanged(_parent2.changes);
 
       // Note that here we assume that .changes is in sync with .snapshot for both parents
 
-      if (parent1ChangeEventNow is ChangeEventReplace ||
-          parent2ChangeEventNow is ChangeEventReplace) {
+      if (parent1Change is ChangeEventReplace ||
+          parent2Change is ChangeEventReplace) {
         return ChangeEventReplace(
             _computeSnapshot(parent1Snapshot, parent2Snapshot));
       }
 
       final keyChanges = <K, ChangeRecord<(V1, V2)>>{};
 
-      if (!identical(parent1ChangeEventPrev, parent1ChangeEventNow)) {
+      if (parent1Change != null) {
         // _parent1 has a new change
-        for (var e
-            in (parent1ChangeEventNow as KeyChanges<K, V1>).changes.entries) {
+        for (var e in (parent1Change as KeyChanges<K, V1>).changes.entries) {
           switch (e.value) {
             case ChangeRecordValue<V1>(value: final v1):
               if (parent2Snapshot.containsKey(e.key)) {
@@ -63,10 +51,9 @@ class JoinComputedMap<K, V1, V2>
         }
       }
 
-      if (!identical(parent2ChangeEventPrev, parent2ChangeEventNow)) {
+      if (parent2Change != null) {
         // _parent2 has a new change
-        for (var e
-            in (parent2ChangeEventNow as KeyChanges<K, V2>).changes.entries) {
+        for (var e in (parent2Change as KeyChanges<K, V2>).changes.entries) {
           switch (e.value) {
             case ChangeRecordValue<V2>(value: final v2):
               if (parent1Snapshot.containsKey(e.key)) {
