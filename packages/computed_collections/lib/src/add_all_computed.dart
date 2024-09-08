@@ -2,6 +2,7 @@ import 'package:computed/computed.dart';
 import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/icomputedmap.dart';
 import 'package:computed_collections/src/expandos.dart';
+import 'package:computed_collections/src/utils/get_if_changed.dart';
 import 'package:computed_collections/src/utils/snapshot_computation.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
@@ -18,80 +19,47 @@ class AddAllComputedComputedMap<K, V>
     changes = Computed(() {
       final parentSnapshot = _parent.snapshot.use;
       final mSnapshot = _m.snapshot.use;
-      ChangeEvent<K, V>? parentChangeEventPrev, parentChangeEventNow;
-      ChangeEvent<K, V>? mChangeEventPrev, mChangeEventNow;
-      try {
-        parentChangeEventPrev = _parent.changes.prev;
-      } catch (NoValueException) {}
-      try {
-        parentChangeEventNow = _parent.changes.use;
-      } catch (NoValueException) {}
-      try {
-        mChangeEventPrev = _m.changes.prev;
-      } catch (NoValueException) {}
-      try {
-        mChangeEventNow = _m.changes.use;
-      } catch (NoValueException) {}
+      final parentChange = getIfChanged(_parent.changes);
+      final mChange = getIfChanged(_m.changes);
 
       // Note that here we assume that .changes is in sync with .snapshot for both _parent and _m
 
-      ChangeEvent<K, V>? res;
-
-      if (!identical(parentChangeEventPrev, parentChangeEventNow)) {
-        // The parent has a new change
-        switch (parentChangeEventNow!) {
-          case ChangeEventReplace<K, V>(newCollection: final newCollection):
-            res = ChangeEventReplace(newCollection.addAll(mSnapshot));
-          case KeyChanges<K, V>(changes: final parentChanges):
-            res = KeyChanges(
-                IMap.fromEntries(parentChanges.entries.map((upstreamChange) {
-              if (mSnapshot.containsKey(upstreamChange.key)) {
-                return <MapEntry<K, ChangeRecord<V>>>[];
-              }
-              return [upstreamChange];
-            }).expand((e) => e)));
-        }
+      if (parentChange is ChangeEventReplace<K, V> ||
+          mChange is ChangeEventReplace<K, V>) {
+        return ChangeEventReplace(parentSnapshot.addAll(mSnapshot));
       }
-      if (!identical(mChangeEventPrev, mChangeEventNow)) {
+
+      var res = <K, ChangeRecord<V>>{};
+
+      if (parentChange != null) {
+        // The parent has a new change
+
+        final parentChanges = (parentChange as KeyChanges<K, V>).changes;
+
+        res = Map.fromEntries(parentChanges.entries.map((upstreamChange) {
+          if (mSnapshot.containsKey(upstreamChange.key)) {
+            return <MapEntry<K, ChangeRecord<V>>>[];
+          }
+          return [upstreamChange];
+        }).expand((e) => e));
+      }
+      if (mChange != null) {
         // The added collection has a new change
 
-        mapMChanges(IMap<K, ChangeRecord<V>> mChanges) {
-          return mChanges.entries.map((e) => MapEntry(
-              e.key,
-              switch (e.value) {
-                ChangeRecordValue<V>() => e.value,
-                ChangeRecordDelete<V>() => parentSnapshot.containsKey(e.key)
-                    ? ChangeRecordValue(parentSnapshot[e.key] as V)
-                    : ChangeRecordDelete<V>(),
-              }));
-        }
+        final mChanges = (mChange as KeyChanges<K, V>).changes;
 
-        switch (mChangeEventNow!) {
-          case ChangeEventReplace<K, V>(newCollection: final newCollection):
-            res = ChangeEventReplace(parentSnapshot.addAll(newCollection));
-          case KeyChanges<K, V>(changes: final mChanges):
-            res = switch (res) {
-              null => KeyChanges(IMap.fromEntries(mapMChanges(mChanges))),
-              KeyChanges<K, V>() =>
-                KeyChanges(res.changes.addEntries(mapMChanges(mChanges))),
-              ChangeEventReplace<K, V>() => ChangeEventReplace(res.newCollection
-                  .addEntries(mChanges.entries
-                      .where((e) => e.value is ChangeRecordValue<V>)
-                      .map((e) => MapEntry(
-                          e.key, (e.value as ChangeRecordValue<V>).value)))),
-            };
-        }
+        res.addEntries(mChanges.entries.map((e) => MapEntry(
+            e.key,
+            switch (e.value) {
+              ChangeRecordValue<V>() => e.value,
+              ChangeRecordDelete<V>() => parentSnapshot.containsKey(e.key)
+                  ? ChangeRecordValue(parentSnapshot[e.key] as V)
+                  : ChangeRecordDelete<V>(),
+            })));
       }
 
-      switch (res) {
-        case null:
-          throw NoValueException();
-        case KeyChanges<K, V>():
-          if (res.changes.isEmpty) throw NoValueException();
-          return res;
-        case ChangeEventReplace<K, V>():
-          return res;
-      }
+      if (res.isEmpty) throw NoValueException();
+      return KeyChanges(res.lock);
     });
     snapshot = snapshotComputation(
         changes, () => _parent.snapshot.use.addAll(_m.snapshot.use));
