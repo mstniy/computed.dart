@@ -1,7 +1,7 @@
 import 'package:computed/computed.dart';
 import 'package:computed/utils/streams.dart';
 import 'package:computed_collections/change_event.dart';
-import 'package:computed_collections/icomputedmap.dart';
+import 'package:computed_collections/computedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:test/test.dart';
 
@@ -10,7 +10,7 @@ import 'helpers.dart';
 void main() {
   test('incremental update works', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final m1 = IComputedMap.fromChangeStream($(() => s.use));
+    final m1 = ComputedMap.fromChangeStream($(() => s.use));
     late (int, int) kv1, kv2;
     final m2 = m1.map((k, v) {
       expect((k, v), kv1);
@@ -53,7 +53,7 @@ void main() {
   });
 
   test('attributes are coherent', () async {
-    final m1 = IComputedMap({0: 1, 1: 2, 2: 3, 3: 4}.lock);
+    final m1 = ComputedMap({0: 1, 1: 2, 2: 3, 3: 4}.lock);
 
     final m2 = m1.map((k, v) {
       return MapEntry(k % 3, v);
@@ -65,7 +65,7 @@ void main() {
   test('does not assert idempotency on the user function', () async {
     var cnt = 0;
     final m =
-        IComputedMap({0: 1}.lock).map((key, value) => MapEntry(++cnt, ++cnt));
+        ComputedMap({0: 1}.lock).map((key, value) => MapEntry(++cnt, ++cnt));
     expect(await getValue(m.snapshot), {1: 2}.lock);
   });
 }

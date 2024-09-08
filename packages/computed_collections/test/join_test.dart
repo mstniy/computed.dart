@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:computed/computed.dart';
 import 'package:computed_collections/change_event.dart';
-import 'package:computed_collections/icomputedmap.dart';
+import 'package:computed_collections/computedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:test/test.dart';
 
@@ -10,12 +10,12 @@ import 'helpers.dart';
 
 void main() {
   test('attributes are coherent', () async {
-    final x = IComputedMap({0: 1, 1: 2}.lock)
-        .join(IComputedMap({1: 3, 2: 4, 3: 5}.lock));
+    final x = ComputedMap({0: 1, 1: 2}.lock)
+        .join(ComputedMap({1: 3, 2: 4, 3: 5}.lock));
     await testCoherence(x, {1: (2, 3)}.lock, 0, (0, 1));
 
     final y =
-        IComputedMap({0: 1, 1: 2, 2: 3}.lock).join(IComputedMap({0: 0}.lock));
+        ComputedMap({0: 1, 1: 2, 2: 3}.lock).join(ComputedMap({0: 0}.lock));
     await testCoherence(y, {0: (1, 0)}.lock, 1, (0, 1));
   });
 
@@ -23,8 +23,8 @@ void main() {
     final s = StreamController<
         (ChangeEvent<int, int>, ChangeEvent<int, int>)>.broadcast(sync: true);
     final s2 = s.stream;
-    final x = IComputedMap.fromChangeStream($(() => s2.use.$1));
-    final y = IComputedMap.fromChangeStream($(() => s2.use.$2));
+    final x = ComputedMap.fromChangeStream($(() => s2.use.$1));
+    final y = ComputedMap.fromChangeStream($(() => s2.use.$2));
     final z = x.join(y);
 
     ChangeEvent<int, (int, int)>? lastRes;

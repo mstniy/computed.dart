@@ -1,6 +1,6 @@
 import 'package:computed/computed.dart';
 import 'package:computed_collections/change_event.dart';
-import 'package:computed_collections/icomputedmap.dart';
+import 'package:computed_collections/computedmap.dart';
 import 'package:computed_collections/src/expandos.dart';
 import 'package:computed_collections/src/utils/snapshot_computation.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
@@ -10,9 +10,9 @@ import 'utils/cs_tracker.dart';
 
 class AddAllComputedMap<K, V>
     with OperatorsMixin<K, V>
-    implements IComputedMap<K, V> {
+    implements ComputedMap<K, V> {
   final IMap<K, V> _m;
-  final IComputedMap<K, V> _parent;
+  final ComputedMap<K, V> _parent;
   late final CSTracker<K, V> _tracker;
   AddAllComputedMap(this._parent, this._m) {
     changes = Computed(() {

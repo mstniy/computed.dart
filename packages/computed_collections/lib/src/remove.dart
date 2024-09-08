@@ -1,6 +1,6 @@
 import 'package:computed/computed.dart';
 import 'package:computed_collections/change_event.dart';
-import 'package:computed_collections/icomputedmap.dart';
+import 'package:computed_collections/computedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import 'add_computedmap.dart';
@@ -9,9 +9,9 @@ import 'utils/cs_tracker.dart';
 
 class RemoveComputedMap<K, V>
     with OperatorsMixin<K, V>
-    implements IComputedMap<K, V> {
+    implements ComputedMap<K, V> {
   K _key;
-  final IComputedMap<K, V> _parent;
+  final ComputedMap<K, V> _parent;
   late final CSTracker<K, V> _tracker;
   RemoveComputedMap(this._parent, this._key) {
     final parentContainsKey = _parent.containsKey(_key);
@@ -42,7 +42,7 @@ class RemoveComputedMap<K, V>
   }
 
   @override
-  IComputedMap<K, V> add(K key, V value) {
+  ComputedMap<K, V> add(K key, V value) {
     if (key == _key) {
       return AddComputedMap(_parent, key, value);
     } else {
@@ -51,7 +51,7 @@ class RemoveComputedMap<K, V>
   }
 
   @override
-  IComputedMap<K, V> remove(K key) {
+  ComputedMap<K, V> remove(K key) {
     if (key == _key) {
       return this;
     } else {

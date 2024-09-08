@@ -1,7 +1,7 @@
 import 'package:computed/computed.dart';
 import 'package:computed/utils/computation_cache.dart';
 import 'package:computed_collections/change_event.dart';
-import 'package:computed_collections/icomputedmap.dart';
+import 'package:computed_collections/computedmap.dart';
 import 'package:computed_collections/src/utils/get_if_changed.dart';
 import 'package:computed_collections/src/utils/snapshot_computation.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
@@ -12,9 +12,9 @@ import 'utils/option.dart';
 
 class LookupComputedMap<K, V1, V2>
     with OperatorsMixin<K, (V1, V2?)>
-    implements IComputedMap<K, (V1, V2?)> {
-  final IComputedMap<K, V1> _parent1;
-  final IComputedMap<K, V2> _parent2;
+    implements ComputedMap<K, (V1, V2?)> {
+  final ComputedMap<K, V1> _parent1;
+  final ComputedMap<K, V2> _parent2;
   late final CSTracker<K, (V1, V2?)> _tracker;
   LookupComputedMap(this._parent1, this._parent2) {
     changes = Computed(() {

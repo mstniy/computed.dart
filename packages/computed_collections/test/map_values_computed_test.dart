@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:computed/computed.dart';
 import 'package:computed/utils/streams.dart';
 import 'package:computed_collections/change_event.dart';
-import 'package:computed_collections/icomputedmap.dart';
+import 'package:computed_collections/computedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:test/test.dart';
 
@@ -13,7 +13,7 @@ void main() {
   test('incremental update works', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
     final s2 = ValueStream<int>.seeded(0, sync: true);
-    final m1 = IComputedMap.fromChangeStream($(() => s.use));
+    final m1 = ComputedMap.fromChangeStream($(() => s.use));
     final m2 = m1.mapValuesComputed((k, v) => $(() => v + s2.use));
     IMap<int, int?>? lastRes;
     final sub = m2.snapshot.listen((event) {
@@ -55,7 +55,7 @@ void main() {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
     final s2 = ValueStream<int>.seeded(5, sync: true);
     s.add(ChangeEventReplace({0: 1, 2: 3}.lock));
-    final m1 = IComputedMap.fromChangeStream($(() => s.use));
+    final m1 = ComputedMap.fromChangeStream($(() => s.use));
     final sub1 = m1.snapshot.listen(null, null); // Force m1 to be computed
     await Future.value();
 
@@ -74,7 +74,7 @@ void main() {
     final s = StreamController<ChangeEvent<int, int>>.broadcast(sync: true);
     final stream = s.stream;
     final s2 = ValueStream.seeded(0, sync: true);
-    final m1 = IComputedMap.fromChangeStream($(() => stream.use));
+    final m1 = ComputedMap.fromChangeStream($(() => stream.use));
     var cCnt = 0;
     final m2 = m1.mapValuesComputed((k, v) => $(() {
           cCnt++;
@@ -121,7 +121,7 @@ void main() {
     final s2 = ValueStream<int>.seeded(5, sync: true);
     final s3 = ValueStream<int>(sync: true);
     var useS2 = true;
-    final m1 = IComputedMap.fromChangeStream($(() => s.use));
+    final m1 = ComputedMap.fromChangeStream($(() => s.use));
     var cCnt = 0;
     final m2 = m1.mapValuesComputed((k, v) => $(() {
           cCnt++;
@@ -180,7 +180,7 @@ void main() {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
     final s2 = ValueStream<int>.seeded(5, sync: true);
     final s3 = ValueStream<int>(sync: true);
-    final m1 = IComputedMap.fromChangeStream($(() => s.use));
+    final m1 = ComputedMap.fromChangeStream($(() => s.use));
     var useS2 = true;
     final m2 = m1.mapValuesComputed(
         (key, value) => $(() => value + (useS2 ? s2.use : s3.use)));
@@ -281,7 +281,7 @@ void main() {
   test('operator[] and containsKey opportunistically use the snapshot',
       () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final m = IComputedMap.fromChangeStream($(() => s.use));
+    final m = ComputedMap.fromChangeStream($(() => s.use));
 
     var cCnt = 0;
 
@@ -315,7 +315,7 @@ void main() {
 
   test('operator[] and containsKey are key-local', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final m = IComputedMap.fromChangeStream($(() => s.use));
+    final m = ComputedMap.fromChangeStream($(() => s.use));
 
     var cCnt = 0;
 
@@ -346,7 +346,7 @@ void main() {
   });
 
   test('attributes are coherent', () async {
-    final m = IComputedMap({0: 1}.lock);
+    final m = ComputedMap({0: 1}.lock);
     final mv = m.mapValuesComputed((key, value) => $(() => value + 1));
     await testCoherenceInt(mv, {0: 2}.lock);
   });
@@ -354,8 +354,8 @@ void main() {
   test('can have inter-key dependencies', () async {
     final s =
         ValueStream<IMap<int, int>>.seeded({0: 0, 1: 0, 2: 0}.lock, sync: true);
-    final m1 = IComputedMap.fromSnapshotStream($(() => s.use));
-    late final IComputedMap<int, int> m2;
+    final m1 = ComputedMap.fromSnapshotStream($(() => s.use));
+    late final ComputedMap<int, int> m2;
 
     final converts = [
       (int v) => $(() => m2[1].use! * 2),

@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:computed/computed.dart';
 import 'package:computed_collections/change_event.dart';
-import 'package:computed_collections/icomputedmap.dart';
+import 'package:computed_collections/computedmap.dart';
 import 'package:computed_collections/src/ss_computedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:test/test.dart';
@@ -39,7 +39,7 @@ void main() {
   });
 
   test('attributes are coherent', () async {
-    final m = IComputedMap.fromSnapshotStream($(() => {0: 1}.lock));
+    final m = ComputedMap.fromSnapshotStream($(() => {0: 1}.lock));
     await testCoherenceInt(m, {0: 1}.lock);
   });
 }

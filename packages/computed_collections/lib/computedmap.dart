@@ -10,11 +10,11 @@ import 'src/ss_computedmap.dart';
 /// Similar to the ObservableMap from the `observable` package, but with the following upsides:
 /// - Individual keys can be observed
 /// - Supports immutable snapshots (using fast_immutable_collections)
-abstract class IComputedMap<K, V> {
-  factory IComputedMap(IMap<K, V> m) => ConstComputedMap(m);
-  factory IComputedMap.fromChangeStream(Computed<ChangeEvent<K, V>> stream) =>
+abstract class ComputedMap<K, V> {
+  factory ComputedMap(IMap<K, V> m) => ConstComputedMap(m);
+  factory ComputedMap.fromChangeStream(Computed<ChangeEvent<K, V>> stream) =>
       ChangeStreamComputedMap(stream);
-  factory IComputedMap.fromSnapshotStream(Computed<IMap<K, V>> stream) =>
+  factory ComputedMap.fromSnapshotStream(Computed<IMap<K, V>> stream) =>
       SnapshotStreamComputedMap(stream);
   Computed<ChangeEvent<K, V>> get changes;
 
@@ -29,42 +29,42 @@ abstract class IComputedMap<K, V> {
   Computed<int> get length;
   //IComputedList<V> get values;
 
-  IComputedMap<K, V> add(
+  ComputedMap<K, V> add(
       K key, V value); // Note that the computed variant is trivial
-  IComputedMap<K, V> addAllComputed(IComputedMap<K, V> other);
-  IComputedMap<K, V> addAll(IMap<K, V> other);
+  ComputedMap<K, V> addAllComputed(ComputedMap<K, V> other);
+  ComputedMap<K, V> addAll(IMap<K, V> other);
   //IComputedIMap<K, V> addEntires(IComputedIList<MapEntry<K, V>> newEntries);
-  IComputedMap<RK, RV> cast<RK, RV>();
+  ComputedMap<RK, RV> cast<RK, RV>();
   Computed<bool> containsKey(K key); // Not that the computed variant is trivial
   Computed<bool> containsValue(
       V value); // Not that the computed variant is trivial
-  IComputedMap<K2, V2> mapComputed<K2, V2>(
+  ComputedMap<K2, V2> mapComputed<K2, V2>(
       Computed<Entry<K2, V2>> Function(K key, V value) convert);
-  IComputedMap<K2, V2> map<K2, V2>(
+  ComputedMap<K2, V2> map<K2, V2>(
       MapEntry<K2, V2> Function(K key, V value) convert);
-  IComputedMap<K, V2> mapValuesComputed<V2>(
+  ComputedMap<K, V2> mapValuesComputed<V2>(
       Computed<V2> Function(K key, V value) convert);
-  IComputedMap<K, V2> mapValues<V2>(V2 Function(K key, V value) convert);
-  IComputedMap<K, V> putIfAbsent(
+  ComputedMap<K, V2> mapValues<V2>(V2 Function(K key, V value) convert);
+  ComputedMap<K, V> putIfAbsent(
       K key, V Function() ifAbsent); // Not that the computed variant is trivial
-  IComputedMap<K, V> remove(K key); // Not that the computed variant is trivial
-  IComputedMap<K, V> removeWhereComputed(
+  ComputedMap<K, V> remove(K key); // Not that the computed variant is trivial
+  ComputedMap<K, V> removeWhereComputed(
       Computed<bool> Function(K key, V value) test);
-  IComputedMap<K, V> removeWhere(bool Function(K key, V value) test);
-  IComputedMap<K, V> update(
+  ComputedMap<K, V> removeWhere(bool Function(K key, V value) test);
+  ComputedMap<K, V> update(
       // Note that the computed variant is trivial
       K key,
       V Function(V value) update,
       {V Function()? ifAbsent});
-  IComputedMap<K, V> updateAllComputed(
+  ComputedMap<K, V> updateAllComputed(
       Computed<V> Function(K key, V value) update);
-  IComputedMap<K, V> updateAll(V Function(K key, V value) update);
+  ComputedMap<K, V> updateAll(V Function(K key, V value) update);
 
-  IComputedMap<K2, IComputedMap<K, V>> groupBy<K2>(
+  ComputedMap<K2, ComputedMap<K, V>> groupBy<K2>(
       K2 Function(K key, V value) key);
-  IComputedMap<K2, IComputedMap<K, V>> groupByComputed<K2>(
+  ComputedMap<K2, ComputedMap<K, V>> groupByComputed<K2>(
       Computed<K2> Function(K key, V value) key);
 
-  IComputedMap<K, (V, V2)> join<V2>(IComputedMap<K, V2> other);
-  IComputedMap<K, (V, V2?)> lookup<V2>(IComputedMap<K, V2> other);
+  ComputedMap<K, (V, V2)> join<V2>(ComputedMap<K, V2> other);
+  ComputedMap<K, (V, V2?)> lookup<V2>(ComputedMap<K, V2> other);
 }

@@ -4,14 +4,14 @@ import 'package:computed_collections/src/utils/cs_tracker.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import '../change_event.dart';
-import '../icomputedmap.dart';
+import '../computedmap.dart';
 import 'computedmap_mixins.dart';
 import 'utils/snapshot_computation.dart';
 
 class MapComputedMap<K, V, KParent, VParent>
     with OperatorsMixin<K, V>
-    implements IComputedMap<K, V> {
-  final IComputedMap<KParent, VParent> _parent;
+    implements ComputedMap<K, V> {
+  final ComputedMap<KParent, VParent> _parent;
   final MapEntry<K, V> Function(KParent key, VParent value) _convert;
 
   final _mappedKeys = <KParent, K>{};

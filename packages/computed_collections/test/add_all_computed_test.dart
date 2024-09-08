@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:computed/computed.dart';
 import 'package:computed_collections/change_event.dart';
-import 'package:computed_collections/icomputedmap.dart';
+import 'package:computed_collections/computedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:test/test.dart';
 
@@ -10,14 +10,14 @@ import 'helpers.dart';
 
 void main() {
   test('initial computation works', () async {
-    final x = IComputedMap({0: 1, 1: 2}.lock);
-    final y = x.addAllComputed(IComputedMap({1: 3, 2: 4}.lock));
+    final x = ComputedMap({0: 1, 1: 2}.lock);
+    final y = x.addAllComputed(ComputedMap({1: 3, 2: 4}.lock));
     expect(await getValue(y.snapshot), {0: 1, 1: 3, 2: 4}.lock);
   });
 
   test('containsKey works', () async {
-    final x = IComputedMap({0: 1, 1: 2}.lock);
-    final y = x.addAllComputed(IComputedMap({1: 3, 2: 4}.lock));
+    final x = ComputedMap({0: 1, 1: 2}.lock);
+    final y = x.addAllComputed(ComputedMap({1: 3, 2: 4}.lock));
     expect(await getValue(y.containsKey(0)), true);
     expect(await getValue(y.containsKey(1)), true);
     expect(await getValue(y.containsKey(2)), true);
@@ -25,8 +25,8 @@ void main() {
   });
 
   test('containsValue works', () async {
-    final x = IComputedMap({0: 1, 1: 4}.lock);
-    final y = x.addAllComputed(IComputedMap({1: 3, 2: 4}.lock));
+    final x = ComputedMap({0: 1, 1: 4}.lock);
+    final y = x.addAllComputed(ComputedMap({1: 3, 2: 4}.lock));
     expect(await getValue(y.containsValue(1)), true);
     expect(await getValue(y.containsValue(3)), true);
     expect(await getValue(y.containsValue(4)), true);
@@ -34,8 +34,8 @@ void main() {
   });
 
   test('operator[] works', () async {
-    final x = IComputedMap({0: 1, 1: 2}.lock);
-    final y = x.addAllComputed(IComputedMap({1: 3, 2: 4}.lock));
+    final x = ComputedMap({0: 1, 1: 2}.lock);
+    final y = x.addAllComputed(ComputedMap({1: 3, 2: 4}.lock));
     expect(await getValue(y[0]), 1);
     expect(await getValue(y[1]), 3);
     expect(await getValue(y[2]), 4);
@@ -44,46 +44,46 @@ void main() {
 
   test('isEmpty works', () async {
     expect(
-        await getValue(IComputedMap(<int, int>{}.lock)
-            .addAllComputed(IComputedMap(<int, int>{}.lock))
+        await getValue(ComputedMap(<int, int>{}.lock)
+            .addAllComputed(ComputedMap(<int, int>{}.lock))
             .isEmpty),
         true);
     expect(
-        await getValue(IComputedMap({0: 1}.lock)
-            .addAllComputed(IComputedMap(<int, int>{}.lock))
+        await getValue(ComputedMap({0: 1}.lock)
+            .addAllComputed(ComputedMap(<int, int>{}.lock))
             .isEmpty),
         false);
     expect(
-        await getValue(IComputedMap(<int, int>{}.lock)
-            .addAllComputed(IComputedMap({0: 1}.lock))
+        await getValue(ComputedMap(<int, int>{}.lock)
+            .addAllComputed(ComputedMap({0: 1}.lock))
             .isEmpty),
         false);
     expect(
-        await getValue(IComputedMap({0: 1}.lock)
-            .addAllComputed(IComputedMap({0: 1}.lock))
+        await getValue(ComputedMap({0: 1}.lock)
+            .addAllComputed(ComputedMap({0: 1}.lock))
             .isEmpty),
         false);
   });
 
   test('isNotEmpty works', () async {
     expect(
-        await getValue(IComputedMap(<int, int>{}.lock)
-            .addAllComputed(IComputedMap(<int, int>{}.lock))
+        await getValue(ComputedMap(<int, int>{}.lock)
+            .addAllComputed(ComputedMap(<int, int>{}.lock))
             .isNotEmpty),
         false);
     expect(
-        await getValue(IComputedMap({0: 1}.lock)
-            .addAllComputed(IComputedMap(<int, int>{}.lock))
+        await getValue(ComputedMap({0: 1}.lock)
+            .addAllComputed(ComputedMap(<int, int>{}.lock))
             .isNotEmpty),
         true);
     expect(
-        await getValue(IComputedMap(<int, int>{}.lock)
-            .addAllComputed(IComputedMap({0: 1}.lock))
+        await getValue(ComputedMap(<int, int>{}.lock)
+            .addAllComputed(ComputedMap({0: 1}.lock))
             .isNotEmpty),
         true);
     expect(
-        await getValue(IComputedMap({0: 1}.lock)
-            .addAllComputed(IComputedMap({0: 1}.lock))
+        await getValue(ComputedMap({0: 1}.lock)
+            .addAllComputed(ComputedMap({0: 1}.lock))
             .isNotEmpty),
         true);
   });
@@ -92,8 +92,8 @@ void main() {
     final s = StreamController<
         (ChangeEvent<int, int>, ChangeEvent<int, int>)>.broadcast(sync: true);
     final s2 = s.stream;
-    final x = IComputedMap.fromChangeStream($(() => s2.use.$1));
-    final y = IComputedMap.fromChangeStream($(() => s2.use.$2));
+    final x = ComputedMap.fromChangeStream($(() => s2.use.$1));
+    final y = ComputedMap.fromChangeStream($(() => s2.use.$2));
     final z = x.addAllComputed(y);
 
     ChangeEvent<int, int>? lastRes;
@@ -214,8 +214,8 @@ void main() {
   test('propagates the change stream 2', () async {
     final s = StreamController<ChangeEvent<int, int>>.broadcast(sync: true);
     final stream = s.stream;
-    final c1 = IComputedMap(<int, int>{1: 1}.lock);
-    final c2 = IComputedMap.fromChangeStream($(() => stream.use));
+    final c1 = ComputedMap(<int, int>{1: 1}.lock);
+    final c2 = ComputedMap.fromChangeStream($(() => stream.use));
     final c3 = c1.addAllComputed(c2);
 
     ChangeEvent<int, int>? lastRes;
@@ -241,8 +241,8 @@ void main() {
   });
 
   test('attributes are coherent', () async {
-    final x = IComputedMap({0: 1, 1: 2}.lock);
-    final y = x.addAllComputed(IComputedMap({1: 3, 2: 4}.lock));
+    final x = ComputedMap({0: 1, 1: 2}.lock);
+    final y = x.addAllComputed(ComputedMap({1: 3, 2: 4}.lock));
     await testCoherenceInt(y, {0: 1, 1: 3, 2: 4}.lock);
   });
 }

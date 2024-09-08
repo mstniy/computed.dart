@@ -1,7 +1,7 @@
 import 'package:computed/computed.dart';
 import 'package:computed/utils/computation_cache.dart';
 import 'package:computed_collections/change_event.dart';
-import 'package:computed_collections/icomputedmap.dart';
+import 'package:computed_collections/computedmap.dart';
 import 'package:computed_collections/src/utils/cs_tracker.dart';
 import 'package:computed_collections/src/utils/snapshot_computation.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
@@ -10,8 +10,8 @@ import 'computedmap_mixins.dart';
 
 class MapValuesComputedMap<K, V, VParent>
     with OperatorsMixin<K, V>
-    implements IComputedMap<K, V> {
-  final IComputedMap<K, VParent> _parent;
+    implements ComputedMap<K, V> {
+  final ComputedMap<K, VParent> _parent;
   final V Function(K key, VParent value) _convert;
 
   final _keyComputations = ComputationCache<K, V?>(assertIdempotent: false);

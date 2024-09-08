@@ -3,13 +3,13 @@ import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/src/utils/cs_tracker.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
-import '../icomputedmap.dart';
+import '../computedmap.dart';
 import 'computedmap_mixins.dart';
 import 'expandos.dart';
 
 class SnapshotStreamComputedMap<K, V>
     with OperatorsMixin<K, V>
-    implements IComputedMap<K, V> {
+    implements ComputedMap<K, V> {
   Computed<IMap<K, V>> _snapshotStream;
   late final CSTracker<K, V> _tracker;
   SnapshotStreamComputedMap(this._snapshotStream) {

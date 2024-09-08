@@ -1,6 +1,6 @@
 import 'package:computed/computed.dart';
 import 'package:computed_collections/change_event.dart';
-import 'package:computed_collections/icomputedmap.dart';
+import 'package:computed_collections/computedmap.dart';
 import 'package:computed_collections/src/expandos.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
@@ -9,11 +9,11 @@ import 'utils/cs_tracker.dart';
 
 class UpdateComputedMap<K, V>
     with OperatorsMixin<K, V>
-    implements IComputedMap<K, V> {
+    implements ComputedMap<K, V> {
   final K _key;
   final V Function(V value) _update;
   final V Function()? _ifAbsent;
-  final IComputedMap<K, V> _parent;
+  final ComputedMap<K, V> _parent;
   late final CSTracker<K, V> _tracker;
 
   late final Computed<V> _keyComputation;

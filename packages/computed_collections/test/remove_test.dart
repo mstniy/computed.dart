@@ -1,7 +1,7 @@
 import 'package:computed/computed.dart';
 import 'package:computed/utils/streams.dart';
 import 'package:computed_collections/change_event.dart';
-import 'package:computed_collections/icomputedmap.dart';
+import 'package:computed_collections/computedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:test/test.dart';
 
@@ -10,7 +10,7 @@ import 'helpers.dart';
 void main() {
   test('snapshot works', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final m1 = IComputedMap.fromChangeStream($(() => s.use));
+    final m1 = ComputedMap.fromChangeStream($(() => s.use));
     // Test both .remove on a fromChangeStream map as well as on another .remove on the same key
     for (var getM2 in [() => m1.remove(0), () => m1.remove(0).remove(0)]) {
       final m2 = getM2();
@@ -44,7 +44,7 @@ void main() {
 
   test('remove on different key works', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final m1 = IComputedMap.fromChangeStream($(() => s.use));
+    final m1 = ComputedMap.fromChangeStream($(() => s.use));
     final m2 = m1.remove(0).remove(1);
 
     IMap<int, int>? lastRes;
@@ -67,7 +67,7 @@ void main() {
 
   test('operator[] and changes works', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final m1 = IComputedMap.fromChangeStream($(() => s.use));
+    final m1 = ComputedMap.fromChangeStream($(() => s.use));
     final m2 = m1.remove(0);
 
     var callCnt1 = 0;
@@ -134,7 +134,7 @@ void main() {
   });
 
   test('attributes are coherent', () async {
-    final m = IComputedMap({0: 1, 1: 2, 2: 3}.lock);
+    final m = ComputedMap({0: 1, 1: 2, 2: 3}.lock);
     final a = m.remove(0);
     final b = a.remove(1);
     final c = a.remove(3);
@@ -144,7 +144,7 @@ void main() {
   });
 
   test('add on remove works', () async {
-    final m = IComputedMap({0: 1, 1: 2, 2: 3}.lock);
+    final m = ComputedMap({0: 1, 1: 2, 2: 3}.lock);
     final a = m.remove(0);
     final b = a.add(0, 2);
     final c = a.add(1, 3);

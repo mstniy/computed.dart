@@ -1,7 +1,7 @@
 import 'package:computed/computed.dart';
 import 'package:computed/utils/computation_cache.dart';
 import 'package:computed_collections/change_event.dart';
-import 'package:computed_collections/icomputedmap.dart';
+import 'package:computed_collections/computedmap.dart';
 import 'package:computed_collections/src/expandos.dart';
 import 'package:computed_collections/src/utils/cs_tracker.dart';
 import 'package:computed_collections/src/utils/snapshot_computation.dart';
@@ -12,8 +12,8 @@ import 'utils/option.dart';
 
 class RemoveWhereComputedMap<K, V>
     with OperatorsMixin<K, V>
-    implements IComputedMap<K, V> {
-  final IComputedMap<K, V> _parent;
+    implements ComputedMap<K, V> {
+  final ComputedMap<K, V> _parent;
   final bool Function(K key, V value) _filter;
 
   final _keyOptionComputations = ComputationCache<K, Option<V>>();

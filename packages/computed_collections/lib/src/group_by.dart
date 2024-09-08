@@ -3,7 +3,7 @@ import 'package:computed_collections/src/utils/custom_downstream.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import '../change_event.dart';
-import '../icomputedmap.dart';
+import '../computedmap.dart';
 import 'computedmap_mixins.dart';
 import 'cs_computedmap.dart';
 import 'utils/cs_tracker.dart';
@@ -18,20 +18,19 @@ final class _GroupInfo<KParent, V> {
   IMap<KParent, V> snapshot;
   Computed<IMap<KParent, V>> ss;
   bool ssHasSubscribers = false;
-  IComputedMap<KParent, V> m;
+  ComputedMap<KParent, V> m;
 
   _GroupInfo(this.snapshot, this.cs, this.ss, this.m);
 }
 
 class GroupByComputedMap<K, V, KParent>
-    with OperatorsMixin<K, IComputedMap<KParent, V>>
-    implements IComputedMap<K, IComputedMap<KParent, V>> {
-  final IComputedMap<KParent, V> _parent;
+    with OperatorsMixin<K, ComputedMap<KParent, V>>
+    implements ComputedMap<K, ComputedMap<KParent, V>> {
+  final ComputedMap<KParent, V> _parent;
   final K Function(KParent key, V value) _convert;
 
-  late final CSTracker<K, IComputedMap<KParent, V>> _tracker;
-  late final Computed<
-          (ChangeEvent<K, IComputedMap<KParent, V>>?, Set<Computed>)>
+  late final CSTracker<K, ComputedMap<KParent, V>> _tracker;
+  late final Computed<(ChangeEvent<K, ComputedMap<KParent, V>>?, Set<Computed>)>
       _keyChangesAndDownstream;
   late final CustomDownstream _pusher;
 
@@ -106,7 +105,7 @@ class GroupByComputedMap<K, V, KParent>
     return self;
   }
 
-  IMap<K, IComputedMap<KParent, V>> _setM(IMap<KParent, V> m) {
+  IMap<K, ComputedMap<KParent, V>> _setM(IMap<KParent, V> m) {
     final (grouped, mappedKeys) = m.groupBy(_convert);
 
     _m = grouped.map((k, v) {
@@ -118,7 +117,7 @@ class GroupByComputedMap<K, V, KParent>
     _mappedKeys = mappedKeys;
 
     return _m!.map((k, v) {
-      return MapEntry<K, IComputedMap<KParent, V>>(k, v.m);
+      return MapEntry<K, ComputedMap<KParent, V>>(k, v.m);
     }).lock;
   }
 
@@ -178,7 +177,7 @@ class GroupByComputedMap<K, V, KParent>
                   ))) ??
               <KParent, (K, V)>{};
 
-          final keyChanges = <K, ChangeRecord<IComputedMap<KParent, V>>>{};
+          final keyChanges = <K, ChangeRecord<ComputedMap<KParent, V>>>{};
 
           final batchedChanges = <K, KeyChanges<KParent, V>>{};
 
@@ -268,10 +267,10 @@ class GroupByComputedMap<K, V, KParent>
     changes = $(() {
       final keyChanges = _keyChangesAndDownstream.use.$1;
       switch (keyChanges) {
-        case KeyChanges<K, IComputedMap<KParent, V>>(changes: final changes):
+        case KeyChanges<K, ComputedMap<KParent, V>>(changes: final changes):
           if (changes.isEmpty) throw NoValueException();
           return keyChanges;
-        case ChangeEventReplace<K, IComputedMap<KParent, V>>():
+        case ChangeEventReplace<K, ComputedMap<KParent, V>>():
           return keyChanges;
         case null:
           throw NoValueException();
@@ -324,17 +323,17 @@ class GroupByComputedMap<K, V, KParent>
   Computed<bool> containsKey(K key) => _tracker.containsKey(key);
 
   @override
-  Computed<IComputedMap<KParent, V>?> operator [](K key) => _tracker[key];
+  Computed<ComputedMap<KParent, V>?> operator [](K key) => _tracker[key];
 
   @override
-  Computed<bool> containsValue(IComputedMap<KParent, V> value) =>
+  Computed<bool> containsValue(ComputedMap<KParent, V> value) =>
       _tracker.containsValue(value);
 
   @override
-  late final Computed<IMap<K, IComputedMap<KParent, V>>> snapshot;
+  late final Computed<IMap<K, ComputedMap<KParent, V>>> snapshot;
 
   @override
-  late final Computed<ChangeEvent<K, IComputedMap<KParent, V>>> changes;
+  late final Computed<ChangeEvent<K, ComputedMap<KParent, V>>> changes;
 
   @override
   Computed<bool> get isEmpty => _parent.isEmpty;

@@ -1,7 +1,7 @@
 import 'package:computed/computed.dart';
 import 'package:computed/utils/streams.dart';
 import 'package:computed_collections/change_event.dart';
-import 'package:computed_collections/icomputedmap.dart';
+import 'package:computed_collections/computedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:test/test.dart';
 
@@ -10,7 +10,7 @@ import 'helpers.dart';
 void main() {
   test('incremental update works', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final m1 = IComputedMap.fromChangeStream($(() => s.use));
+    final m1 = ComputedMap.fromChangeStream($(() => s.use));
     final m2 = m1.removeWhere((k, v) => (v % 2) == 0);
     IMap<int, int>? lastRes;
     final sub = m2.snapshot.listen((event) {
@@ -33,7 +33,7 @@ void main() {
   });
 
   test('initial computation works', () async {
-    final m1 = IComputedMap({0: 1, 1: 1, 2: 3, 3: 3}.lock);
+    final m1 = ComputedMap({0: 1, 1: 1, 2: 3, 3: 3}.lock);
 
     final m2 = m1.removeWhere((k, v) {
       return k == v;
@@ -43,7 +43,7 @@ void main() {
   });
   test('operator[] works', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final m1 = IComputedMap.fromChangeStream($(() => s.use));
+    final m1 = ComputedMap.fromChangeStream($(() => s.use));
     var cCnt = 0;
     final m2 = m1.removeWhere((k, v) {
       cCnt++;
@@ -109,7 +109,7 @@ void main() {
 
   test('propagates the change stream', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final m1 = IComputedMap.fromChangeStream($(() => s.use));
+    final m1 = ComputedMap.fromChangeStream($(() => s.use));
     final m2 = m1.removeWhere((key, value) => key == value);
     ChangeEvent<int, int>? lastRes;
     var callCnt = 0;
@@ -155,7 +155,7 @@ void main() {
   test('operator[] and containsKey opportunistically uses the snapshot',
       () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final m = IComputedMap.fromChangeStream($(() => s.use));
+    final m = ComputedMap.fromChangeStream($(() => s.use));
 
     var cCnt = 0;
 
@@ -210,7 +210,7 @@ void main() {
   });
 
   test('attributes are coherent', () async {
-    final m = IComputedMap({0: 1, 1: 1}.lock);
+    final m = ComputedMap({0: 1, 1: 1}.lock);
     final mv = m.removeWhere((key, value) => key == value);
     await testCoherenceInt(mv, {0: 1}.lock);
   });

@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:computed/computed.dart';
 import 'package:computed/utils/streams.dart';
 import 'package:computed_collections/change_event.dart';
-import 'package:computed_collections/icomputedmap.dart';
+import 'package:computed_collections/computedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:test/test.dart';
 
@@ -12,7 +12,7 @@ import 'helpers.dart';
 void main() {
   test('incremental update works', () async {
     final s1 = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final m1 = IComputedMap.fromChangeStream($(() => s1.use));
+    final m1 = ComputedMap.fromChangeStream($(() => s1.use));
 
     // Make different elements depend on different data sources, because why not
     final lookups =
@@ -189,7 +189,7 @@ void main() {
     final sTrap = StreamController
         .broadcast(); // Used for checking if the computation has any listeners left
     final sTrapStream = sTrap.stream;
-    final m1 = IComputedMap.fromChangeStream($(() => s1.use));
+    final m1 = ComputedMap.fromChangeStream($(() => s1.use));
     final callHistory = <(int, int)>[];
     final m2 = m1.mapComputed((k, v) => Computed(() {
           callHistory.add((k, v));
@@ -242,7 +242,7 @@ void main() {
   test('can resubscribe after cancel', () async {
     final s1 = StreamController<ChangeEvent<int, int>>.broadcast(sync: true);
     final s1stream = s1.stream;
-    final m1 = IComputedMap.fromChangeStream($(() => s1stream.use));
+    final m1 = ComputedMap.fromChangeStream($(() => s1stream.use));
     final m2 = m1.mapComputed((k, v) => $(() => Entry(k, v)));
     IMap<int, int>? lastRes1;
     var sub = m2.snapshot.listen((event) {
@@ -280,7 +280,7 @@ void main() {
       (_) => $(() => throw NoValueException()),
       (k) => $(() => Entry(42, k))
     ];
-    final m1 = IComputedMap.fromChangeStream($(() => s1stream.use));
+    final m1 = ComputedMap.fromChangeStream($(() => s1stream.use));
     final m2 = m1.mapComputed((k, v) => cs[v](k));
     IMap<int, int>? snapshot;
     final sub = m2.snapshot.listen((event) {
@@ -309,7 +309,7 @@ void main() {
   });
 
   test('attributes are coherent', () async {
-    final m1 = IComputedMap({0: 1, 1: 2, 2: 3, 3: 4}.lock);
+    final m1 = ComputedMap({0: 1, 1: 2, 2: 3, 3: 4}.lock);
 
     final m2 = m1.mapComputed((k, v) {
       return $(() => Entry(k % 3, v));
@@ -320,7 +320,7 @@ void main() {
 
   test('does not assert idempotency on the user function', () async {
     var cnt = 0;
-    final m = IComputedMap({0: 1}.lock).mapComputed((key, value) =>
+    final m = ComputedMap({0: 1}.lock).mapComputed((key, value) =>
         Computed(() => Entry(++cnt, ++cnt), assertIdempotent: false));
     expect(await getValues(m.snapshot), [
       {}.lock,

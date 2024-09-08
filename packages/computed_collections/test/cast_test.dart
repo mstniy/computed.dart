@@ -1,4 +1,4 @@
-import 'package:computed_collections/icomputedmap.dart';
+import 'package:computed_collections/computedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:test/test.dart';
 
@@ -22,14 +22,14 @@ class C {
 
 void main() {
   test('works', () async {
-    final a = IComputedMap({0: B()}.lock);
+    final a = ComputedMap({0: B()}.lock);
     final b = a.cast<int, A>();
     final c = b.cast<int, B>();
     expect(await getValue(b.snapshot), <int, A>{0: B()}.lock);
     expect(await getValue(c.snapshot), {0: B()}.lock);
   });
   test('throws if a cast fails', () async {
-    final a = IComputedMap({0: B()}.lock);
+    final a = ComputedMap({0: B()}.lock);
     final b = a.cast<int, C>();
     try {
       await getValue(b.snapshot);
@@ -41,7 +41,7 @@ void main() {
     }
   });
   test('attributes are coherent', () async {
-    final m = IComputedMap({0: 1}.lock);
+    final m = ComputedMap({0: 1}.lock);
     final a = m.cast<int, int>();
     await testCoherenceInt(a, {0: 1}.lock);
   });

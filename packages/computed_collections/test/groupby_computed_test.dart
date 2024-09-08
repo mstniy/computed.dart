@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:computed/computed.dart';
 import 'package:computed/utils/streams.dart';
 import 'package:computed_collections/change_event.dart';
-import 'package:computed_collections/icomputedmap.dart';
+import 'package:computed_collections/computedmap.dart';
 import 'package:computed_collections/src/const_computedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:test/test.dart';
@@ -13,12 +13,12 @@ import 'helpers.dart';
 void main() {
   test('incremental update works', () async {
     final s1 = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final m1 = IComputedMap.fromChangeStream($(() => s1.use));
+    final m1 = ComputedMap.fromChangeStream($(() => s1.use));
     // Make different elements' groups depend on different data sources, because why not
     final lookups =
         List.generate(2, (_) => ValueStream<IList<int>>(sync: true));
     final m2 = m1.groupByComputed((k, v) => $(() => lookups[k % 3].use[v % 3]));
-    IMap<int, IComputedMap<int, int>>? lastRes1;
+    IMap<int, ComputedMap<int, int>>? lastRes1;
     final sub1 = m2.snapshot.listen((event) {
       lastRes1 = event;
     }, null);
@@ -46,7 +46,7 @@ void main() {
     final sub7 = $(() => m2.snapshot.use[2]?.changes.use).listen((event) {
       lastRes7 = event;
     }, null);
-    ChangeEvent<int, IComputedMap<int, int>>? lastRes8;
+    ChangeEvent<int, ComputedMap<int, int>>? lastRes8;
     final sub8 = m2.changes.listen((event) {
       lastRes8 = event;
     }, null);
@@ -105,7 +105,7 @@ void main() {
     expect(
         lastRes8,
         KeyChanges({
-          1: ChangeRecordDelete<IComputedMap<int, int>>(),
+          1: ChangeRecordDelete<ComputedMap<int, int>>(),
           2: ChangeRecordValue(lastRes1![2]!)
         }.lock));
 
@@ -124,7 +124,7 @@ void main() {
     expect(
         lastRes8,
         KeyChanges({
-          1: ChangeRecordDelete<IComputedMap<int, int>>(),
+          1: ChangeRecordDelete<ComputedMap<int, int>>(),
           2: ChangeRecordValue(lastRes1![2]!)
         }.lock)); // No change
 
@@ -144,7 +144,7 @@ void main() {
     expect(
         lastRes8,
         KeyChanges({
-          2: ChangeRecordDelete<IComputedMap<int, int>>(),
+          2: ChangeRecordDelete<ComputedMap<int, int>>(),
         }.lock));
     await Future.value();
     expect(lastRes1!.keys, [0]);
@@ -282,7 +282,7 @@ void main() {
     expect(lastRes6, null); // The group got deleted
     expect(lastRes7, null); // Re-created
     expect(lastRes8,
-        KeyChanges({1: ChangeRecordDelete<IComputedMap<int, int>>()}.lock));
+        KeyChanges({1: ChangeRecordDelete<ComputedMap<int, int>>()}.lock));
 
     s1.add(KeyChanges({10: ChangeRecordValue(1)}.lock));
     await Future.value();
@@ -298,7 +298,7 @@ void main() {
     expect(lastRes7, null);
     expect(
         lastRes8,
-        KeyChanges({1: ChangeRecordDelete<IComputedMap<int, int>>()}
+        KeyChanges({1: ChangeRecordDelete<ComputedMap<int, int>>()}
             .lock)); // No change
 
     s1.add(KeyChanges({
@@ -321,7 +321,7 @@ void main() {
             {4: ChangeRecordDelete<int>(), 7: ChangeRecordDelete<int>()}.lock));
     expect(
         lastRes8,
-        KeyChanges({1: ChangeRecordDelete<IComputedMap<int, int>>()}
+        KeyChanges({1: ChangeRecordDelete<ComputedMap<int, int>>()}
             .lock)); // No change
 
     lookups[1].add([1, 2, 0].lock);
@@ -354,7 +354,7 @@ void main() {
     final sTrap = StreamController
         .broadcast(); // Used for checking if the computation has any listeners left
     final sTrapStream = sTrap.stream;
-    final m1 = IComputedMap.fromChangeStream($(() => s1.use));
+    final m1 = ComputedMap.fromChangeStream($(() => s1.use));
     final callHistory = <(int, int)>[];
     final m2 = m1.groupByComputed((k, v) => Computed(() {
           callHistory.add((k, v));
@@ -407,9 +407,9 @@ void main() {
   test('can resubscribe after cancel', () async {
     final s1 = StreamController<ChangeEvent<int, int>>.broadcast(sync: true);
     final s1stream = s1.stream;
-    final m1 = IComputedMap.fromChangeStream($(() => s1stream.use));
+    final m1 = ComputedMap.fromChangeStream($(() => s1stream.use));
     final m2 = m1.groupByComputed((k, v) => $(() => v));
-    IMap<int, IComputedMap<int, int>>? lastRes1;
+    IMap<int, ComputedMap<int, int>>? lastRes1;
     var sub1 = m2.snapshot.listen((event) {
       lastRes1 = event;
     }, null);
@@ -442,9 +442,9 @@ void main() {
     final s1 = StreamController<ChangeEvent<int, int>>.broadcast(sync: true);
     final s1stream = s1.stream;
     final cs = <Computed<int>>[$(() => throw NoValueException()), $(() => 42)];
-    final m1 = IComputedMap.fromChangeStream($(() => s1stream.use));
+    final m1 = ComputedMap.fromChangeStream($(() => s1stream.use));
     final m2 = m1.groupByComputed((k, v) => cs[v]);
-    IMap<int, IComputedMap<int, int>>? lastRes1;
+    IMap<int, ComputedMap<int, int>>? lastRes1;
     final sub1 = m2.snapshot.listen((event) {
       lastRes1 = event;
     }, null);
@@ -517,7 +517,7 @@ void main() {
     expect(await getValue(m3.isNotEmpty), false);
 
     // containsValue
-    IMap<int, IComputedMap<int, int>>? res;
+    IMap<int, ComputedMap<int, int>>? res;
     final sub = m2.snapshot.listen((s) => res = s, null);
     await Future.value();
     await Future.value();

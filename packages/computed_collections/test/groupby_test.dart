@@ -1,7 +1,7 @@
 import 'package:computed/computed.dart';
 import 'package:computed/utils/streams.dart';
 import 'package:computed_collections/change_event.dart';
-import 'package:computed_collections/icomputedmap.dart';
+import 'package:computed_collections/computedmap.dart';
 import 'package:computed_collections/src/const_computedmap.dart';
 import 'package:computed_collections/src/ss_computedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
@@ -12,9 +12,9 @@ import 'helpers.dart';
 void main() {
   test('incremental update works', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final m1 = IComputedMap.fromChangeStream($(() => s.use));
+    final m1 = ComputedMap.fromChangeStream($(() => s.use));
     final m2 = m1.groupBy((_, v) => v % 3); // Divide into three groups
-    IMap<int, IComputedMap<int, int>>? lastRes1;
+    IMap<int, ComputedMap<int, int>>? lastRes1;
     final sub1 = m2.snapshot.listen((event) {
       lastRes1 = event;
     }, null);
@@ -34,7 +34,7 @@ void main() {
     final sub5 = $(() => m2.snapshot.use[0]?.changes.use).listen((event) {
       lastRes5 = event;
     }, null);
-    ChangeEvent<int, IComputedMap<int, int>>? lastRes6;
+    ChangeEvent<int, ComputedMap<int, int>>? lastRes6;
     final sub6 = m2.changes.listen((event) {
       lastRes6 = event;
     }, null);
@@ -70,7 +70,7 @@ void main() {
         KeyChanges({
           0: ChangeRecordValue(lastRes1![0]!),
           2: ChangeRecordValue(lastRes1![2]!),
-          1: ChangeRecordDelete<IComputedMap<int, int>>()
+          1: ChangeRecordDelete<ComputedMap<int, int>>()
         }.lock));
 
     // Change the value of an existing item, while preserving its group
@@ -85,7 +85,7 @@ void main() {
     expect(lastRes4, null);
     expect(lastRes5, KeyChanges({1: ChangeRecordValue(3)}.lock));
     expect(lastRes6,
-        KeyChanges({2: ChangeRecordDelete<IComputedMap<int, int>>()}.lock));
+        KeyChanges({2: ChangeRecordDelete<ComputedMap<int, int>>()}.lock));
 
     // Add a value to an existing group
     s.add(KeyChanges({0: ChangeRecordValue(0)}.lock));
@@ -96,7 +96,7 @@ void main() {
     expect(lastRes5, KeyChanges({0: ChangeRecordValue(0)}.lock));
     // No change
     expect(lastRes6,
-        KeyChanges({2: ChangeRecordDelete<IComputedMap<int, int>>()}.lock));
+        KeyChanges({2: ChangeRecordDelete<ComputedMap<int, int>>()}.lock));
 
     // Remove a value from an existing group, which has other elements
     s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
@@ -107,7 +107,7 @@ void main() {
     expect(lastRes5, KeyChanges({0: ChangeRecordDelete<int>()}.lock));
     // No change
     expect(lastRes6,
-        KeyChanges({2: ChangeRecordDelete<IComputedMap<int, int>>()}.lock));
+        KeyChanges({2: ChangeRecordDelete<ComputedMap<int, int>>()}.lock));
 
     // Re-introduce a previously removed group
     s.add(KeyChanges({0: ChangeRecordValue(2)}.lock));
@@ -204,7 +204,7 @@ void main() {
           3: ChangeRecordDelete<int>(),
         }.lock));
     expect(lastRes6,
-        KeyChanges({1: ChangeRecordDelete<IComputedMap<int, int>>()}.lock));
+        KeyChanges({1: ChangeRecordDelete<ComputedMap<int, int>>()}.lock));
 
     sub1.cancel();
     sub2.cancel();
@@ -252,7 +252,7 @@ void main() {
     expect(await getValue(m2.containsValue(group)), true);
     expect(
         await getValue(m2.containsValue(
-            IComputedMap.fromChangeStream($(() => throw NoValueException())))),
+            ComputedMap.fromChangeStream($(() => throw NoValueException())))),
         false);
 
     sub.cancel();
@@ -275,7 +275,7 @@ void main() {
     final s = ValueStream<ChangeEvent<int, int>>.seeded(
         ChangeEventReplace({0: 1}.lock),
         sync: true);
-    final m1 = IComputedMap.fromChangeStream($(() => s.use));
+    final m1 = ComputedMap.fromChangeStream($(() => s.use));
     final m2 = m1.groupBy((key, value) => key);
 
     List<Object?> res = [null, null, null, null];
@@ -297,7 +297,7 @@ void main() {
   test('listening on snapshot when there already are listeners and groups',
       () async {
     final m =
-        IComputedMap({0: 1, 1: 2, 2: 3}.lock).groupBy((key, value) => key % 2);
+        ComputedMap({0: 1, 1: 2, 2: 3}.lock).groupBy((key, value) => key % 2);
 
     final sub = m.changes.listen(null);
     await Future.value();
@@ -311,7 +311,7 @@ void main() {
       'listening on snapshot when there already are listeners and upstream has reported an exception',
       () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final m1 = IComputedMap.fromChangeStream($(() => s.use));
+    final m1 = ComputedMap.fromChangeStream($(() => s.use));
     final m2 = m1.groupBy((key, value) => key);
 
     Object? exc1;
@@ -342,7 +342,7 @@ void main() {
 
   test('defunct computations stop computing', () async {
     final s = ValueStream<IMap<int, int>>.seeded({0: 1}.lock, sync: true);
-    final m1 = IComputedMap.fromSnapshotStream($(() => s.use));
+    final m1 = ComputedMap.fromSnapshotStream($(() => s.use));
     final m2 = m1.groupBy((key, value) => key);
     final defunct = (await getValue(m2[0]))!;
     expect(await getValues(defunct.snapshot), []);
@@ -365,10 +365,10 @@ void main() {
 
   test('handles upstream extraneous deletions', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final m1 = IComputedMap.fromChangeStream($(() => s.use));
+    final m1 = ComputedMap.fromChangeStream($(() => s.use));
     final m2 = m1.groupBy((key, value) => key);
 
-    IMap<int, IComputedMap<int, int>>? snap;
+    IMap<int, ComputedMap<int, int>>? snap;
     final sub = m2.snapshot.listen((event) => snap = event);
     await Future.value();
     s.add(ChangeEventReplace({0: 1, 1: 2, 2: 3}.lock));

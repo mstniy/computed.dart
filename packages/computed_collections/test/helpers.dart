@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:computed/computed.dart';
-import 'package:computed_collections/icomputedmap.dart';
+import 'package:computed_collections/computedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:test/expect.dart';
 
@@ -33,14 +33,14 @@ Future<T> getValue<T>(Computed<T> c) async {
 }
 
 Future<void> testCoherenceInt(
-    IComputedMap<int, int> map, IMap<int, int> expected) async {
+    ComputedMap<int, int> map, IMap<int, int> expected) async {
   final nonExistentKey = expected.isEmpty ? 0 : expected.keys.reduce(max) + 1;
   final nonExistentValue =
       expected.isEmpty ? 0 : expected.values.reduce(max) + 1;
   return testCoherence(map, expected, nonExistentKey, nonExistentValue);
 }
 
-Future<void> testCoherence<K, V>(IComputedMap<K, V> map, IMap<K, V> expected,
+Future<void> testCoherence<K, V>(ComputedMap<K, V> map, IMap<K, V> expected,
     K nonExistentKey, V nonExistentValue) async {
   // Test them twice for good measure
   for (var i = 0; i < 2; i++) {

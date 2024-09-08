@@ -1,7 +1,7 @@
 import 'package:computed/computed.dart';
 import 'package:computed/utils/streams.dart';
 import 'package:computed_collections/change_event.dart';
-import 'package:computed_collections/icomputedmap.dart';
+import 'package:computed_collections/computedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:test/test.dart';
 
@@ -10,7 +10,7 @@ import 'helpers.dart';
 void main() {
   test('snapshot works', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final m1 = IComputedMap.fromChangeStream($(() => s.use));
+    final m1 = ComputedMap.fromChangeStream($(() => s.use));
     final m2 = m1.update(0, (value) => value + 1, ifAbsent: () => 0);
     IMap<int, int>? lastRes;
     final sub = m2.snapshot.listen((event) {
@@ -35,7 +35,7 @@ void main() {
   test(
       'snapshot, operator[] throws if the key does not exist and no ifAbsent is given',
       () async {
-    final m1 = IComputedMap(<int, int>{}.lock);
+    final m1 = ComputedMap(<int, int>{}.lock);
     final m2 = m1.update(0, (v) => v);
 
     for (var c in [
@@ -66,7 +66,7 @@ void main() {
 
   test('operator[] works', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final m1 = IComputedMap.fromChangeStream($(() => s.use));
+    final m1 = ComputedMap.fromChangeStream($(() => s.use));
     final m2 = m1.update(0, (v) => v + 1, ifAbsent: () => 0);
 
     var callCnt1 = 0;
@@ -129,7 +129,7 @@ void main() {
   test('change stream throws if the key gets deleted and no ifAbsent is given',
       () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final m1 = IComputedMap.fromChangeStream($(() => s.use));
+    final m1 = ComputedMap.fromChangeStream($(() => s.use));
     final m2 = m1.update(0, (v) => v);
 
     Object? lastExc;
@@ -152,7 +152,7 @@ void main() {
 
   test('propagates the change stream', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-    final m1 = IComputedMap.fromChangeStream($(() => s.use));
+    final m1 = ComputedMap.fromChangeStream($(() => s.use));
     final m2 = m1.update(0, (value) => value + 1, ifAbsent: () => 0);
     ChangeEvent<int, int>? lastRes;
     final sub = m2.changes.listen((event) {
@@ -177,7 +177,7 @@ void main() {
   });
 
   test('attributes are coherent', () async {
-    final m = IComputedMap({0: 1}.lock);
+    final m = ComputedMap({0: 1}.lock);
     final a = m.update(0, (v) => v + 1);
     final b = a.update(1, (v) => v + 1, ifAbsent: () => 42);
     await testCoherenceInt(a, {0: 2}.lock);
@@ -186,7 +186,7 @@ void main() {
 
   test('does not assert idempotency on the user function', () async {
     var cnt = 5;
-    final m = IComputedMap({0: 1}.lock)
+    final m = ComputedMap({0: 1}.lock)
         .update(0, (_) => ++cnt, ifAbsent: () => ++cnt)
         .update(1, (_) => ++cnt, ifAbsent: () => ++cnt);
     expect(await getValue(m.snapshot), {0: 6, 1: 7}.lock);
