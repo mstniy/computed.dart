@@ -495,7 +495,6 @@ class ComputedImpl<T> implements Computed<T> {
         "Computed expressions must be purely functional. Please use listeners for side effects. For computations creating asynchronous operations, make sure to use `Computed.async`.";
     GlobalCtx._currentUpdateNodeDirty[this] = null;
     final oldComputation = GlobalCtx._currentComputation;
-    var gotNVE = false;
     bool shouldNotify = false;
     try {
       _prevResult = _lastResult;
@@ -524,15 +523,16 @@ class ComputedImpl<T> implements Computed<T> {
         }
       }
 
-      if (!newResult._isValue && newResult._exc is NoValueException) {
-        gotNVE = true;
-      } else {
-        _lastResult = newResult;
-      }
+      final gotNVE = !newResult._isValue && newResult._exc is NoValueException;
 
       shouldNotify = !gotNVE &&
           (!_memoized ||
-              (_prevResult?.shouldNotifyMemoized(_lastResult) ?? true));
+              (_prevResult?.shouldNotifyMemoized(newResult) ?? true));
+
+      if (shouldNotify) {
+        _lastResult = newResult;
+      }
+
       // Commit the changes to the DAG
       for (var e in _curUpstreamComputations!.entries) {
         final up = e.key;

@@ -970,6 +970,50 @@ void main() {
   });
 
   test(
+      'memoized computations\' results\' identity does not change on equal values',
+      () async {
+    // Wrap the int in a record so that we can reason about its identity
+    final s = ValueStream<((int,), (int,))>.seeded(((0,), (0,)), sync: true);
+    final c1 = $(() => s.use.$1);
+    final c2 = $(() => s.use.$2);
+
+    var callCnt = 0;
+
+    final sub = Computed(() {
+      callCnt += 1;
+      switch (callCnt) {
+        case 1:
+          expect(c1.useOr((42,)), (42,));
+          expect(c2.useOr((42,)), (42,));
+        case 2:
+          expect(c1.use, (0,));
+          expect(c2.use, (0,));
+        case 3:
+          expect(c1.use, (0,));
+          expect(c2.use, (1,));
+          // This is what we are really testing
+          expect(c1.prev, same(c1.use));
+        case _:
+          fail('Must not happen');
+      }
+
+      return;
+    }, assertIdempotent: false)
+        .listen(null);
+
+    await Future.value();
+    expect(callCnt, 2);
+
+    s.add(((0,), (0,)));
+    expect(callCnt, 2); // Does not lead to a re-computation as (0,) == (0,)
+
+    s.add(((0,), (1,))); // This will lead to a re-computation
+    expect(callCnt, 3);
+
+    sub.cancel();
+  });
+
+  test(
       '.use-ing a computation multiple times doesn\'t run it more times than needed',
       () async {
     final controller = StreamController<int>.broadcast(
