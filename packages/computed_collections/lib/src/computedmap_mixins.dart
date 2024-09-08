@@ -1,5 +1,4 @@
 import 'package:computed/computed.dart';
-import 'package:computed_collections/src/join.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import '../icomputedmap.dart';
@@ -14,6 +13,8 @@ import 'remove_where.dart';
 import 'add_all.dart';
 import 'add_computedmap.dart';
 import 'update.dart';
+import 'join.dart';
+import 'lookup.dart';
 
 mixin OperatorsMixin<K, V> {
   IComputedMap<K, V> add(K key, V value) =>
@@ -91,4 +92,6 @@ mixin OperatorsMixin<K, V> {
 
   IComputedMap<K, (V, V2)> join<V2>(IComputedMap<K, V2> other) =>
       JoinComputedMap(this as IComputedMap<K, V>, other);
+  IComputedMap<K, (V, V2?)> lookup<V2>(IComputedMap<K, V2> other) =>
+      LookupComputedMap(this as IComputedMap<K, V>, other);
 }

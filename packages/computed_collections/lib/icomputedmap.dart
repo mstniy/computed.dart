@@ -66,4 +66,5 @@ abstract class IComputedMap<K, V> {
       Computed<K2> Function(K key, V value) key);
 
   IComputedMap<K, (V, V2)> join<V2>(IComputedMap<K, V2> other);
+  IComputedMap<K, (V, V2?)> lookup<V2>(IComputedMap<K, V2> other);
 }

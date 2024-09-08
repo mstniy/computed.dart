@@ -146,7 +146,7 @@ void main() {
       ChangeEventReplace({0: 0, 2: 2}.lock) // No change
     ));
     expect(callCnt, 4);
-    expect(lastRes, ChangeEventReplace({0: 0, 1: 3, 2: 2}.lock));
+    expect(lastRes, KeyChanges({1: ChangeRecordValue(3)}.lock));
 
     s.add((
       KeyChanges({
