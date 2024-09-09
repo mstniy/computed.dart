@@ -33,16 +33,27 @@ void main() {
     kv1 = (1, 1);
     kv2 = (0, 2);
     s.add(KeyChanges({1: ChangeRecordValue(1)}.lock));
-    expect(lastRes, {0: 2}.lock);
+    expect(lastRes, {0: 1}.lock);
     kv1 = (2, 2);
     kv2 = (0, 3);
     s.add(KeyChanges({2: ChangeRecordValue(2)}.lock));
-    expect(lastRes, {0: 3}.lock);
+    expect(lastRes, {0: 1}.lock);
+    kv1 = (0, 3);
+    kv2 = (1, 0);
+    s.add(KeyChanges({0: ChangeRecordValue(3)}.lock));
+    expect(lastRes, {0: 2, 1: 0}.lock);
+    kv1 = (0, 4);
+    kv2 = (2, 0);
+    s.add(KeyChanges({0: ChangeRecordValue(4)}.lock));
+    expect(lastRes, {0: 2, 2: 0}.lock);
+    s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
+    expect(lastRes, {0: 2}.lock);
     s.add(KeyChanges({1: ChangeRecordDelete<int>()}.lock));
     expect(lastRes, {0: 3}.lock);
-    s.add(KeyChanges({2: ChangeRecordDelete<int>()}.lock));
-    expect(lastRes, {0: 1}.lock);
+    // Duplicate upstream deletion
     s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
+    expect(lastRes, {0: 3}.lock);
+    s.add(KeyChanges({2: ChangeRecordDelete<int>()}.lock));
     expect(lastRes, {}.lock);
     kv1 = (4, 5);
     kv2 = (0, 3);
@@ -59,7 +70,7 @@ void main() {
       return MapEntry(k % 3, v);
     });
 
-    await testCoherenceInt(m2, {1: 2, 2: 3, 0: 4}.lock);
+    await testCoherenceInt(m2, {0: 1, 1: 2, 2: 3}.lock);
   });
 
   test('does not assert idempotency on the user function', () async {

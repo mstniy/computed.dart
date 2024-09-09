@@ -72,13 +72,18 @@ void main() {
     s1.add(KeyChanges(
         {0: ChangeRecordDelete<int>(), 1: ChangeRecordValue(1)}.lock));
     await Future.value();
+    expect(snapshot, {}.lock);
+    expect(
+        change,
+        KeyChanges({
+          2: ChangeRecordDelete<int>(),
+        }.lock));
     await Future.value();
     expect(snapshot, {0: 1}.lock);
     expect(
         change,
         KeyChanges({
           0: ChangeRecordValue(1),
-          2: ChangeRecordDelete<int>(),
         }.lock));
 
     // Add new entries to an existing key
@@ -91,7 +96,6 @@ void main() {
         change,
         KeyChanges({
           0: ChangeRecordValue(1),
-          2: ChangeRecordDelete<int>(),
         }.lock)); // No change
 
     // Remove an entry from an existing key, which has other entries,
@@ -146,12 +150,14 @@ void main() {
     s1.add(KeyChanges(
         {1: ChangeRecordDelete<int>(), 4: ChangeRecordValue(4)}.lock));
     await Future.value();
-    await Future.value();
-    expect(snapshot, {0: 4, 1: 0}.lock);
+    expect(snapshot, {1: 0}.lock);
     expect(
         change,
         KeyChanges(
-            {0: ChangeRecordValue(4), 2: ChangeRecordDelete<int>()}.lock));
+            {0: ChangeRecordDelete<int>(), 2: ChangeRecordDelete<int>()}.lock));
+    await Future.value();
+    expect(snapshot, {0: 4, 1: 0}.lock);
+    expect(change, KeyChanges({0: ChangeRecordValue(4)}.lock));
 
     // Make multiple changes to groups in one upstream change
     s1.add(KeyChanges({
@@ -322,9 +328,6 @@ void main() {
     var cnt = 0;
     final m = ComputedMap({0: 1}.lock).mapComputed((key, value) =>
         Computed(() => Entry(++cnt, ++cnt), assertIdempotent: false));
-    expect(await getValues(m.snapshot), [
-      {}.lock,
-      {1: 2}.lock
-    ]);
+    expect(await getValue(m.snapshot), {1: 2}.lock);
   });
 }

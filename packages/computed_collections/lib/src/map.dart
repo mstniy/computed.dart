@@ -28,11 +28,11 @@ class MapComputedMap<K, V, KParent, VParent>
     for (var e in up.entries) {
       final res = _convert(e.key, e.value);
       _mappedKeys[e.key] = res.key;
-      ress[res.key] = res.value;
-      _mappedKeysReverse.update(res.key, (mKR) {
-        mKR[e.key] = res.value;
-        return mKR;
-      }, ifAbsent: () => {e.key: res.value});
+      if (!ress.containsKey(res.key)) {
+        ress[res.key] = res.value;
+      }
+      final group = _mappedKeysReverse[res.key] ??= {};
+      group[e.key] = res.value;
     }
 
     final ressLocked = ress.lock;
@@ -50,35 +50,43 @@ class MapComputedMap<K, V, KParent, VParent>
         case KeyChanges<KParent, VParent>(changes: final changes):
           final keyChanges = <K, ChangeRecord<V>>{};
 
+          void removeKeyFromGroup(KParent kparent, K k) {
+            final oldGroup = _mappedKeysReverse[k]!;
+            final wasActive = kparent == oldGroup.keys.first;
+            assert(oldGroup.containsKey(kparent));
+            oldGroup.remove(kparent);
+            if (oldGroup.isEmpty) {
+              _mappedKeysReverse.remove(k);
+              keyChanges[k] = ChangeRecordDelete();
+            } else if (wasActive) {
+              keyChanges[k] = ChangeRecordValue(oldGroup.values.first);
+            }
+          }
+
           for (var e in changes.entries) {
             switch (e.value) {
               case ChangeRecordValue<VParent>(value: final value):
                 final converted = _convert(e.key, value);
+                if (_mappedKeys.containsKey(e.key) &&
+                    _mappedKeys[e.key] != converted.key) {
+                  // Mapped key changed - remove the parent key from the old mapped key
+                  final oldMappedKey = _mappedKeys[e.key] as K;
+                  removeKeyFromGroup(e.key, oldMappedKey);
+                }
                 _mappedKeys[e.key] = converted.key;
-                _mappedKeysReverse.update(converted.key, (m) {
-                  m[e.key] = converted.value;
-                  return m;
-                }, ifAbsent: () => {e.key: converted.value});
-                keyChanges[converted.key] = ChangeRecordValue(converted.value);
+                final newGroup = _mappedKeysReverse[converted.key] ??= {};
+                newGroup[e.key] = converted.value;
+                if (newGroup.keys.first == e.key) {
+                  keyChanges[converted.key] =
+                      ChangeRecordValue(converted.value);
+                }
               case ChangeRecordDelete<VParent>():
                 if (!_mappedKeys.containsKey(e.key)) {
                   // Duplicate deletion from upstream
                   continue;
                 }
                 final oldMappedKey = _mappedKeys.remove(e.key) as K;
-                var wasActive;
-                final newParentKeyList =
-                    _mappedKeysReverse.update(oldMappedKey, (s) {
-                  wasActive = e.key == s.keys.last;
-                  return s..remove(e.key);
-                });
-                if (newParentKeyList.isEmpty) {
-                  _mappedKeysReverse.remove(oldMappedKey);
-                  keyChanges[oldMappedKey] = ChangeRecordDelete();
-                } else if (wasActive) {
-                  keyChanges[oldMappedKey] =
-                      ChangeRecordValue(newParentKeyList.values.last);
-                }
+                removeKeyFromGroup(e.key, oldMappedKey);
             }
           }
 

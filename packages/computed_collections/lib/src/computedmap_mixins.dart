@@ -5,7 +5,6 @@ import '../computedmap.dart';
 import 'add_all_computed.dart';
 import 'group_by.dart';
 import 'map.dart';
-import 'map_computed.dart';
 import 'map_values.dart';
 import 'map_values_computed.dart';
 import 'remove.dart';
@@ -35,7 +34,9 @@ mixin OperatorsMixin<K, V> {
 
   ComputedMap<K2, V2> mapComputed<K2, V2>(
           Computed<Entry<K2, V2>> Function(K key, V value) convert) =>
-      MapComputedComputedMap(this as ComputedMap<K, V>, convert);
+      (this as ComputedMap<K, V>)
+          .mapValuesComputed(convert)
+          .map((key, value) => MapEntry(value.key, value.value));
 
   ComputedMap<K, V2> mapValues<V2>(V2 Function(K key, V value) convert) =>
       MapValuesComputedMap(this as ComputedMap<K, V>, convert);
