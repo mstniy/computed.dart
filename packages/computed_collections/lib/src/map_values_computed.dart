@@ -111,6 +111,9 @@ class MapValuesComputedComputedMap<K, V, VParent>
         }
       }).expand((e) => e));
 
+      // TODO: Is it not a bug that we are not durably subscribing to _convert results here?
+      //  Also, this entire logic feels funky to begin with.
+
       if (gotNVE) throw NoValueException();
       return unwrapped;
     });

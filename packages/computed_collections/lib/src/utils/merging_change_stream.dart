@@ -16,42 +16,37 @@ class MergingChangeStream<K, V> extends Stream<ChangeEvent<K, V>> {
     _stream.add(oldChangesLastAdded);
   }
 
-  bool get hasListener => _stream.hasListener;
-
   void add(ChangeEvent<K, V> change) {
     if (_changesLastAdded == null) {
-      _changesLastAdded = change;
-      // Batch the changes until the next microtask, then add to the stream
-      scheduleMicrotask(_maybeFlushChanges);
-    } else if (change is ChangeEventReplace<K, V>) {
-      _changesLastAdded = change;
-    } else {
-      assert(change is KeyChanges<K, V>);
-      if (_changesLastAdded is KeyChanges<K, V>) {
-        _changesLastAdded = KeyChanges((_changesLastAdded as KeyChanges<K, V>)
-            .changes
-            .addAll((change as KeyChanges<K, V>).changes));
-      } else {
-        assert(_changesLastAdded is ChangeEventReplace<K, V>);
-        final keyChanges = (change as KeyChanges<K, V>).changes;
-        final keyDeletions =
-            keyChanges.entries.where((e) => e.value is ChangeRecordDelete<K>);
-        _changesLastAdded = ChangeEventReplace((_changesLastAdded
-                as ChangeEventReplace<K, V>)
-            .newCollection
-            .addEntries(keyChanges.entries
-                .where((e) => e.value is! ChangeRecordDelete<K>)
-                .map((e) =>
-                    MapEntry(e.key, (e.value as ChangeRecordValue<V>).value))));
-        keyDeletions.forEach((e) => _changesLastAdded = ChangeEventReplace(
-            (_changesLastAdded as ChangeEventReplace<K, V>)
-                .newCollection
-                .remove(e.key)));
+      // If the given change is empty, do nothing
+      if (change is! KeyChanges<K, V> || change.changes.isNotEmpty) {
+        _changesLastAdded = change;
+        // Batch the changes until the next microtask, then add to the stream
+        scheduleMicrotask(_maybeFlushChanges);
       }
+    } else {
+      _changesLastAdded = switch (change) {
+        ChangeEventReplace<K, V>() => change,
+        KeyChanges<K, V>() => switch (_changesLastAdded!) {
+            KeyChanges<K, V>(changes: final changes) =>
+              KeyChanges(changes.addAll(change.changes)),
+            ChangeEventReplace<K, V>(newCollection: final oldNewCollection) =>
+              ChangeEventReplace(change.changes.entries.fold(
+                  oldNewCollection,
+                  (newCollection, changeEntry) => switch (changeEntry.value) {
+                        ChangeRecordValue<V>(value: final value) =>
+                          newCollection.add(changeEntry.key, value),
+                        ChangeRecordDelete<V>() =>
+                          newCollection.remove(changeEntry.key),
+                      })),
+          },
+      };
     }
   }
 
   void addError(Object o) {
+    // TODO: Do not flush synchronously here.
+    //  Follow the pattern used by [add].
     _maybeFlushChanges();
     _stream.addError(o);
   }
