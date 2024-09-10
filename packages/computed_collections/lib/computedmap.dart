@@ -1,6 +1,7 @@
 import 'package:computed/computed.dart';
 import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/src/const_computedmap.dart';
+import 'package:computed_collections/src/flat.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import 'src/cs_computedmap.dart';
@@ -67,4 +68,9 @@ abstract class ComputedMap<K, V> {
 
   ComputedMap<K, (V, V2)> join<V2>(ComputedMap<K, V2> other);
   ComputedMap<K, (V, V2?)> lookup<V2>(ComputedMap<K, V2> other);
+}
+
+extension ComputedComputedFlat<K1, K2, V>
+    on ComputedMap<K1, ComputedMap<K2, V>> {
+  ComputedMap<(K1, K2), V> flat() => FlatComputedMap(this);
 }
