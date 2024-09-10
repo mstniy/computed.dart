@@ -68,6 +68,9 @@ abstract class ComputedMap<K, V> {
 
   ComputedMap<K, (V, V2)> join<V2>(ComputedMap<K, V2> other);
   ComputedMap<K, (V, V2?)> lookup<V2>(ComputedMap<K, V2> other);
+
+  ComputedMap<(K, K2), (V, V2)> cartesianProduct<K2, V2>(
+      ComputedMap<K2, V2> other);
 }
 
 extension ComputedComputedFlat<K1, K2, V>

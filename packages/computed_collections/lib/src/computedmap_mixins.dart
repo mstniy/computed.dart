@@ -95,4 +95,10 @@ mixin OperatorsMixin<K, V> {
       JoinComputedMap(this as ComputedMap<K, V>, other);
   ComputedMap<K, (V, V2?)> lookup<V2>(ComputedMap<K, V2> other) =>
       LookupComputedMap(this as ComputedMap<K, V>, other);
+
+  ComputedMap<(K, K2), (V, V2)> cartesianProduct<K2, V2>(
+          ComputedMap<K2, V2> other) =>
+      (this as ComputedMap<K, V>)
+          .mapValues((k1, v1) => other.mapValues((k2, v2) => (v1, v2)))
+          .flat();
 }
