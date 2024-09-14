@@ -125,15 +125,30 @@ void main() {
     // Upstream replacement
     s1.add(ChangeEventReplace({0: 0, 1: 1, 3: 2, 4: 0}.lock));
     await Future.value();
+    expect(snapshot, {}.lock);
+    expect(change, ChangeEventReplace({}.lock));
+    await Future.value();
     expect(snapshot, {0: 1, 1: 0, 2: 2}.lock);
-    expect(change, ChangeEventReplace({0: 1, 1: 0, 2: 2}.lock));
+    expect(
+        change,
+        KeyChanges({
+          0: ChangeRecordValue(1),
+          1: ChangeRecordValue(0),
+          2: ChangeRecordValue(2)
+        }.lock));
 
     // Change the mapped key of a non-leader entry
     s1.add(KeyChanges({4: ChangeRecordValue(5)}.lock));
     await Future.value();
     await Future.value();
     expect(snapshot, {0: 1, 1: 0, 2: 2}.lock);
-    expect(change, ChangeEventReplace({0: 1, 1: 0, 2: 2}.lock)); // No change
+    expect(
+        change,
+        KeyChanges({
+          0: ChangeRecordValue(1),
+          1: ChangeRecordValue(0),
+          2: ChangeRecordValue(2)
+        }.lock)); // No change
 
     // Change the mapped key of a leader entry, while keeping its former key populated
     s1.add(KeyChanges({3: ChangeRecordValue(0)}.lock));

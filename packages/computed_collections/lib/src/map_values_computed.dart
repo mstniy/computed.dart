@@ -43,44 +43,48 @@ class MapValuesComputedComputedMap<K, V, VParent>
     }, assertIdempotent: false);
 
     late final MergingChangeStream<K, V> _changes;
-    var _changesState = <K, ComputedSubscription<V>>{};
+    var _changesState = <K, ComputedSubscription<void>>{};
 
-    void _computationListener(K key, V value) {
-      _changes.add(KeyChanges(
-          <K, ChangeRecord<V>>{key: ChangeRecordValue<V>(value)}.lock));
+    ComputedSubscription<void> _listenToNestedComputation(
+        K k, Computed<V> nested) {
+      return Computed.async(() {
+        final value = nested.use;
+        _changes.add(
+            KeyChanges(<K, ChangeRecord<V>>{k: ChangeRecordValue(value)}.lock));
+      },
+              dispose: (_) => _changes.add(KeyChanges(
+                  <K, ChangeRecord<V>>{k: ChangeRecordDelete<V>()}.lock)))
+          .listen(null);
+    }
+
+    void _setState(IMap<K, Computed<V>> m) {
+      _changesState.values.forEach((s) => s.cancel());
+      _changesState =
+          m.unlock.map((k, c) => MapEntry(k, _listenToNestedComputation(k, c)));
     }
 
     void _computedChangesListener(ChangeEvent<K, Computed<V>> computedChanges) {
-      if (computedChanges is ChangeEventReplace<K, Computed<V>>) {
-        final newChangesState = <K, ComputedSubscription<V>>{};
-        computedChanges.newCollection.forEach((key, value) {
-          newChangesState[key] = value.listen(
-              (e) => _computationListener(key, e), _changes.addError);
-        });
-        _changesState.values.forEach((sub) => sub.cancel());
-        _changesState = newChangesState;
-        _changes.add(ChangeEventReplace(<K, V>{}.lock));
-      } else if (computedChanges is KeyChanges<K, Computed<V>>) {
-        for (var e in computedChanges.changes.entries) {
-          final key = e.key;
-          final change = e.value;
-          if (change is ChangeRecordValue<Computed<V>>) {
-            final oldSub = _changesState[key];
-            _changesState[key] = change.value
-                .listen((e) => _computationListener(key, e), _changes.addError);
-            oldSub?.cancel();
-            // Emit a deletion event, as the key won't have a value until the next microtask
+      switch (computedChanges) {
+        case ChangeEventReplace<K, Computed<V>>():
+          _changes.add(ChangeEventReplace(<K, V>{}.lock));
+          _setState(computedChanges.newCollection);
+        case KeyChanges<K, Computed<V>>():
+          for (var e in computedChanges.changes.entries) {
+            final key = e.key;
+            final change = e.value;
+            // Note that this emits a deletion event for the key, if it has a value,
+            // and we want that as the key won't have a value until the next microtask.
             // Note that if the new computation has a value already, this will be overwritten
-            // by [_computationListener].
-            _changes.add(KeyChanges(
-                <K, ChangeRecord<V>>{key: ChangeRecordDelete<V>()}.lock));
-          } else if (change is ChangeRecordDelete<Computed<V>>) {
+            // by the computation in [_listenToNestedComputation].
             _changesState[key]?.cancel();
-            _changesState.remove(key);
-            _changes.add(KeyChanges(
-                <K, ChangeRecord<V>>{key: ChangeRecordDelete<V>()}.lock));
+            switch (change) {
+              case ChangeRecordValue<Computed<V>>():
+                _changesState[key] =
+                    _listenToNestedComputation(key, change.value);
+              case ChangeRecordDelete<Computed<V>>():
+                _changesState.remove(key);
+            }
           }
-        }
       }
     }
 
@@ -98,24 +102,9 @@ class MapValuesComputedComputedMap<K, V, VParent>
     });
     changes = $(() => _changes.use);
     snapshot = snapshotComputation(changes, () {
-      final entries = _parent.snapshot.use
-          .map(((key, value) => MapEntry(key, _convert(key, value))));
-      var gotNVE = false;
-      final unwrapped = IMap.fromEntries(entries.entries.map((e) {
-        try {
-          return [MapEntry(e.key, e.value.use)];
-        } on NoValueException {
-          gotNVE = true;
-          return <MapEntry<K, V>>[];
-          // Keep going, we want Computed to be aware of all the dependencies
-        }
-      }).expand((e) => e));
-
-      // TODO: Is it not a bug that we are not durably subscribing to _convert results here?
-      //  Also, this entire logic feels funky to begin with.
-
-      if (gotNVE) throw NoValueException();
-      return unwrapped;
+      _setState(_parent.snapshot.use
+          .map((key, value) => MapEntry(key, _convert(key, value))));
+      return IMap<K, V>.empty();
     });
 
     _tracker = CSTracker(changes, snapshot);

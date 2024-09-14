@@ -102,16 +102,12 @@ class FlatComputedMap<K1, K2, V>
           computedChanges.changes.entries.forEach((e) {
             final k1 = e.key;
             final change = e.value;
+            _keySubs[k1]
+                ?.cancel(); // Note that this emits deletion events for the old key products, if a snapshot exists
             switch (change) {
               case ChangeRecordValue<ComputedMap<K2, V>>():
-                _keySubs.update(k1, (oldSub) {
-                  oldSub
-                      .cancel(); // Note that this emits deletion events for the old key products, if a snapshot exists
-                  return _listenToNestedMap(k1, change.value);
-                }, ifAbsent: () => _listenToNestedMap(k1, change.value));
+                _keySubs[k1] = _listenToNestedMap(k1, change.value);
               case ChangeRecordDelete<ComputedMap<K2, V>>():
-                _keySubs[k1]
-                    ?.cancel(); // Note that this emits deletion events for the old key products, if a snapshot exists
                 _keySubs.remove(k1);
             }
           });

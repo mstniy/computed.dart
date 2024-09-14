@@ -23,7 +23,8 @@ void main() {
     expect(lastRes, {}.lock);
     s.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
     expect(lastRes, {}.lock);
-    await Future.value();
+    await Future.value(); // One MT for Computed to subscribe to s2
+    await Future.value(); // Another for the MergingChangeStream
     expect(lastRes, {0: 1}.lock);
     s2.add(1);
     await Future.value();
@@ -31,14 +32,17 @@ void main() {
 
     s.add(KeyChanges({0: ChangeRecordValue(2)}.lock));
     await Future.value();
+    await Future.value();
     expect(lastRes, {0: 3}.lock);
     s2.add(2);
     await Future.value();
     expect(lastRes, {0: 4}.lock);
     s.add(KeyChanges({1: ChangeRecordValue(1)}.lock));
     await Future.value();
+    await Future.value();
     expect(lastRes, {0: 4, 1: 3}.lock);
     s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
+    await Future.value();
     await Future.value();
     expect(lastRes, {1: 3}.lock);
     s2.add(3);
@@ -64,6 +68,8 @@ void main() {
     final sub2 = m2.snapshot.listen((event) {
       lastRes = event;
     }, (e) => fail(e.toString()));
+    await Future.value();
+    await Future.value();
     await Future.value();
     expect(lastRes, {0: 6, 2: 8}.lock);
 
@@ -91,6 +97,7 @@ void main() {
     expect(cCnt, 2); // Two runs in which it throws NVE
     await Future.value();
     expect(cCnt, 4); // After Computed subscribes to s2
+    await Future.value();
     expect(lastRes, {0: 1}.lock);
 
     sub.cancel();
@@ -112,6 +119,7 @@ void main() {
     expect(lastRes, {}.lock);
     await Future.value();
     expect(cCnt, 8); // After Computed subscribes to s2
+    await Future.value();
     expect(lastRes, {2: 4}.lock);
 
     sub.cancel();
@@ -196,17 +204,20 @@ void main() {
     s.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
     expect(callCnt, 0);
     await Future.value();
+    await Future.value();
     expect(callCnt, 1);
     expect(lastRes, KeyChanges({0: ChangeRecordValue(6)}.lock));
 
     s.add(KeyChanges({1: ChangeRecordValue(2)}.lock));
     expect(callCnt, 1);
     await Future.value();
+    await Future.value();
     expect(callCnt, 2);
     expect(lastRes, KeyChanges({1: ChangeRecordValue(7)}.lock));
 
     s.add(KeyChanges({0: ChangeRecordValue(2)}.lock));
     expect(callCnt, 2);
+    await Future.value();
     await Future.value();
     expect(callCnt, 3);
     expect(lastRes, KeyChanges({0: ChangeRecordValue(7)}.lock));
@@ -215,17 +226,21 @@ void main() {
     s.add(KeyChanges({0: ChangeRecordValue(3)}.lock));
     expect(callCnt, 3);
     await Future.value();
+    await Future.value();
     expect(callCnt, 4);
     expect(lastRes,
         KeyChanges({0: ChangeRecordDelete()}.lock)); // s3 has no value yet
     s.add(KeyChanges({0: ChangeRecordValue(4)}.lock));
     await Future.value();
+    await Future.value();
     expect(callCnt, 4); // Not notified, as the last event was already deletion
     expect(lastRes, KeyChanges({0: ChangeRecordDelete()}.lock));
     s.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
     await Future.value();
+    await Future.value();
     expect(callCnt, 4);
     s.add(KeyChanges({0: ChangeRecordValue(4)}.lock));
+    await Future.value();
     await Future.value();
     expect(callCnt, 4); // Not notified, as s3 still has no value
     s3.add(0);
@@ -245,12 +260,21 @@ void main() {
     expect(callCnt, 6);
     await Future.value();
     expect(callCnt, 7);
-    expect(lastRes, ChangeEventReplace({0: 10, 1: 11, 2: 12}.lock));
-
-    s2.add(6);
-    expect(callCnt, 7);
+    expect(lastRes, ChangeEventReplace({}.lock));
     await Future.value();
     expect(callCnt, 8);
+    expect(
+        lastRes,
+        KeyChanges({
+          0: ChangeRecordValue(10),
+          1: ChangeRecordValue(11),
+          2: ChangeRecordValue(12)
+        }.lock));
+
+    s2.add(6);
+    expect(callCnt, 8);
+    await Future.value();
+    expect(callCnt, 9);
     expect(
         lastRes,
         KeyChanges({
@@ -264,15 +288,14 @@ void main() {
     s.add(KeyChanges({1: ChangeRecordDelete<int>()}.lock));
     s2.add(7);
     s.add(KeyChanges({3: ChangeRecordValue(11)}.lock));
-    expect(callCnt, 8);
-    await Future.value();
     expect(callCnt, 9);
-    expect(lastRes, ChangeEventReplace({2: 17, 0: 7}.lock));
     await Future.value();
     expect(callCnt, 10);
-    expect(lastRes, KeyChanges({3: ChangeRecordValue(18)}.lock));
+    expect(lastRes, ChangeEventReplace({2: 17, 0: 7, 3: 18}.lock));
 
-    await Future.value(); // No more calls
+    for (var i = 0; i < 5; i++) {
+      await Future.value(); // No more calls
+    }
     expect(callCnt, 10);
 
     sub.cancel();
@@ -365,6 +388,40 @@ void main() {
 
     m2 = m1.mapValuesComputed((key, value) => converts[key](value));
 
-    expect(await getValue(m2.snapshot), {0: 6, 1: 3, 2: 2}.lock);
+    expect(await getValues(m2.snapshot), [
+      {}.lock,
+      {0: 6, 1: 3, 2: 2}.lock
+    ]);
+  });
+
+  test('(regression) reactive towards the initial set of value computations',
+      () async {
+    final s = ValueStream<int>(sync: true);
+    final m = ComputedMap.fromIMap({0: 0}.lock)
+        .mapValuesComputed((k, v) => $(() => s.use));
+
+    var cnt = 0;
+    IMap<int, int>? last;
+
+    final sub = m.snapshot.listen((event) {
+      cnt++;
+      last = event;
+    });
+
+    await Future.value();
+    expect(cnt, 1);
+    expect(last, const IMap.empty());
+
+    s.add(0);
+    await Future.value();
+    expect(cnt, 2);
+    expect(last, {0: 0}.lock);
+
+    s.add(1);
+    await Future.value();
+    expect(cnt, 3);
+    expect(last, {0: 1}.lock);
+
+    sub.cancel();
   });
 }
