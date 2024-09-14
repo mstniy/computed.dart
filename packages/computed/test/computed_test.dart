@@ -3189,5 +3189,31 @@ void main() {
       sub.cancel();
       expect(flag2, true);
     });
+
+    test('(regression) cancelling a weak user inside onCancel does not crash',
+        () {
+      late final ComputedSubscription<void> sub3;
+      final c1 = Computed(() => 0, onCancel: () => sub3.cancel());
+      final c2 = $(() => c1.use);
+
+      final c3 = $(() => c2.useWeak);
+
+      final sub2 = c2.listen(null);
+      sub3 = c3.listen(null);
+
+      sub2.cancel();
+    });
+
+    test(
+        '(regression) re-cancelling a subscription inside onCancel does not crash',
+        () {
+      late final ComputedSubscription<void> sub2;
+      final c1 = Computed(() => 0, onCancel: () => sub2.cancel());
+      final c2 = $(() => c1.use);
+
+      sub2 = c2.listen(null);
+
+      sub2.cancel();
+    });
   });
 }

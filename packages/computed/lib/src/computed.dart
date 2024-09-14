@@ -698,11 +698,13 @@ class ComputedImpl<T> implements Computed<T> {
   }
 
   void _removeDownstreamComputation(ComputedImpl c) {
+    bool wasWeak = _weakDownstreamComputations.contains(c);
     bool removed = _memoizedDownstreamComputations.remove(c) ||
         _nonMemoizedDownstreamComputations.remove(c) ||
         _weakDownstreamComputations.remove(c);
     assert(removed, "Corrupted internal state");
-    if (_memoizedDownstreamComputations.isEmpty &&
+    if (!wasWeak &&
+        _memoizedDownstreamComputations.isEmpty &&
         _nonMemoizedDownstreamComputations.isEmpty &&
         _listeners.isEmpty) {
       _removeDataSourcesAndUpstreams();
@@ -710,7 +712,9 @@ class ComputedImpl<T> implements Computed<T> {
   }
 
   void _removeListener(ComputedSubscription<T> sub) {
-    _listeners.remove(sub);
+    if (_listeners.remove(sub) == null) {
+      return;
+    }
     if (_memoizedDownstreamComputations.isEmpty &&
         _nonMemoizedDownstreamComputations.isEmpty &&
         _listeners.isEmpty) {
