@@ -10,12 +10,6 @@ import 'helpers.dart';
 
 void main() {
   test('change stream works', () async {
-    (ComputedMap<int, int>, ValueStream<ChangeEvent<int, int>>)
-        getControlledMap() {
-      final s = ValueStream<ChangeEvent<int, int>>(sync: true);
-      return (ComputedMap.fromChangeStream($(() => s.use)), s);
-    }
-
     final s = ValueStream<ChangeEvent<int, ComputedMap<int, int>>>(sync: true);
     final m = ComputedMap.fromChangeStream($(() => s.use)).flat();
 
@@ -30,8 +24,13 @@ void main() {
     await Future.value();
     expect(cnt, 0);
 
-    var (nested0, stream0) = getControlledMap();
+    final stream0 = ValueStream<ChangeEvent<int, int>>(sync: true);
+    final nested0 = ComputedMap.fromChangeStream($(() => stream0.use));
+
+    expect(stream0.hasListener, false);
+
     s.add(KeyChanges({0: ChangeRecordValue(nested0)}.lock));
+    expect(stream0.hasListener, true);
     await Future.value();
     expect(cnt, 0);
 
@@ -66,6 +65,7 @@ void main() {
         }.lock));
 
     s.add(KeyChanges({0: ChangeRecordDelete<ComputedMap<int, int>>()}.lock));
+    expect(stream0.hasListener, false);
     await Future.value();
     expect(cnt, 4);
     expect(
@@ -92,6 +92,29 @@ void main() {
         last,
         KeyChanges({
           (0, 5): ChangeRecordValue(6),
+        }.lock));
+
+    s.add(ChangeEventReplace({
+      2: ComputedMap({4: 5}.lock),
+    }.lock));
+    await Future.value();
+    expect(cnt, 7);
+    expect(
+        last,
+        ChangeEventReplace({
+          (2, 4): 5,
+        }.lock));
+
+    s.add(KeyChanges({
+      2: ChangeRecordValue(ComputedMap({6: 7}.lock)),
+    }.lock));
+    await Future.value();
+    expect(cnt, 8);
+    expect(
+        last,
+        KeyChanges({
+          (2, 4): ChangeRecordDelete<int>(),
+          (2, 6): ChangeRecordValue(7),
         }.lock));
 
     sub.cancel();
