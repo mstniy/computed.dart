@@ -134,7 +134,7 @@ void main() {
   });
 
   test('attributes are coherent', () async {
-    final m = ComputedMap({0: 1, 1: 2, 2: 3}.lock);
+    final m = ComputedMap.fromIMap({0: 1, 1: 2, 2: 3}.lock);
     final a = m.remove(0);
     final b = a.remove(1);
     final c = a.remove(3);
@@ -144,7 +144,7 @@ void main() {
   });
 
   test('add on remove works', () async {
-    final m = ComputedMap({0: 1, 1: 2, 2: 3}.lock);
+    final m = ComputedMap.fromIMap({0: 1, 1: 2, 2: 3}.lock);
     final a = m.remove(0);
     final b = a.add(0, 2);
     final c = a.add(1, 3);

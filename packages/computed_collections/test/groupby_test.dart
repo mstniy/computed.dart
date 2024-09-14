@@ -296,8 +296,8 @@ void main() {
 
   test('listening on snapshot when there already are listeners and groups',
       () async {
-    final m =
-        ComputedMap({0: 1, 1: 2, 2: 3}.lock).groupBy((key, value) => key % 2);
+    final m = ComputedMap.fromIMap({0: 1, 1: 2, 2: 3}.lock)
+        .groupBy((key, value) => key % 2);
 
     final sub = m.changes.listen(null);
     await Future.value();

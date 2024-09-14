@@ -6,7 +6,7 @@ import 'helpers.dart';
 
 void main() {
   test('attributes are coherent', () async {
-    final m = ComputedMap({0: 1}.lock);
+    final m = ComputedMap.fromIMap({0: 1}.lock);
     final a = m.putIfAbsent(0, () => 0);
     final b = a.putIfAbsent(1, () => 1);
     await testCoherenceInt(a, {0: 1}.lock);

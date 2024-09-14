@@ -10,12 +10,12 @@ import 'helpers.dart';
 
 void main() {
   test('attributes are coherent', () async {
-    final x = ComputedMap({0: 1, 1: 2}.lock)
-        .lookup(ComputedMap({1: 3, 2: 4, 3: 5}.lock));
+    final x = ComputedMap.fromIMap({0: 1, 1: 2}.lock)
+        .lookup(ComputedMap.fromIMap({1: 3, 2: 4, 3: 5}.lock));
     await testCoherence(x, {0: (1, null), 1: (2, 3)}.lock, 2, (0, 1));
 
-    final y =
-        ComputedMap({0: 1, 1: 2, 2: 3}.lock).lookup(ComputedMap({0: 0}.lock));
+    final y = ComputedMap.fromIMap({0: 1, 1: 2, 2: 3}.lock)
+        .lookup(ComputedMap.fromIMap({0: 0}.lock));
     await testCoherence(
         y, {0: (1, 0), 1: (2, null), 2: (3, null)}.lock, 3, (0, 1));
   });

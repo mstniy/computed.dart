@@ -35,7 +35,7 @@ void main() {
   test(
       'snapshot, operator[] throws if the key does not exist and no ifAbsent is given',
       () async {
-    final m1 = ComputedMap(<int, int>{}.lock);
+    final m1 = ComputedMap.fromIMap(<int, int>{}.lock);
     final m2 = m1.update(0, (v) => v);
 
     for (var c in [
@@ -177,7 +177,7 @@ void main() {
   });
 
   test('attributes are coherent', () async {
-    final m = ComputedMap({0: 1}.lock);
+    final m = ComputedMap.fromIMap({0: 1}.lock);
     final a = m.update(0, (v) => v + 1);
     final b = a.update(1, (v) => v + 1, ifAbsent: () => 42);
     await testCoherenceInt(a, {0: 2}.lock);
@@ -186,7 +186,7 @@ void main() {
 
   test('does not assert idempotency on the user function', () async {
     var cnt = 5;
-    final m = ComputedMap({0: 1}.lock)
+    final m = ComputedMap.fromIMap({0: 1}.lock)
         .update(0, (_) => ++cnt, ifAbsent: () => ++cnt)
         .update(1, (_) => ++cnt, ifAbsent: () => ++cnt);
     expect(await getValue(m.snapshot), {0: 6, 1: 7}.lock);

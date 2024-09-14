@@ -12,7 +12,7 @@ import 'src/ss_computedmap.dart';
 /// - Individual keys can be observed
 /// - Supports immutable snapshots (using fast_immutable_collections)
 abstract class ComputedMap<K, V> {
-  factory ComputedMap(IMap<K, V> m) => ConstComputedMap(m);
+  factory ComputedMap.fromIMap(IMap<K, V> m) => ConstComputedMap(m);
   factory ComputedMap.fromChangeStream(Computed<ChangeEvent<K, V>> stream) =>
       ChangeStreamComputedMap(stream);
   factory ComputedMap.fromSnapshotStream(Computed<IMap<K, V>> stream) =>

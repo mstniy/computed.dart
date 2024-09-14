@@ -9,13 +9,13 @@ import 'helpers.dart';
 
 void main() {
   test('initial computation works', () async {
-    final x = ComputedMap({0: 1, 1: 2}.lock);
+    final x = ComputedMap.fromIMap({0: 1, 1: 2}.lock);
     final y = x.addAll({1: 3, 2: 4}.lock);
     expect(await getValue(y.snapshot), {0: 1, 1: 3, 2: 4}.lock);
   });
 
   test('containsKey works', () async {
-    final x = ComputedMap({0: 1, 1: 2}.lock);
+    final x = ComputedMap.fromIMap({0: 1, 1: 2}.lock);
     final y = x.addAll({1: 3, 2: 4}.lock);
     expect(await getValue(y.containsKey(0)), true);
     expect(await getValue(y.containsKey(1)), true);
@@ -24,7 +24,7 @@ void main() {
   });
 
   test('containsValue works', () async {
-    final x = ComputedMap({0: 1, 1: 4}.lock);
+    final x = ComputedMap.fromIMap({0: 1, 1: 4}.lock);
     final y = x.addAll({1: 3, 2: 4}.lock);
     expect(await getValue(y.containsValue(1)), true);
     expect(await getValue(y.containsValue(3)), true);
@@ -33,7 +33,7 @@ void main() {
   });
 
   test('operator[] works', () async {
-    final x = ComputedMap({0: 1, 1: 2}.lock);
+    final x = ComputedMap.fromIMap({0: 1, 1: 2}.lock);
     final y = x.addAll({1: 3, 2: 4}.lock);
     expect(await getValue(y[0]), 1);
     expect(await getValue(y[1]), 3);
@@ -74,7 +74,7 @@ void main() {
   });
 
   test('attributes are coherent', () async {
-    final x = ComputedMap({0: 1, 1: 2}.lock);
+    final x = ComputedMap.fromIMap({0: 1, 1: 2}.lock);
     final y = x.addAll({1: 3, 2: 4}.lock);
     await testCoherenceInt(y, {0: 1, 1: 3, 2: 4}.lock);
   });

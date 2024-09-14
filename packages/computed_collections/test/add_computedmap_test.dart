@@ -165,7 +165,7 @@ void main() {
   });
 
   test('attributes are coherent', () async {
-    final m = ComputedMap({0: 1}.lock);
+    final m = ComputedMap.fromIMap({0: 1}.lock);
     final a = m.add(1, 2);
     final b = a.add(0, 2);
     final c = a.add(0, 3);

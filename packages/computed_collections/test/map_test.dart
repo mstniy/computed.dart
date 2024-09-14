@@ -64,7 +64,7 @@ void main() {
   });
 
   test('attributes are coherent', () async {
-    final m1 = ComputedMap({0: 1, 1: 2, 2: 3, 3: 4}.lock);
+    final m1 = ComputedMap.fromIMap({0: 1, 1: 2, 2: 3, 3: 4}.lock);
 
     final m2 = m1.map((k, v) {
       return MapEntry(k % 3, v);
@@ -75,8 +75,8 @@ void main() {
 
   test('does not assert idempotency on the user function', () async {
     var cnt = 0;
-    final m =
-        ComputedMap({0: 1}.lock).map((key, value) => MapEntry(++cnt, ++cnt));
+    final m = ComputedMap.fromIMap({0: 1}.lock)
+        .map((key, value) => MapEntry(++cnt, ++cnt));
     expect(await getValue(m.snapshot), {1: 2}.lock);
   });
 }

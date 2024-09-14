@@ -7,8 +7,8 @@ import 'helpers.dart';
 
 void main() {
   test('works', () async {
-    final m1 = ComputedMap({0: 1, 2: 3}.lock);
-    final m2 = ComputedMap({4: 5, 6: 7}.lock);
+    final m1 = ComputedMap.fromIMap({0: 1, 2: 3}.lock);
+    final m2 = ComputedMap.fromIMap({4: 5, 6: 7}.lock);
     final m3 = m1.cartesianProduct(m2);
 
     expect(

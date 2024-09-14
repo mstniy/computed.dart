@@ -33,7 +33,7 @@ void main() {
   });
 
   test('initial computation works', () async {
-    final m1 = ComputedMap({0: 1, 1: 1, 2: 3, 3: 3}.lock);
+    final m1 = ComputedMap.fromIMap({0: 1, 1: 1, 2: 3, 3: 3}.lock);
 
     final m2 = m1.removeWhere((k, v) {
       return k == v;
@@ -210,7 +210,7 @@ void main() {
   });
 
   test('attributes are coherent', () async {
-    final m = ComputedMap({0: 1, 1: 1}.lock);
+    final m = ComputedMap.fromIMap({0: 1, 1: 1}.lock);
     final mv = m.removeWhere((key, value) => key == value);
     await testCoherenceInt(mv, {0: 1}.lock);
   });

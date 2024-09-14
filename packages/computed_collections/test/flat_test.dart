@@ -76,7 +76,7 @@ void main() {
 
     s.add(ChangeEventReplace({
       0: nested0,
-      1: ComputedMap({2: 3}.lock)
+      1: ComputedMap.fromIMap({2: 3}.lock)
     }.lock));
     await Future.value();
     expect(cnt, 5);
@@ -95,7 +95,7 @@ void main() {
         }.lock));
 
     s.add(ChangeEventReplace({
-      2: ComputedMap({4: 5}.lock),
+      2: ComputedMap.fromIMap({4: 5}.lock),
     }.lock));
     await Future.value();
     expect(cnt, 7);
@@ -106,7 +106,7 @@ void main() {
         }.lock));
 
     s.add(KeyChanges({
-      2: ChangeRecordValue(ComputedMap({6: 7}.lock)),
+      2: ChangeRecordValue(ComputedMap.fromIMap({6: 7}.lock)),
     }.lock));
     await Future.value();
     expect(cnt, 8);
@@ -121,9 +121,9 @@ void main() {
   });
 
   test('attributes are coherent', () async {
-    final m1 = ComputedMap({
-      0: ComputedMap({1: 2}.lock),
-      3: ComputedMap({4: 5, 6: 7}.lock)
+    final m1 = ComputedMap.fromIMap({
+      0: ComputedMap.fromIMap({1: 2}.lock),
+      3: ComputedMap.fromIMap({4: 5, 6: 7}.lock)
     }.lock);
     final m2 = m1.flat();
     await testCoherence(m2, {(0, 1): 2, (3, 4): 5, (3, 6): 7}.lock, (0, 0), 0);
