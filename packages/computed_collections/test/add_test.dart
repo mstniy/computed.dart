@@ -63,6 +63,15 @@ void main() {
     sub.cancel();
   });
 
+  test('remove works', () async {
+    final m1 = ComputedMap.fromIMap({0: 1}.lock).add(1, 2);
+    final m2 = m1.remove(1);
+    final m3 = m1.remove(0);
+
+    await testCoherenceInt(m2, {0: 1}.lock);
+    await testCoherenceInt(m3, {1: 2}.lock);
+  });
+
   test('operator[] works', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
     final m1 = ComputedMap.fromChangeStream($(() => s.use));
