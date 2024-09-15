@@ -90,6 +90,7 @@ Future<void> testExceptions(
 
     await Future.value();
     s.addError(42);
+    await Future.value(); // In case the given map has a MT delay
     expect(cnt, 1);
     expect(last, 42);
 

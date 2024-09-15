@@ -1,54 +1,64 @@
 import 'dart:async';
 
-import 'package:computed_collections/change_event.dart';
+import '../../change_event.dart';
+import 'value_or_exception.dart';
 
 class MergingChangeStream<K, V> extends Stream<ChangeEvent<K, V>> {
-  ChangeEvent<K, V>? _changesLastAdded;
+  ValueOrException<ChangeEvent<K, V>>? _changesLastAdded;
   final StreamController<ChangeEvent<K, V>> _stream;
   MergingChangeStream({void Function()? onListen, void Function()? onCancel})
       : _stream = StreamController.broadcast(
             sync: true, onListen: onListen, onCancel: onCancel);
 
-  void _maybeFlushChanges() {
-    if (_changesLastAdded == null) return; // Already flushed
+  void _flushChanges() {
     final oldChangesLastAdded = _changesLastAdded!;
     _changesLastAdded = null;
-    _stream.add(oldChangesLastAdded);
+    switch (oldChangesLastAdded) {
+      case Value<ChangeEvent<K, V>>(value: final changes):
+        _stream.add(changes);
+      case Exception<ChangeEvent<K, V>>(exc: final exc):
+        _stream.addError(exc);
+    }
   }
 
   void add(ChangeEvent<K, V> change) {
-    if (_changesLastAdded == null) {
-      // If the given change is empty, do nothing
-      if (change is! KeyChanges<K, V> || change.changes.isNotEmpty) {
-        _changesLastAdded = change;
-        // Batch the changes until the next microtask, then add to the stream
-        scheduleMicrotask(_maybeFlushChanges);
-      }
-    } else {
-      _changesLastAdded = switch (change) {
-        ChangeEventReplace<K, V>() => change,
-        KeyChanges<K, V>() => switch (_changesLastAdded!) {
-            KeyChanges<K, V>(changes: final changes) =>
-              KeyChanges(changes.addAll(change.changes)),
-            ChangeEventReplace<K, V>(newCollection: final oldNewCollection) =>
-              ChangeEventReplace(change.changes.entries.fold(
-                  oldNewCollection,
-                  (newCollection, changeEntry) => switch (changeEntry.value) {
-                        ChangeRecordValue<V>(value: final value) =>
-                          newCollection.add(changeEntry.key, value),
-                        ChangeRecordDelete<V>() =>
-                          newCollection.remove(changeEntry.key),
-                      })),
-          },
-      };
+    switch (_changesLastAdded) {
+      case null:
+        // If the given change is empty, do nothing
+        if (change is! KeyChanges<K, V> || change.changes.isNotEmpty) {
+          _changesLastAdded = ValueOrException.value(change);
+          // Batch the changes until the next microtask, then add to the stream
+          scheduleMicrotask(_flushChanges);
+        }
+      case Value<ChangeEvent<K, V>>(value: final changesLastAdded):
+        _changesLastAdded = ValueOrException.value(switch (change) {
+          ChangeEventReplace<K, V>() => change,
+          KeyChanges<K, V>() => switch (changesLastAdded) {
+              KeyChanges<K, V>(changes: final changes) =>
+                KeyChanges(changes.addAll(change.changes)),
+              ChangeEventReplace<K, V>(newCollection: final oldNewCollection) =>
+                ChangeEventReplace(change.changes.entries.fold(
+                    oldNewCollection,
+                    (newCollection, changeEntry) => switch (changeEntry.value) {
+                          ChangeRecordValue<V>(value: final value) =>
+                            newCollection.add(changeEntry.key, value),
+                          ChangeRecordDelete<V>() =>
+                            newCollection.remove(changeEntry.key),
+                        })),
+            },
+        });
+      case Exception<ChangeEvent<K, V>>():
+      // Ignore changes added after an exception
     }
   }
 
   void addError(Object o) {
-    // TODO: Do not flush synchronously here.
-    //  Follow the pattern used by [add].
-    _maybeFlushChanges();
-    _stream.addError(o);
+    // Maybe schedule a new MT to notify the listeners
+    if (_changesLastAdded == null) {
+      scheduleMicrotask(_flushChanges);
+    }
+    // Overwrite the buffered changes with the exception
+    _changesLastAdded = ValueOrException.exc(o);
   }
 
   @override
