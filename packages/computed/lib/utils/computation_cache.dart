@@ -34,8 +34,9 @@ class ComputationCache<K, V> {
     newComputation = Computed(() {
       final cachedComputation = _m[key];
       if (cachedComputation != null &&
-          !identical(cachedComputation, newComputation))
+          !identical(cachedComputation, newComputation)) {
         return cachedComputation.use;
+      }
       // No cached result
       _m[key] = newComputation;
       return computation();

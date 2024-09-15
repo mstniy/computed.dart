@@ -12,9 +12,13 @@ class Option<T> {
       : is_ = false,
         value = null;
 
+  @override
   bool operator ==(Object other) =>
       other is Option &&
       ((is_ && other.is_ && value == other.value) || (!is_ && !other.is_));
+
+  @override
+  int get hashCode => Object.hash(is_, value);
 
   @override
   String toString() => is_ ? 'Option.some($value)' : 'Option.none()';

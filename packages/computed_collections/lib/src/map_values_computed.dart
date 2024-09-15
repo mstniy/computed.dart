@@ -23,7 +23,7 @@ class MapValuesComputedComputedMap<K, V, VParent>
   late final CSTracker<K, V> _tracker;
 
   MapValuesComputedComputedMap(this._parent, this._convert) {
-    final _computedChanges = Computed(() {
+    final computedChanges = Computed(() {
       final change = _parent.changes.use;
       return switch (change) {
         ChangeEventReplace<K, VParent>() => ChangeEventReplace(change
@@ -42,67 +42,72 @@ class MapValuesComputedComputedMap<K, V, VParent>
       };
     }, assertIdempotent: false);
 
-    late final MergingChangeStream<K, V> _changes;
-    var _changesState = <K, ComputedSubscription<void>>{};
+    late final MergingChangeStream<K, V> merger;
+    var changesState = <K, ComputedSubscription<void>>{};
 
-    ComputedSubscription<void> _listenToNestedComputation(
+    ComputedSubscription<void> listenToNestedComputation(
         K k, Computed<V> nested) {
       return Computed.async(() {
         final value = nested.use;
-        _changes.add(
+        merger.add(
             KeyChanges(<K, ChangeRecord<V>>{k: ChangeRecordValue(value)}.lock));
       },
-              dispose: (_) => _changes.add(KeyChanges(
+              dispose: (_) => merger.add(KeyChanges(
                   <K, ChangeRecord<V>>{k: ChangeRecordDelete<V>()}.lock)))
           .listen(null);
     }
 
-    void _setState(IMap<K, Computed<V>> m) {
-      _changesState.values.forEach((s) => s.cancel());
-      _changesState =
-          m.unlock.map((k, c) => MapEntry(k, _listenToNestedComputation(k, c)));
+    void setState(IMap<K, Computed<V>> m) {
+      for (var s in changesState.values) {
+        s.cancel();
+      }
+      changesState =
+          m.unlock.map((k, c) => MapEntry(k, listenToNestedComputation(k, c)));
     }
 
-    void _computedChangesListener(ChangeEvent<K, Computed<V>> computedChanges) {
-      switch (computedChanges) {
+    void computedChangesListener(
+        ChangeEvent<K, Computed<V>> computedChangesValue) {
+      switch (computedChangesValue) {
         case ChangeEventReplace<K, Computed<V>>():
-          _changes.add(ChangeEventReplace(<K, V>{}.lock));
-          _setState(computedChanges.newCollection);
+          merger.add(ChangeEventReplace(<K, V>{}.lock));
+          setState(computedChangesValue.newCollection);
         case KeyChanges<K, Computed<V>>():
-          for (var e in computedChanges.changes.entries) {
+          for (var e in computedChangesValue.changes.entries) {
             final key = e.key;
             final change = e.value;
             // Note that this emits a deletion event for the key, if it has a value,
             // and we want that as the key won't have a value until the next microtask.
             // Note that if the new computation has a value already, this will be overwritten
             // by the computation in [_listenToNestedComputation].
-            _changesState[key]?.cancel();
+            changesState[key]?.cancel();
             switch (change) {
               case ChangeRecordValue<Computed<V>>():
-                _changesState[key] =
-                    _listenToNestedComputation(key, change.value);
+                changesState[key] =
+                    listenToNestedComputation(key, change.value);
               case ChangeRecordDelete<Computed<V>>():
-                _changesState.remove(key);
+                changesState.remove(key);
             }
           }
       }
     }
 
     ComputedSubscription<ChangeEvent<K, Computed<V>>>?
-        _computedChangesSubscription;
-    _changes = MergingChangeStream(onListen: () {
-      assert(_computedChangesSubscription == null);
-      _computedChangesSubscription =
-          _computedChanges.listen(_computedChangesListener, _changes.addError);
+        computedChangesSubscription;
+    merger = MergingChangeStream(onListen: () {
+      assert(computedChangesSubscription == null);
+      computedChangesSubscription =
+          computedChanges.listen(computedChangesListener, merger.addError);
     }, onCancel: () {
-      _changesState.values.forEach((sub) => sub.cancel());
-      _changesState.clear();
-      _computedChangesSubscription!.cancel();
-      _computedChangesSubscription = null;
+      for (var sub in changesState.values) {
+        sub.cancel();
+      }
+      changesState.clear();
+      computedChangesSubscription!.cancel();
+      computedChangesSubscription = null;
     });
-    changes = $(() => _changes.use);
+    changes = $(() => merger.use);
     snapshot = snapshotComputation(changes, () {
-      _setState(_parent.snapshot.use
+      setState(_parent.snapshot.use
           .map((key, value) => MapEntry(key, _convert(key, value))));
       return IMap<K, V>.empty();
     });
@@ -150,8 +155,9 @@ class MapValuesComputedComputedMap<K, V, VParent>
     final keyOptionComputation = _getKeyOptionComputation(key);
     return $(() {
       final option = keyOptionComputation.use;
-      if (!option.is_)
+      if (!option.is_) {
         return null; // The key does not exist in the parent or the mapped computations has no value yet
+      }
       // The key exists in the parent and the mapped computation has a value
       return option.value;
     });
@@ -162,8 +168,9 @@ class MapValuesComputedComputedMap<K, V, VParent>
     final keyOptionComputation = _getKeyOptionComputation(key);
     return $(() {
       final option = keyOptionComputation.use;
-      if (!option.is_)
+      if (!option.is_) {
         return false; // The key does not exist in the parent or the mapped computations has no value yet
+      }
       // The key exists in the parent and the mapped computation has a value
       return true;
     });

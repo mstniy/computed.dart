@@ -66,6 +66,7 @@ class AddAllComputedComputedMap<K, V>
     _tracker = CSTracker(changes, snapshot);
   }
 
+  @override
   Computed<V?> operator [](K key) {
     final mContainsKey = _m.containsKey(key);
     final mKey = _m[key];
@@ -83,12 +84,17 @@ class AddAllComputedComputedMap<K, V>
   @override
   Computed<bool> containsValue(V value) => _tracker.containsValue(value);
 
+  @override
   late final Computed<ChangeEvent<K, V>> changes;
+  @override
   late final Computed<IMap<K, V>> snapshot;
+  @override
   Computed<bool> get isEmpty =>
       isEmptyExpando[this] ??= $(() => _parent.isEmpty.use && _m.isEmpty.use);
+  @override
   Computed<bool> get isNotEmpty => isNotEmptyExpando[this] ??=
       $(() => _parent.isNotEmpty.use || _m.isNotEmpty.use);
+  @override
   Computed<int> get length =>
       lengthExpando[this] ??= $(() => snapshot.use.length);
 }

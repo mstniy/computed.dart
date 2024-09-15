@@ -10,7 +10,7 @@ import 'expandos.dart';
 class SnapshotStreamComputedMap<K, V>
     with OperatorsMixin<K, V>
     implements ComputedMap<K, V> {
-  Computed<IMap<K, V>> _snapshotStream;
+  final Computed<IMap<K, V>> _snapshotStream;
   late final CSTracker<K, V> _tracker;
   SnapshotStreamComputedMap(this._snapshotStream) {
     final snapshotPrev = $(() {

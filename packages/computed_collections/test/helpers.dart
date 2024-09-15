@@ -97,7 +97,9 @@ Future<void> testExceptions(
     expect(last, 42);
 
     s.addError(43);
-    for (var i = 0; i < 5; i++) await Future.value();
+    for (var i = 0; i < 5; i++) {
+      await Future.value();
+    }
     // Make sure there are no uncaught exceptions
 
     sub.cancel();

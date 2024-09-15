@@ -34,7 +34,9 @@ void main() {
       lastRes = event;
     });
 
-    for (var i = 0; i < 5; i++) await Future.value();
+    for (var i = 0; i < 5; i++) {
+      await Future.value();
+    }
     expect(callCnt, 0);
 
     s.add((

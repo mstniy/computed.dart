@@ -825,7 +825,9 @@ void main() {
     final c2 = $(() {
       try {
         c.use;
-      } catch (e) {}
+      } catch (e) {
+        // pass
+      }
     });
     final sub3 = c2.listen((event) {}, null);
     final sub1 = c.listen((event) {}, null);
@@ -1522,7 +1524,9 @@ void main() {
       final c2 = $(() {
         try {
           c.useWeak;
-        } on NoStrongUserException {}
+        } on NoStrongUserException {
+          // pass
+        }
         return c.use;
       });
       var lCnt = 0;
@@ -1613,7 +1617,9 @@ void main() {
         cnt++;
         try {
           return c1.useWeak;
-        } on NoStrongUserException {}
+        } on NoStrongUserException {
+          // pass
+        }
       });
       final sub2 = c1.listen(null);
       final sub1 = c2.listen(null);
@@ -1639,14 +1645,18 @@ void main() {
           cnt.add(2);
           try {
             c1.useWeak;
-          } on NoStrongUserException {}
+          } on NoStrongUserException {
+            // pass
+          }
           if (direction) c3.use;
         });
         c3 = $(() {
           cnt.add(3);
           try {
             c1.useWeak;
-          } on NoStrongUserException {}
+          } on NoStrongUserException {
+            // pass
+          }
           if (!direction) c2.use;
         });
         final sub1 = c1.listen(null);
@@ -1677,7 +1687,9 @@ void main() {
         cnt++;
         try {
           return c1.useWeak;
-        } on NoStrongUserException {}
+        } on NoStrongUserException {
+          // pass
+        }
       });
       final sub2 = c1.listen(null);
       final sub1 = c2.listen(null);
@@ -1700,7 +1712,9 @@ void main() {
         s.useOr(0);
         try {
           return c1.useWeak;
-        } on NoStrongUserException {}
+        } on NoStrongUserException {
+          // pass
+        }
       });
       final sub2 = c1.listen(null);
       final sub1 = c2.listen(null);

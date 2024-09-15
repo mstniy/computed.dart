@@ -38,6 +38,7 @@ class AddComputedMap<K, V>
     _tracker = CSTracker(changes, snapshot);
   }
 
+  @override
   Computed<V?> operator [](K key) {
     if (key == _key) return $(() => _value);
     return _parent[key];
@@ -74,9 +75,14 @@ class AddComputedMap<K, V>
     return _tracker.containsValue(value);
   }
 
+  @override
   late final Computed<ChangeEvent<K, V>> changes;
+  @override
   late final Computed<IMap<K, V>> snapshot;
+  @override
   Computed<bool> get isEmpty => $(() => false);
+  @override
   Computed<bool> get isNotEmpty => $(() => true);
+  @override
   late final Computed<int> length;
 }

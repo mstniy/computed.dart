@@ -104,7 +104,9 @@ void main() {
 
     s.add(KeyChanges({1: ChangeRecordValue(2)}.lock));
     s2.add(1);
-    for (var i = 0; i < 5; i++) await Future.value();
+    for (var i = 0; i < 5; i++) {
+      await Future.value();
+    }
     expect(cCnt, 4); // No new computations as there are no listeners
 
     sub = m2.snapshot.listen((event) {

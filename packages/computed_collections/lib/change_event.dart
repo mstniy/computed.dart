@@ -17,6 +17,7 @@ class KeyChanges<K, V> extends ChangeEvent<K, V> {
 
   KeyChanges(this.changes);
 
+  @override
   bool operator ==(Object other) =>
       other is KeyChanges && other.changes == changes;
 
@@ -33,6 +34,7 @@ class ChangeRecordValue<V> extends ChangeRecord<V> {
 
   ChangeRecordValue(this.value);
 
+  @override
   bool operator ==(Object other) =>
       other is ChangeRecordValue && other.value == value;
 
@@ -47,6 +49,7 @@ class ChangeRecordValue<V> extends ChangeRecord<V> {
 class ChangeRecordDelete<V> extends ChangeRecord<V> {
   ChangeRecordDelete();
 
+  @override
   bool operator ==(Object other) => other is ChangeRecordDelete;
 
   @override
@@ -59,6 +62,7 @@ class ChangeEventReplace<K, V> extends ChangeEvent<K, V> {
 
   ChangeEventReplace(this.newCollection);
 
+  @override
   bool operator ==(Object other) =>
       other is ChangeEventReplace && other.newCollection == newCollection;
 

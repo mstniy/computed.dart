@@ -103,7 +103,9 @@ void main() {
       lastRes = event;
     }, (e) => fail(e.toString()));
 
-    for (var i = 0; i < 5; i++) await Future.value();
+    for (var i = 0; i < 5; i++) {
+      await Future.value();
+    }
     expect(callCnt, 0);
     s.add((
       ChangeEventReplace({0: 0, 1: 1, 2: 2}.lock),
@@ -225,7 +227,9 @@ void main() {
       lastRes = event;
     }, (e) => fail(e.toString()));
 
-    for (var i = 0; i < 5; i++) await Future.value();
+    for (var i = 0; i < 5; i++) {
+      await Future.value();
+    }
     expect(callCnt, 0);
 
     s.add(KeyChanges({0: ChangeRecordValue(1), 1: ChangeRecordValue(2)}.lock));

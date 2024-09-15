@@ -93,6 +93,7 @@ class LookupComputedMap<K, V1, V2>
     });
   }
 
+  @override
   Computed<(V1, V2?)?> operator [](K key) {
     final keyComputation = _getKeyComputation(key);
     return $(() => keyComputation.use.value);
@@ -109,9 +110,14 @@ class LookupComputedMap<K, V1, V2>
     return _tracker.containsValue(value);
   }
 
+  @override
   late final Computed<ChangeEvent<K, (V1, V2?)>> changes;
+  @override
   late final Computed<IMap<K, (V1, V2?)>> snapshot;
+  @override
   Computed<bool> get isEmpty => _parent1.isEmpty;
+  @override
   Computed<bool> get isNotEmpty => _parent1.isNotEmpty;
+  @override
   Computed<int> get length => _parent1.length;
 }

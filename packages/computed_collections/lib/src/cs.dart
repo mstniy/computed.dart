@@ -20,6 +20,7 @@ class ChangeStreamComputedMap<K, V>
     _tracker = CSTracker(changes, snapshot);
   }
 
+  @override
   Computed<V?> operator [](K key) => _tracker[key];
 
   @override

@@ -142,7 +142,9 @@ void main() {
     s.add(ChangeEventReplace({0: 1}.lock));
     expect(cCnt, 1); // And not 2 or 3
     expect(resCache2, [2]);
-    for (var i = 0; i < 5; i++) await Future.value();
+    for (var i = 0; i < 5; i++) {
+      await Future.value();
+    }
     expect(cCnt, 1); // Still
     expect(resCache2, [2]);
 

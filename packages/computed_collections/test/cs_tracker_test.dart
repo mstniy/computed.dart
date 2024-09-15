@@ -54,7 +54,9 @@ void main() {
     expect(last[1], null);
     expect(last[2], 2);
 
-    subs.forEach((s) => s.cancel());
+    for (var s in subs) {
+      s.cancel();
+    }
   });
 
   test('containsValue works', () async {
@@ -115,6 +117,8 @@ void main() {
     expect(cnts, [3, 3, 3]);
     expect(lasts, [true, true, false]);
 
-    subs.forEach((e) => e.cancel());
+    for (var e in subs) {
+      e.cancel();
+    }
   });
 }

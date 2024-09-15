@@ -10,7 +10,7 @@ import 'utils/cs_tracker.dart';
 class RemoveComputedMap<K, V>
     with OperatorsMixin<K, V>
     implements ComputedMap<K, V> {
-  K _key;
+  final K _key;
   final ComputedMap<K, V> _parent;
   late final CSTracker<K, V> _tracker;
   RemoveComputedMap(this._parent, this._key) {
@@ -36,6 +36,7 @@ class RemoveComputedMap<K, V>
     _tracker = CSTracker(changes, snapshot);
   }
 
+  @override
   Computed<V?> operator [](K key) {
     if (key == _key) return $(() => null);
     return _parent[key];
@@ -71,9 +72,14 @@ class RemoveComputedMap<K, V>
     return _tracker.containsValue(value);
   }
 
+  @override
   late final Computed<ChangeEvent<K, V>> changes;
+  @override
   late final Computed<IMap<K, V>> snapshot;
+  @override
   Computed<bool> get isEmpty => $(() => length.use == 0);
+  @override
   Computed<bool> get isNotEmpty => $(() => length.use > 0);
+  @override
   late final Computed<int> length;
 }

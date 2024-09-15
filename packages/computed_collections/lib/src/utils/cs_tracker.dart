@@ -18,7 +18,7 @@ class CSTracker<K, V> {
       Computed<IMap<K, V>> snapshotStream) {
     final downstream = <Computed>{};
 
-    Set<Computed> _allStreams() =>
+    Set<Computed> allStreams() =>
         {..._keyStreams.values, ..._valueStreams.values};
 
     _pusher = CustomDownstream(() {
@@ -31,7 +31,7 @@ class CSTracker<K, V> {
         rethrow; // Not much to do if we don't have a snapshot
       } catch (e) {
         _snapshot = ValueOrException.exc(e);
-        return _allStreams();
+        return allStreams();
       }
       final ChangeEvent<K, V> change;
       try {
@@ -40,7 +40,7 @@ class CSTracker<K, V> {
         if (sOld == null) {
           // TODO: iterate over either the set of streams or the set of keys
           //  in the snapshot, whichever is smaller.
-          return _allStreams();
+          return allStreams();
         }
         return {};
       }

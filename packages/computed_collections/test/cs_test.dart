@@ -108,7 +108,9 @@ void main() {
     expect(callCnt3, 2);
     expect(lastRes3, 2);
 
-    for (var i = 0; i < 5; i++) await Future.value(); // No more updates
+    for (var i = 0; i < 5; i++) {
+      await Future.value(); // No more updates
+    }
     expect(callCnt1, 5);
     expect(callCnt2, 3);
     expect(callCnt3, 2);
@@ -116,7 +118,9 @@ void main() {
     sub1.cancel();
 
     s.add(ChangeEventReplace({0: 1, 1: 3}.lock));
-    for (var i = 0; i < 5; i++) await Future.value();
+    for (var i = 0; i < 5; i++) {
+      await Future.value();
+    }
     expect(callCnt1, 5); // The listener has been cancelled
     expect(callCnt2, 4);
     expect(lastRes2, 1);
@@ -127,7 +131,9 @@ void main() {
     sub2.cancel();
 
     s.add(ChangeEventReplace({0: 2, 1: 4}.lock));
-    for (var i = 0; i < 5; i++) await Future.value();
+    for (var i = 0; i < 5; i++) {
+      await Future.value();
+    }
     expect(callCnt1, 5);
     expect(callCnt2, 4);
     expect(callCnt3, 3);

@@ -294,11 +294,19 @@ void main() {
     res = List.generate(x.length, (_) => null);
     await Future.value();
     s.addError(42);
-    res.forEach((o) => expect(o, 42));
+    for (var o in res) {
+      expect(o, 42);
+    }
     s.addError(43); // Has no effect due to the "cancelOnError" semantics
-    for (var i = 0; i < 5; i++) await Future.value();
-    res.forEach((o) => expect(o, 42)); // And not 43
-    x.forEach((sub) => sub.cancel());
+    for (var i = 0; i < 5; i++) {
+      await Future.value();
+    }
+    for (var o in res) {
+      expect(o, 42);
+    } // And not 43
+    for (var sub in x) {
+      sub.cancel();
+    }
   });
 
   test('listening on snapshot when there already are listeners and groups',

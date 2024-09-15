@@ -1,8 +1,9 @@
 import 'package:computed/computed.dart';
+// ignore: implementation_imports
 import 'package:computed/src/computed.dart';
 
 class CustomDownstream extends ComputedImpl<void> {
-  Set<Computed> _downstream;
+  final Set<Computed> _downstream;
   CustomDownstream(Set<Computed> Function() f, this._downstream)
       : super(() {
           _downstream.clear();

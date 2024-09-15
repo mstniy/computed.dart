@@ -4,12 +4,21 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:test/test.dart';
 
 void main() {
-  test('option toString()', () {
-    final some = Option.some(0);
-    final none = Option.none();
+  group('option', () {
+    test('hashCode', () {
+      expect(Option.some(0).hashCode, Option.some(0).hashCode);
+      expect(Option.none().hashCode, Option.none().hashCode);
+      expect(Option.some(0).hashCode, isNot(Option.none().hashCode));
+      expect(Option.some(0).hashCode, isNot(Option.some(1).hashCode));
+      expect(Option.some(null).hashCode, isNot(Option.none().hashCode));
+    });
+    test('toString()', () {
+      final some = Option.some(0);
+      final none = Option.none();
 
-    expect(some.toString(), 'Option.some(0)');
-    expect(none.toString(), 'Option.none()');
+      expect(some.toString(), 'Option.some(0)');
+      expect(none.toString(), 'Option.none()');
+    });
   });
 
   group('KeyChanges', () {

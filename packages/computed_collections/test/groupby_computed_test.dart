@@ -366,49 +366,67 @@ void main() {
     final callHistory = <(int, int)>[];
     final m2 = m1.groupByComputed((k, v) => Computed(() {
           callHistory.add((k, v));
-          sTrapStream.react((d) => null);
+          sTrapStream.react((d) {});
           return v;
         }, assertIdempotent: false));
     final sub = m2.snapshot.listen(null, null);
 
     s1.add(KeyChanges({0: ChangeRecordValue(0)}.lock));
-    for (var i = 0; i < 5; i++) await Future.value();
+    for (var i = 0; i < 5; i++) {
+      await Future.value();
+    }
     expect(callHistory, [(0, 0)]);
     callHistory.clear();
 
     s1.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
-    for (var i = 0; i < 5; i++) await Future.value();
+    for (var i = 0; i < 5; i++) {
+      await Future.value();
+    }
     expect(callHistory, [(0, 1)]);
     callHistory.clear();
 
     s1.add(KeyChanges({0: ChangeRecordDelete<int>()}.lock));
-    for (var i = 0; i < 5; i++) await Future.value();
+    for (var i = 0; i < 5; i++) {
+      await Future.value();
+    }
     expect(callHistory, []);
     sTrap.add(0);
-    for (var i = 0; i < 5; i++) await Future.value();
+    for (var i = 0; i < 5; i++) {
+      await Future.value();
+    }
     expect(callHistory, []);
 
     s1.add(KeyChanges({0: ChangeRecordValue(0)}.lock));
-    for (var i = 0; i < 5; i++) await Future.value();
+    for (var i = 0; i < 5; i++) {
+      await Future.value();
+    }
     expect(callHistory, [(0, 0)]);
     callHistory.clear();
 
     s1.add(ChangeEventReplace(<int, int>{}.lock));
-    for (var i = 0; i < 5; i++) await Future.value();
+    for (var i = 0; i < 5; i++) {
+      await Future.value();
+    }
     expect(callHistory, []);
     sTrap.add(0);
-    for (var i = 0; i < 5; i++) await Future.value();
+    for (var i = 0; i < 5; i++) {
+      await Future.value();
+    }
     expect(callHistory, []);
 
     s1.add(ChangeEventReplace({0: 1, 1: 2}.lock));
-    for (var i = 0; i < 5; i++) await Future.value();
+    for (var i = 0; i < 5; i++) {
+      await Future.value();
+    }
     expect(callHistory, [(0, 1), (1, 2)]);
     callHistory.clear();
 
     sub.cancel();
     s1.add(ChangeEventReplace({0: 0}.lock));
     sTrap.add(0);
-    for (var i = 0; i < 5; i++) await Future.value();
+    for (var i = 0; i < 5; i++) {
+      await Future.value();
+    }
     expect(callHistory, []);
   });
 

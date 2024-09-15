@@ -133,7 +133,9 @@ void main() {
     sub2.cancel();
 
     s.add(ChangeEventReplace({0: 3, 1: 5}.lock));
-    for (var i = 0; i < 5; i++) await Future.value();
+    for (var i = 0; i < 5; i++) {
+      await Future.value();
+    }
     expect(callCnt1, 1); // The listeners have been cancelled
     expect(callCnt2, 4);
   });

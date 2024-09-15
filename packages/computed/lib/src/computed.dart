@@ -97,16 +97,16 @@ class _WeakMemoizedValueOrException<T> {
   _WeakMemoizedValueOrException(this._weak, this._memoized, this._voe);
 }
 
-const _NoReactivityInsideReact =
+const _noReactivityInsideReact =
     "`use`, `useWeak` and `react` not allowed inside react callbacks.";
-const _NoReactivityOutsideComputations =
+const _noReactivityOutsideComputations =
     "`use`, `useWeak`, `react` and `prev` are only allowed inside computations.";
 
 class GlobalCtx {
   static ComputedImpl? _currentComputation;
   static ComputedImpl get currentComputation {
     if (_currentComputation == null) {
-      throw StateError(_NoReactivityOutsideComputations);
+      throw StateError(_noReactivityOutsideComputations);
     }
     return _currentComputation!;
   }
@@ -163,7 +163,9 @@ class GlobalCtx {
 }
 
 void _injectNodesToDAG(Set<Computed> nodes) {
-  nodes.forEach((c) => GlobalCtx._currentUpdateNodeDirty[c] = true);
+  for (var c in nodes) {
+    GlobalCtx._currentUpdateNodeDirty[c] = true;
+  }
   GlobalCtx._currentUpdateNodes.addAll(nodes.cast<ComputedImpl>());
 }
 
@@ -172,12 +174,12 @@ void _rerunGraph(Set<ComputedImpl> roots) {
   GlobalCtx._currentUpdateNodeDirty = Expando('computed_dag_runner_node_dirty');
   _injectNodesToDAG(roots);
 
-  void _evalAfterEnsureUpstreamEvald(ComputedImpl node) {
-    node._lastUpstreamComputations.keys.forEach((c) {
+  void evalAfterEnsureUpstreamEvald(ComputedImpl node) {
+    for (var c in node._lastUpstreamComputations.keys) {
       if (c._lastUpdate != GlobalCtx._currentUpdate) {
-        _evalAfterEnsureUpstreamEvald(c);
+        evalAfterEnsureUpstreamEvald(c);
       }
-    });
+    }
     // It is possible that this node has been forced to be evaluated by another
     // In this case, do not re-compute it again
     if (GlobalCtx._currentUpdateNodeDirty[node] == true) {
@@ -194,7 +196,7 @@ void _rerunGraph(Set<ComputedImpl> roots) {
     final cur = GlobalCtx._currentUpdateNodes.first;
     GlobalCtx._currentUpdateNodes.remove(cur);
     if (cur._lastUpdate == GlobalCtx._currentUpdate) continue;
-    _evalAfterEnsureUpstreamEvald(cur);
+    evalAfterEnsureUpstreamEvald(cur);
   }
 }
 
@@ -238,7 +240,7 @@ class ComputedImpl<T> implements Computed<T> {
 
     final caller = GlobalCtx.currentComputation;
     if (GlobalCtx._reacting) {
-      throw StateError(_NoReactivityInsideReact);
+      throw StateError(_noReactivityInsideReact);
     }
     // Make sure the caller is subscribed, upgrade to non-weak if needed
     caller._curUpstreamComputations!.update(
@@ -285,8 +287,9 @@ class ComputedImpl<T> implements Computed<T> {
           _nonMemoizedDownstreamComputations.isEmpty &&
           _listeners.isEmpty) {
         throw NoStrongUserException();
-      } else
+      } else {
         throw NoValueException();
+      }
     }
     return _lastResult!.value;
   }
@@ -385,8 +388,9 @@ class ComputedImpl<T> implements Computed<T> {
         Zone.current.handleUncaughtError(_lastResult!._exc!, _lastResult!._st!);
       }
       scheduleMicrotask(() {
-        if (_listeners[sub] != false)
+        if (_listeners[sub] != false) {
           return; // We have been cancelled or the listener has already been notified
+        }
         // No need to set the value of _listeners here, it will never be used again
         if (!_novalue) {
           if (!_lastResult!._isValue) {
@@ -728,7 +732,7 @@ class ComputedImpl<T> implements Computed<T> {
     assert(_dss != null);
     final caller = GlobalCtx.currentComputation;
     if (GlobalCtx._reacting) {
-      throw StateError(_NoReactivityInsideReact);
+      throw StateError(_noReactivityInsideReact);
     }
     // Make sure the caller is subscribed
     caller._curUpstreamComputations![this] =

@@ -36,7 +36,7 @@ class GroupByComputedMap<K, V, KParent>
 
   var _mappedKeys = <KParent, K>{};
   Object? _exc;
-  Map<K, _GroupInfo<KParent, V>>? _m = null;
+  Map<K, _GroupInfo<KParent, V>>? _m;
   var _initialValue = true;
 
   void _onCancel() {
@@ -138,7 +138,7 @@ class GroupByComputedMap<K, V, KParent>
         // Pass
       } catch (e) {
         _exc = e;
-        throw e;
+        rethrow;
       }
 
       if (_initialValue) {

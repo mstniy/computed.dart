@@ -1,8 +1,0 @@
-name: computed_workspace
-publish: none
-
-environment:
-  sdk: ^3.2.1
-
-dev_dependencies:
-  lints: ^3.0.0

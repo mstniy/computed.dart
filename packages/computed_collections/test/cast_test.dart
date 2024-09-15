@@ -7,6 +7,7 @@ import 'helpers.dart';
 abstract class A {}
 
 class B extends A {
+  @override
   bool operator ==(Object o) => o is B;
 
   @override
@@ -14,6 +15,7 @@ class B extends A {
 }
 
 class C {
+  @override
   bool operator ==(Object o) => o is C;
 
   @override

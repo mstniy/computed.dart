@@ -75,6 +75,7 @@ class UpdateComputedMap<K, V>
     }, assertIdempotent: false);
   }
 
+  @override
   Computed<V?> operator [](K key) {
     if (key != _key) return _parent[key];
     return _keyComputation;
@@ -93,8 +94,11 @@ class UpdateComputedMap<K, V>
   @override
   Computed<bool> containsValue(V value) => _tracker.containsValue(value);
 
+  @override
   late final Computed<ChangeEvent<K, V>> changes;
+  @override
   late final Computed<IMap<K, V>> snapshot;
+  @override
   Computed<bool> get isEmpty {
     if (_ifAbsent != null) return $(() => false);
     if (isEmptyExpando[this] != null) return isEmptyExpando[this]!;
@@ -103,6 +107,7 @@ class UpdateComputedMap<K, V>
         $(() => parentContainsKey.use ? false : _throwArgError());
   }
 
+  @override
   Computed<bool> get isNotEmpty {
     if (_ifAbsent != null) return $(() => true);
     if (isNotEmptyExpando[this] != null) return isNotEmptyExpando[this]!;
@@ -111,5 +116,6 @@ class UpdateComputedMap<K, V>
         $(() => parentContainsKey.use ? true : _throwArgError());
   }
 
+  @override
   late final Computed<int> length;
 }

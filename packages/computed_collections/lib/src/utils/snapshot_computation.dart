@@ -5,13 +5,13 @@ import '../../change_event.dart';
 
 Computed<IMap<K, V>> snapshotComputation<K, V>(
     Computed<ChangeEvent<K, V>> changes,
-    IMap<K, V> Function()? _initialValueComputer) {
+    IMap<K, V> Function()? initialValueComputer) {
   final firstReactToken = IMap<K,
       V>(); // TODO: This is obviously ugly. Make Computed.withPrev support null instead
   return Computed.withPrev((prev) {
     if (identical(prev, firstReactToken)) {
-      if (_initialValueComputer != null) {
-        prev = _initialValueComputer();
+      if (initialValueComputer != null) {
+        prev = initialValueComputer();
       } else {
         prev = <K, V>{}.lock;
       }
