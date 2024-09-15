@@ -5,7 +5,7 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import '../change_event.dart';
 import '../computedmap.dart';
 import 'computedmap_mixins.dart';
-import 'cs_computedmap.dart';
+import 'cs.dart';
 import 'utils/cs_tracker.dart';
 import 'utils/snapshot_computation.dart';
 import 'utils/group_by.dart';

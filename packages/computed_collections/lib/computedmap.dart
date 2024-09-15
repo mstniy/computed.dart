@@ -1,11 +1,11 @@
 import 'package:computed/computed.dart';
 import 'package:computed_collections/change_event.dart';
-import 'package:computed_collections/src/const_computedmap.dart';
+import 'package:computed_collections/src/const.dart';
 import 'package:computed_collections/src/flat.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
-import 'src/cs_computedmap.dart';
-import 'src/ss_computedmap.dart';
+import 'src/cs.dart';
+import 'src/ss.dart';
 
 /// An in-memory, partially- or fully-observable key-value store.
 /// Similar to the ObservableMap from the `observable` package, but with the following upsides:

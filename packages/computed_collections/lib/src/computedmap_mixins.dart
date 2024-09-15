@@ -10,7 +10,7 @@ import 'map_values_computed.dart';
 import 'remove.dart';
 import 'remove_where.dart';
 import 'add_all.dart';
-import 'add_computedmap.dart';
+import 'add.dart';
 import 'update.dart';
 import 'join.dart';
 import 'lookup.dart';
