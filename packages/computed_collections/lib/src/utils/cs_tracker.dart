@@ -103,8 +103,8 @@ class CSTracker<K, V> {
     return _keyStreams.putIfAbsent(key, () {
       final s = Computed<Option<V>>.async(() {
         _pusher.use;
-        // Note that this computation does not .use anything
-        //  it is instead ran by the snapshot computation using "push" semantics
+        // Note that this computation is ran by the
+        // [_pusher] using "push" semantics
         if (_snapshot == null) {
           throw NoValueException(); // Wait until we get a snapshot
         }
@@ -143,8 +143,8 @@ class CSTracker<K, V> {
           value,
           () => Computed.async(() {
                 _pusher.use;
-                // Note that this computation does not .use anything
-                //  it is instead ran by the snapshot computation using "push" semantics
+                //s Note that this computation is ran by the
+                // [_pusher] using "push" semantics.
                 // Note that this could be further optimized by keeping a set of keys
                 // containing each value, at the cost of additional memory.
                 if (_snapshot == null) {

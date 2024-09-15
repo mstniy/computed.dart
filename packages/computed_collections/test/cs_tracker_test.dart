@@ -8,6 +8,8 @@ import 'package:computed_collections/src/utils/snapshot_computation.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:test/test.dart';
 
+import 'helpers.dart';
+
 void main() {
   test('works without any upstream changes', () async {
     for (var e in [
@@ -55,5 +57,66 @@ void main() {
     expect(last[2], 2);
 
     subs.forEach((s) => s.cancel());
+  });
+
+  test('containsValue works', () async {
+    final s = ValueStream<(ChangeEvent<int, int>, IMap<int, int>)>(sync: true);
+    final t = CSTracker($(() => s.use.$1), $(() => s.use.$2));
+
+    var cnts = [0, 0, 0];
+    var lasts = [false, false, false];
+    final subs = [1, 2, 3]
+        .mapIndexedAndLast((i, y, _) => t.containsValue(y).listen((event) {
+              cnts[i]++;
+              lasts[i] = event;
+            }))
+        .toList();
+
+    await Future.value();
+    expect(cnts, [0, 0, 0]);
+
+    s.add((
+      KeyChanges({
+        0: ChangeRecordValue(1),
+        1: ChangeRecordValue(2),
+        2: ChangeRecordDelete<int>()
+      }.lock),
+      {0: 1, 1: 2}.lock
+    ));
+
+    await Future.value();
+    expect(cnts, [1, 1, 1]);
+    expect(lasts, [true, true, false]);
+
+    s.add((
+      KeyChanges({
+        0: ChangeRecordDelete<int>(),
+        1: ChangeRecordValue(1),
+        2: ChangeRecordValue(5)
+      }.lock),
+      {1: 1, 2: 5}.lock
+    ));
+
+    await Future.value();
+    expect(cnts, [1, 2, 1]);
+    expect(lasts, [true, false, false]);
+
+    s.add((
+      KeyChanges({1: ChangeRecordDelete<int>(), 2: ChangeRecordValue(3)}.lock),
+      {2: 3}.lock
+    ));
+
+    await Future.value();
+    expect(cnts, [2, 2, 2]);
+    expect(lasts, [false, false, true]);
+
+    s.add(
+        (ChangeEventReplace({0: 1, 1: 2, 2: 6}.lock), {0: 1, 1: 2, 2: 6}.lock));
+
+    await Future.value();
+    expect(cnts, [3, 3, 3]);
+    expect(lasts, [true, true, false]);
+
+    subs.forEach((e) => e.cancel());
   });
 }
