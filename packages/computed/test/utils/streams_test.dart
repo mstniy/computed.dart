@@ -269,5 +269,26 @@ void main() {
       sub.cancel();
       expect(s.hasListener, false);
     });
+
+    test('close is nop', () async {
+      final s = ValueStream();
+      s.close();
+    });
+
+    test('can cancel and re-listen in the same MT', () async {
+      final s = ValueStream.seeded(0, sync: true);
+      var sub = s.listen((event) => fail('Must never be called'));
+      sub.cancel();
+      var cnt = 0;
+      sub = s.listen((event) {
+        cnt++;
+        expect(event, 0);
+      });
+      expect(cnt, 0);
+      await Future.value();
+      expect(cnt, 1);
+
+      sub.cancel();
+    });
   });
 }

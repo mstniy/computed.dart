@@ -1,12 +1,24 @@
 import 'dart:async';
 
-class _ValueOrException<T> {
-  final bool _isValue;
-  Object? _exc;
-  T? _value;
+sealed class _ValueOrException<T> {
+  _ValueOrException._();
 
-  _ValueOrException.value(this._value) : _isValue = true;
-  _ValueOrException.exc(this._exc) : _isValue = false;
+  factory _ValueOrException.value(T value) => Value(value);
+  factory _ValueOrException.exc(Object exc, StackTrace? st) =>
+      Exception(exc, st);
+}
+
+class Value<T> extends _ValueOrException<T> {
+  final T _value;
+
+  Value(this._value) : super._();
+}
+
+class Exception<T> extends _ValueOrException<T> {
+  final Object exc;
+  final StackTrace? st;
+
+  Exception(this.exc, this.st) : super._();
 }
 
 /// A [StreamController]-like class.
@@ -19,7 +31,7 @@ class _ValueOrException<T> {
 /// - Produces the last value or error to new listeners, if there is any.
 ///
 /// Note that most of these properties are similar to rxdart's BehaviorSubject.
-class ValueStream<T> extends Stream<T> {
+class ValueStream<T> extends Stream<T> implements EventSink<T> {
   late StreamController<T> _controller;
   _ValueOrException<T>? _lastNotifiedValue;
   _ValueOrException<T>? _lastAddedValue;
@@ -51,16 +63,24 @@ class ValueStream<T> extends Stream<T> {
 
   void _controllerAddMicrotask() {
     _controllerAddScheduled = false;
-    if (_lastNotifiedValue?._isValue == true &&
-        _lastAddedValue!._isValue &&
-        _lastNotifiedValue!._value == _lastAddedValue!._value) return;
+    // If _lastNotifiedValue and _lastAddedValue have equal values,
+    // skip notifying listeners.
+    switch ((_lastNotifiedValue, _lastAddedValue)) {
+      case (Value(_value: final v1), Value(_value: final v2)):
+        if (v1 == v2) {
+          return;
+        }
+      case _:
+      // pass
+    }
     if (_controller.hasListener) {
       // Otherwise the controller will buffer
       _lastNotifiedValue = _lastAddedValue;
-      if (_lastAddedValue!._isValue) {
-        _controller.add(_lastAddedValue!._value as T);
-      } else {
-        _controller.addError(_lastAddedValue!._exc!);
+      switch (_lastAddedValue!) {
+        case Value<T>(_value: final value):
+          _controller.add(value);
+        case Exception<T>(exc: final exc, st: final st):
+          _controller.addError(exc, st);
       }
     }
   }
@@ -77,6 +97,7 @@ class ValueStream<T> extends Stream<T> {
   ///
   /// If there are no listeners, buffers [t] and drops any previusly
   /// buffered values/errors.
+  @override
   void add(T t) {
     _lastAddedValue = _ValueOrException.value(t);
     if (!_sync && _controller.hasListener) {
@@ -89,8 +110,9 @@ class ValueStream<T> extends Stream<T> {
   }
 
   /// As with [add], but for adding errors.
-  void addError(Object o) {
-    _lastAddedValue = _ValueOrException.exc(o);
+  @override
+  void addError(Object o, [StackTrace? st]) {
+    _lastAddedValue = _ValueOrException.exc(o, st);
     if (!_sync && _controller.hasListener) {
       if (_controllerAddScheduled) return;
       _controllerAddScheduled = true;
@@ -127,5 +149,10 @@ class ValueStream<T> extends Stream<T> {
     _lastNotifiedValue = null;
     _setController(); // The old one is no good anymore
     if (_userOnCancel != null) _userOnCancel();
+  }
+
+  @override
+  void close() {
+    // Nop
   }
 }
