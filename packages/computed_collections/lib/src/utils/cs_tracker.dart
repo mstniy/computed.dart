@@ -26,11 +26,9 @@ class CSTracker<K, V> {
     }
 
     _pusher = CustomDownstream(() {
-      if (_snapshot != null && !_snapshot!.isValue) {
-        // "cancelOnError" semantics
-        throw NoValueException();
-      }
-      final sOld = _snapshot;
+      // If [_snapshot] is an exception, this throws.
+      // This allows us to have cancelOnError semantics
+      final sOld = _snapshot?.value;
       try {
         _snapshot = ValueOrException.value(snapshotStream.use);
       } on NoValueException {
@@ -65,17 +63,15 @@ class CSTracker<K, V> {
                         _keyStreams.containsKey(e.key) &&
                         switch (e.value) {
                           ChangeRecordValue<V>(value: final value) =>
-                            !sOld.value_!.containsKey(e.key) ||
-                                sOld.value_![e.key] != value,
-                          ChangeRecordDelete<V>() =>
-                            sOld.value_!.containsKey(e.key),
+                            !sOld.containsKey(e.key) || sOld[e.key] != value,
+                          ChangeRecordDelete<V>() => sOld.containsKey(e.key),
                         })
                     .map((e) => _keyStreams[e.key]!),
                 ...changes.entries
                     .where((e) =>
-                        sOld.value_!.containsKey(e.key) &&
-                        _valueStreams.containsKey(sOld.value_![e.key]))
-                    .map((e) => _valueStreams[sOld.value_![e.key]]!),
+                        sOld.containsKey(e.key) &&
+                        _valueStreams.containsKey(sOld[e.key]))
+                    .map((e) => _valueStreams[sOld[e.key]]!),
                 ...changes.values
                     .where((ce) =>
                         ce is ChangeRecordValue<V> &&
