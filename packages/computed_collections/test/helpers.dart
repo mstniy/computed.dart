@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:computed/computed.dart';
+import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/computedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:test/expect.dart';
@@ -65,5 +66,33 @@ Future<void> testCoherence<K, V>(ComputedMap<K, V> map, IMap<K, V> expected,
         anyOf(equals([false, expected.isNotEmpty]), [expected.isNotEmpty]));
     expect(await getValues(map.length),
         anyOf(equals([0, expected.length]), [expected.length]));
+  }
+}
+
+Future<void> testExceptions(
+    ComputedMap<int, int> map, EventSink<ChangeEvent<int, int>> s) async {
+  for (final x in [
+    () => map.snapshot,
+    () => map.changes,
+    () => map[0],
+    () => map.isEmpty,
+    () => map.isNotEmpty,
+    () => map.length,
+    () => map.containsKey(0),
+    () => map.containsValue(0),
+  ]) {
+    var cnt = 0;
+    Object? last;
+    final sub = x().listen(null, (e) {
+      cnt++;
+      last = e;
+    });
+
+    await Future.value();
+    s.addError(42);
+    expect(cnt, 1);
+    expect(last, 42);
+
+    sub.cancel();
   }
 }

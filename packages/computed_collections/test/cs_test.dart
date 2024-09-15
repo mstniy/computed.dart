@@ -136,69 +136,7 @@ void main() {
   test('propagates exceptions', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
     final m = ComputedMap.fromChangeStream($(() => s.use));
-    IMap<int, int>? lastRes1;
-    Object? lastExc1;
-    var callCnt1 = 0;
-    final sub1 = m.snapshot.listen((event) {
-      callCnt1++;
-      lastRes1 = event;
-      lastExc1 = null;
-    }, (e) {
-      callCnt1++;
-      lastRes1 = null;
-      lastExc1 = e;
-    });
-    int? lastRes2;
-    Object? lastExc2;
-    var callCnt2 = 0;
-    final sub2 = m[0].listen((event) {
-      callCnt2++;
-      lastRes2 = event;
-      lastExc2 = null;
-    }, (e) {
-      callCnt2++;
-      lastRes2 = null;
-      lastExc2 = e;
-    });
-    expect(callCnt1, 0);
-    expect(callCnt2, 0);
-    await Future.value();
-    expect(callCnt1, 1);
-    expect(lastRes1, {}.lock);
-    expect(callCnt2, 1);
-    expect(lastRes2, null);
-    s.addError(42);
-    expect(callCnt1, 2);
-    expect(lastExc1, 42);
-    expect(callCnt2, 2);
-    expect(lastExc2, 42);
-    s.add(KeyChanges({0: ChangeRecordValue(1)}.lock));
-    expect(callCnt1, 2);
-    expect(callCnt2, 2);
-
-    Object? lastExc3;
-    var callCnt3 = 0;
-    final sub3 = m[1].listen(
-        (event) => fail('Must have produced an exception instead'), (e) {
-      callCnt3++;
-      lastExc3 = e;
-    });
-
-    expect(callCnt3, 0);
-    await Future.value();
-    expect(callCnt3, 1);
-    expect(lastExc3, 42);
-    expect(callCnt1, 2);
-    expect(callCnt2, 2);
-
-    for (var i = 0; i < 5; i++) await Future.value();
-    expect(callCnt1, 2); // No further callbacks
-    expect(callCnt2, 2);
-    expect(callCnt3, 1);
-
-    sub1.cancel();
-    sub2.cancel();
-    sub3.cancel();
+    await testExceptions(m, s);
   });
 
   test('propagates the change stream', () async {

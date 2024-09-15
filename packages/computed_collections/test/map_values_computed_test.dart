@@ -424,4 +424,12 @@ void main() {
 
     sub.cancel();
   });
+
+  test('propagates exceptions', () async {
+    final s = ValueStream<ChangeEvent<int, int>>(sync: true);
+    final m = ComputedMap.fromChangeStream($(() => s.use));
+    final mvc = m.mapValuesComputed((key, value) => $(() => value));
+
+    await testExceptions(mvc, s);
+  });
 }
