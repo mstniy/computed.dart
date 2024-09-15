@@ -5,6 +5,7 @@ import 'package:computed_collections/src/flat.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import 'src/cs.dart';
+import 'src/cs_with_prev.dart';
 import 'src/ss.dart';
 
 /// An in-memory, partially- or fully-observable key-value store.
@@ -15,6 +16,9 @@ abstract class ComputedMap<K, V> {
   factory ComputedMap.fromIMap(IMap<K, V> m) => ConstComputedMap(m);
   factory ComputedMap.fromChangeStream(Computed<ChangeEvent<K, V>> stream) =>
       ChangeStreamComputedMap(stream);
+  factory ComputedMap.fromChangeStreamWithPrev(
+          ChangeEvent<K, V> Function(IMap<K, V>?) f) =>
+      ChangeStreamWithPrevComputedMap(f);
   factory ComputedMap.fromSnapshotStream(Computed<IMap<K, V>> stream) =>
       SnapshotStreamComputedMap(stream);
   Computed<ChangeEvent<K, V>> get changes;

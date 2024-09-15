@@ -2,21 +2,29 @@ import 'package:computed/computed.dart';
 import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/computedmap.dart';
 import 'package:computed_collections/src/utils/cs_tracker.dart';
-import 'package:computed_collections/src/utils/snapshot_computation.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import 'computedmap_mixins.dart';
 import 'expandos.dart';
 
-class ChangeStreamComputedMap<K, V>
+class ChangeStreamWithPrevComputedMap<K, V>
     with OperatorsMixin<K, V>
     implements ComputedMap<K, V> {
   late final CSTracker<K, V> _tracker;
-  ChangeStreamComputedMap(this.changes,
-      {IMap<K, V> Function()? initialValueComputer,
-      Computed<IMap<K, V>>? snapshotStream}) {
-    snapshot =
-        snapshotStream ?? snapshotComputation(changes, initialValueComputer);
+
+  final ChangeEvent<K, V> Function(IMap<K, V>? prev) _f;
+  IMap<K, V>? _snapshot;
+
+  ChangeStreamWithPrevComputedMap(this._f) {
+    changes = Computed(() {
+      final newChange = _f(_snapshot);
+      _snapshot = (_snapshot ?? IMap<K, V>.empty()).withChange(newChange);
+      return newChange;
+    }, assertIdempotent: false, onCancel: () => _snapshot = null);
+    snapshot = $(() {
+      changes.use;
+      return _snapshot!;
+    });
     _tracker = CSTracker(changes, snapshot);
   }
 
@@ -29,7 +37,7 @@ class ChangeStreamComputedMap<K, V>
   Computed<bool> containsValue(V value) => _tracker.containsValue(value);
 
   @override
-  final Computed<ChangeEvent<K, V>> changes;
+  late final Computed<ChangeEvent<K, V>> changes;
 
   @override
   Computed<bool> get isEmpty =>

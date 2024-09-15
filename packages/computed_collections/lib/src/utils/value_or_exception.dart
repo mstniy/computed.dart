@@ -1,3 +1,4 @@
+// TODO: Refactor this into a sealed class
 class ValueOrException<T> {
   final bool isValue;
   Object? exc_;
