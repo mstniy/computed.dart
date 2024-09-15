@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:computed/computed.dart';
+import 'package:computed/utils/streams.dart';
 import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/computedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
@@ -70,7 +71,9 @@ Future<void> testCoherence<K, V>(ComputedMap<K, V> map, IMap<K, V> expected,
 }
 
 Future<void> testExceptions(
-    ComputedMap<int, int> map, EventSink<ChangeEvent<int, int>> s) async {
+    ComputedMap<int, int> map, ValueStream<ChangeEvent<int, int>> s) async {
+  s.addError(42);
+
   for (final x in [
     () => map.snapshot,
     () => map.changes,
@@ -89,11 +92,16 @@ Future<void> testExceptions(
     });
 
     await Future.value();
-    s.addError(42);
-    await Future.value(); // In case the given map has a MT delay
+    await Future.value(); // In case the map has a MT delay
     expect(cnt, 1);
     expect(last, 42);
 
+    s.addError(43);
+    for (var i = 0; i < 5; i++) await Future.value();
+    // Make sure there are no uncaught exceptions
+
     sub.cancel();
+
+    s.addError(42); // Prepare for the next iteration
   }
 }
