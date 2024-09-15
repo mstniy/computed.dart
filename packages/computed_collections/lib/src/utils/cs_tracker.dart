@@ -21,10 +21,6 @@ class CSTracker<K, V> {
     Set<Computed> _allStreams() =>
         {..._keyStreams.values, ..._valueStreams.values};
 
-    void _onException(Object e) {
-      _snapshot = ValueOrException.exc(e);
-    }
-
     _pusher = CustomDownstream(() {
       // If [_snapshot] is an exception, this throws.
       // This allows us to have cancelOnError semantics
@@ -34,7 +30,7 @@ class CSTracker<K, V> {
       } on NoValueException {
         rethrow; // Not much to do if we don't have a snapshot
       } catch (e) {
-        _onException(e);
+        _snapshot = ValueOrException.exc(e);
         return _allStreams();
       }
       final ChangeEvent<K, V> change;
@@ -47,10 +43,9 @@ class CSTracker<K, V> {
           return _allStreams();
         }
         return {};
-      } catch (e) {
-        _onException(e);
-        return _allStreams();
       }
+      // We don't catch other exceptions here - instead assuming
+      //  the snapshot stream would have thrown them.
       // "push" the update to the relevant streams by returning them as our downstream
       return switch (change) {
         KeyChanges<K, V>(changes: final changes) => sOld == null
@@ -105,9 +100,6 @@ class CSTracker<K, V> {
         _pusher.use;
         // Note that this computation is ran by the
         // [_pusher] using "push" semantics
-        if (_snapshot == null) {
-          throw NoValueException(); // Wait until we get a snapshot
-        }
         final snapshot = _snapshot!.value;
         return snapshot.containsKey(key)
             ? Option.some(snapshot[key] as V)
@@ -147,9 +139,6 @@ class CSTracker<K, V> {
                 // [_pusher] using "push" semantics.
                 // Note that this could be further optimized by keeping a set of keys
                 // containing each value, at the cost of additional memory.
-                if (_snapshot == null) {
-                  throw NoValueException(); // Wait until we get a snapshot
-                }
                 return _snapshot!.value.containsValue(value);
               }, onCancel: onCancel_));
       return leaderStream.use;
