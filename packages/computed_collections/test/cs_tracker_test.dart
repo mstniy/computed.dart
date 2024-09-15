@@ -8,8 +8,6 @@ import 'package:computed_collections/src/utils/snapshot_computation.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:test/test.dart';
 
-import 'helpers.dart';
-
 void main() {
   test('works without any upstream changes', () async {
     for (var e in [

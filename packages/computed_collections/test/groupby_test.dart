@@ -278,13 +278,20 @@ void main() {
     final m1 = ComputedMap.fromChangeStream($(() => s.use));
     final m2 = m1.groupBy((key, value) => key);
 
-    List<Object?> res = [null, null, null, null];
+    late final List<Object?> res;
     final x = [
-      m2.changes.listen((e) => null, (o) => res[0] = o),
-      m2.snapshot.listen((e) => null, (o) => res[1] = o),
-      $(() => m2[0].use?.changes.use).listen((e) => null, (o) => res[2] = o),
-      $(() => m2[0].use?.snapshot.use).listen((e) => null, (o) => res[3] = o),
-    ];
+      m2.changes,
+      m2.snapshot,
+      m2[0],
+      $(() => m2[0].use?.changes.use),
+      $(() => m2[0].use?.snapshot.use),
+      m2.isEmpty,
+      m2.isNotEmpty,
+      m2.length,
+      m2.containsKey(0),
+      m2.containsValue(ComputedMap.fromIMap(<int, int>{}.lock))
+    ].mapIndexedAndLast((i, c, _) => c.listen(null, (o) => res[i] = o));
+    res = List.generate(x.length, (_) => null);
     await Future.value();
     s.addError(42);
     res.forEach((o) => expect(o, 42));

@@ -49,8 +49,6 @@ class GroupByComputedMap<K, V, KParent>
   Computed<ChangeEvent<KParent, V>> _makeCS(K key) {
     late final Computed<ChangeEvent<KParent, V>> self;
     self = Computed(() {
-      if (_exc != null) throw _exc!;
-
       final g = _m?[key];
 
       if (g?.cs != self) {
@@ -79,8 +77,6 @@ class GroupByComputedMap<K, V, KParent>
   Computed<IMap<KParent, V>> _makeSS(K key) {
     late final Computed<IMap<KParent, V>> self;
     self = Computed(() {
-      if (_exc != null) throw _exc!;
-
       final g = _m?[key];
 
       if (g?.ss != self) {
