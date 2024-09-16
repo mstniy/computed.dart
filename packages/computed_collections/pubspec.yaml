@@ -1,7 +1,7 @@
 name: computed_collections
 description: Performant and flexible functional reactive programming for collections
 
-repository: https://github.com/mstniy/computed.dart
+repository: https://github.com/mstniy/computed.dart/tree/master/packages/computed_collections
 
 version: 0.1.0
 

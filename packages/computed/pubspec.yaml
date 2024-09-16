@@ -1,7 +1,7 @@
 name: computed
 description: A performant and flexible reactive programming framework for Dart
 
-repository: https://github.com/mstniy/computed.dart
+repository: https://github.com/mstniy/computed.dart/tree/master/packages/computed
 
 version: 0.5.0
 
