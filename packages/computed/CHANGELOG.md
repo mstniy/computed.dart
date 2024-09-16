@@ -1,3 +1,22 @@
+## 0.5.0 - 2024-09-16
+
+- New computation configuration options: `dispose`, `onCancel`, `assertIdempotent`
+- `useWeak`
+- Revamped the DAG runner. Lazily discovers the relevant part of the computation graph. Supports custom downstreams.
+- Changed `.prev` semantics
+- Removed mocking support
+- Removed `ResourceStream` in favor of disposing async computations
+- `ComputationCache`
+- `ValueStream` now implements the `EventSink` interface.
+- If a memoized computation's result is equal to the previous one, keep using the old one
+- Support receiving stack traces from data sources
+- `.listen`: Made `onError` optional
+- `.listen`: `onError` can take the stacktrace as a parameter
+- Allow listeners to cancel themselves and other listeners on the same computation
+- `ValueStream`: `hasListener`
+- `ValueStream`: `add`/`addError`: Avoid scheduling a microtask if there are no listeners
+- Fix a bug where sync exceptions thrown while attempting to listen to data sources corrupted the internal state
+
 ## 0.4.1 - 2023-12-26
 
 - `ValueStream`: Support initial values

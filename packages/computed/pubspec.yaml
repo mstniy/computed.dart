@@ -1,9 +1,9 @@
 name: computed
-description: Straightforward, reliable, performant and testable reactive state management
+description: A performant and flexible reactive programming framework for Dart
 
 repository: https://github.com/mstniy/computed.dart
 
-version: 0.4.1
+version: 0.5.0
 
 environment:
   sdk: ">=3.2.1 <4.0.0"
