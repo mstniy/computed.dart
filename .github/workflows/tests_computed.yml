@@ -1,4 +1,4 @@
-name: tests
+name: computed
 
 on:
   pull_request:
@@ -7,7 +7,7 @@ on:
     branches: [master]
 
 jobs:
-  computed:
+  tests:
     uses: ./.github/workflows/test_main.yml
     with:
       package: computed

@@ -3,8 +3,6 @@ A straightforward, reliable, performant and testable reactive state management s
 > [!TIP]
 > Are you using Flutter? Then make sure to check out [Computed Flutter](https://github.com/mstniy/computed_flutter).
 
-[![Workflow Status](https://github.com/mstniy/computed.dart/actions/workflows/tests.yml/badge.svg)](https://github.com/mstniy/computed.dart/actions?query=branch%3Amaster+workflow%3Atests) [![codecov](https://codecov.io/github/mstniy/computed.dart/graph/badge.svg?token=VVG1YCC1FL)](https://codecov.io/github/mstniy/computed.dart)
-
 ---
 
 Computed makes it a breeze to write code that reacts to external events. Just define how you compute your app state based on external data sources, and what effects you want as a result, and Computed will take care of everything else, allowing you to define your app state declaratively, rather than imperatively.
