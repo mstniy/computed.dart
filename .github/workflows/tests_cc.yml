@@ -7,11 +7,8 @@ on:
     branches: [master]
 
 jobs:
-  computed:
-    uses: ./.github/workflows/test_main.yml
-    with:
-      package: computed
   computed_collections:
     uses: ./.github/workflows/test_main.yml
     with:
       package: computed_collections
+    secrets: inherit

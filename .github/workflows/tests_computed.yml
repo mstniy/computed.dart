@@ -1,0 +1,14 @@
+name: tests
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+jobs:
+  computed:
+    uses: ./.github/workflows/test_main.yml
+    with:
+      package: computed
+    secrets: inherit
