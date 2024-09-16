@@ -347,7 +347,6 @@ class ComputedImpl<T> implements Computed<T> {
   }
 
   void onDataSourceError(Object err, StackTrace st) {
-    if (_dss == null) return;
     GlobalCtx._currentUpdate = _Token();
 
     _dss!._lastEmit = GlobalCtx._currentUpdate;
