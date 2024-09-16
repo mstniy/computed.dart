@@ -1,0 +1,41 @@
+name: tests_main
+
+# See https://github.com/orgs/community/discussions/52616#discussioncomment-9364532
+on:
+  workflow_call:
+    inputs:
+      package:
+        required: true
+        type: string
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dart-lang/setup-dart@v1
+
+      - name: Install dependencies
+        run: |
+          dart pub get
+          dart pub global activate coverage
+        working-directory: packages/${{inputs.package}}
+
+      - name: Verify formatting
+        run: dart format --output=none --set-exit-if-changed .
+        working-directory: packages/${{inputs.package}}
+
+      - name: Analyze source
+        run: dart analyze
+        working-directory: packages/${{inputs.package}}
+
+      - name: Run tests
+        run: dart pub global run coverage:test_with_coverage --branch-coverage
+        working-directory: packages/${{inputs.package}}
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./packages/${{inputs.package}}/coverage/lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}

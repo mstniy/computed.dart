@@ -7,35 +7,11 @@ on:
     branches: [master]
 
 jobs:
-  check:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        package: ["computed"]
-    steps:
-      - uses: actions/checkout@v3
-      - uses: dart-lang/setup-dart@v1
-
-      - name: Install dependencies
-        run: |
-          dart pub get
-          dart pub global activate coverage
-        working-directory: packages/${{matrix.package}}
-
-      - name: Verify formatting
-        run: dart format --output=none --set-exit-if-changed .
-        working-directory: packages/${{matrix.package}}
-
-      - name: Analyze source
-        run: dart analyze
-        working-directory: packages/${{matrix.package}}
-
-      - name: Run tests
-        run: dart pub global run coverage:test_with_coverage --branch-coverage
-        working-directory: packages/${{matrix.package}}
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          files: ./packages/${{matrix.package}}/coverage/lcov.info
-          token: ${{ secrets.CODECOV_TOKEN }}
+  computed:
+    uses: ./.github/workflows/test_main.yml
+    with:
+      package: computed
+  computed_collections:
+    uses: ./.github/workflows/test_main.yml
+    with:
+      package: computed_collections
