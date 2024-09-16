@@ -1,0 +1,13 @@
+comment:
+  layout: "header, diff, flags, components" # show component info in the PR comment
+
+component_management:
+  individual_components:
+    - component_id: computed
+      name: computed
+      paths:
+        - packages/computed/**
+    - component_id: computed_collections
+      name: computed_collections
+      paths:
+        - packages/computed_collections/**
