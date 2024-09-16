@@ -7,7 +7,7 @@ on:
     branches: [master]
 
 jobs:
-  tests:
+  test:
     uses: ./.github/workflows/test_main.yml
     with:
       package: computed
