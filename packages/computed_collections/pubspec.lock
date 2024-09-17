@@ -52,10 +52,9 @@ packages:
   computed:
     dependency: "direct main"
     description:
-      name: computed
-      sha256: da0f24e5cb61545f5602d207348b5e35f2521d5c71095c837982195b7135c10c
-      url: "https://pub.dev"
-    source: hosted
+      path: "../computed"
+      relative: true
+    source: path
     version: "0.5.0"
   convert:
     dependency: transitive
@@ -394,4 +393,4 @@ packages:
     source: hosted
     version: "3.1.2"
 sdks:
-  dart: ">=3.2.1 <4.0.0"
+  dart: ">=3.4.0 <4.0.0"

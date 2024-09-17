@@ -28,55 +28,62 @@ class FlatComputedMap<K1, K2, V>
       final snapshotComputation = nested.snapshot;
       final changeStream = nested.changes;
       final initialPrevToken = IMap<K2, V>.empty();
-      return Computed<IMap<K2, V>>.withPrev((prev) {
-        final IMap<K2, V> snap;
-        final ChangeEvent<K2, V>? change;
-        try {
-          snap = snapshotComputation.use;
-          change = getIfChanged(changeStream);
-        } on NoValueException {
-          // This must be coming from the nested snapshot
-          // Can't do much without a snapshot
-          throw NoValueException();
-        } catch (e) {
-          merger.addError(e);
-          // Throwing the exception causes withPrev to stop computing us
-          rethrow;
-        }
+      // Keep a copy here so that onCancel can use it
+      IMap<K2, V>? snapMutable;
+      return Computed<IMap<K2, V>>.withPrev(
+              (prev) {
+                final IMap<K2, V> snap;
+                final ChangeEvent<K2, V>? change;
+                try {
+                  snap = snapshotComputation.use;
+                  change = getIfChanged(changeStream);
+                } on NoValueException {
+                  // This must be coming from the nested snapshot
+                  // Can't do much without a snapshot
+                  throw NoValueException();
+                } catch (e) {
+                  merger.addError(e);
+                  // Throwing the exception causes withPrev to stop computing us
+                  rethrow;
+                }
 
-        IMap<K2, V>? snapPrev;
-        try {
-          snapPrev = snapshotComputation.prev;
-        } on NoValueException {
-          // Leave null
-        }
+                IMap<K2, V>? snapPrev;
+                try {
+                  snapPrev = snapshotComputation.prev;
+                } on NoValueException {
+                  // Leave null
+                }
 
-        if (identical(prev, initialPrevToken)) {
-          // This is the initial snapshot - broadcast the new key products
-          merger.add(KeyChanges(
-              snap.map((k2, v) => MapEntry((k1, k2), ChangeRecordValue(v)))));
-        } else if (change != null) {
-          switch (change) {
-            case KeyChanges<K2, V>():
-              merger.add(KeyChanges(
-                  change.changes.map((k2, r) => MapEntry((k1, k2), r))));
-            case ChangeEventReplace<K2, V>():
-              if (snapPrev != null) {
-                // Broadcast a deletion for all the key products of the old snapshot
-                merger.add(KeyChanges(snapPrev.map(
-                    (k2, _) => MapEntry((k1, k2), ChangeRecordDelete<V>()))));
-              }
-              // Broadcast the new key products
-              merger.add(KeyChanges(change.newCollection
-                  .map((k2, v) => MapEntry((k1, k2), ChangeRecordValue(v)))));
-          }
-        }
-        return snap;
-      },
+                if (identical(prev, initialPrevToken)) {
+                  // This is the initial snapshot - broadcast the new key products
+                  merger.add(KeyChanges(snap.map(
+                      (k2, v) => MapEntry((k1, k2), ChangeRecordValue(v)))));
+                } else if (change != null) {
+                  switch (change) {
+                    case KeyChanges<K2, V>():
+                      merger.add(KeyChanges(change.changes
+                          .map((k2, r) => MapEntry((k1, k2), r))));
+                    case ChangeEventReplace<K2, V>():
+                      if (snapPrev != null) {
+                        // Broadcast a deletion for all the key products of the old snapshot
+                        merger.add(KeyChanges(snapPrev.map((k2, _) =>
+                            MapEntry((k1, k2), ChangeRecordDelete<V>()))));
+                      }
+                      // Broadcast the new key products
+                      merger.add(KeyChanges(change.newCollection.map((k2, v) =>
+                          MapEntry((k1, k2), ChangeRecordValue(v)))));
+                  }
+                }
+                snapMutable = snap;
+                return snap;
+              },
               initialPrev: initialPrevToken,
               async: true,
-              dispose: (snap) => merger.add(KeyChanges(snap
-                  .map((k2, _) => MapEntry((k1, k2), ChangeRecordDelete())))))
+              onCancel: () {
+                merger.add(KeyChanges((snapMutable ?? const IMap.empty())
+                    .map((k2, _) => MapEntry((k1, k2), ChangeRecordDelete()))));
+                snapMutable = null;
+              })
           // Explicitly ignore exceptions thrown by the computation,
           // as they must be coming from the nested map and we handle
           // them by adding them to the merger before throwing ourselves
