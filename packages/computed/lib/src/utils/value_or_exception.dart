@@ -9,6 +9,15 @@ sealed class ValueOrException<T> {
         Value<T>(value: final v) => v,
         Exception<T>(exc: final e) => throw e,
       };
+
+  // Note that this is not strictly an operator==, as it does not
+  // check [st].
+  bool equals(ValueOrException<T> other) => switch ((this, other)) {
+        (Value(value: final v1), Value(value: final v2)) => v1 == v2,
+        (Exception(exc: final exc1), Exception(exc: final exc2)) =>
+          exc1 == exc2,
+        _ => false
+      };
 }
 
 class Value<T> extends ValueOrException<T> {

@@ -506,12 +506,7 @@ class ComputedImpl<T> implements Computed<T> {
         // Run f() once again and see if it behaves identically
         bool ensureIdempotent() {
           final idempotentResult = _evalFGuarded();
-          return switch ((newResult, idempotentResult)) {
-            (Value(value: final v1), Value(value: final v2)) => v1 == v2,
-            (Exception(exc: final exc1), Exception(exc: final exc2)) =>
-              exc1 == exc2,
-            _ => false
-          };
+          return newResult.equals(idempotentResult);
         }
 
         try {
@@ -526,15 +521,8 @@ class ComputedImpl<T> implements Computed<T> {
         Exception<T>(exc: final exc) => exc is NoValueException,
       };
 
-      shouldNotify = !gotNVE &&
-          (!_memoized ||
-              switch ((_prevResult, newResult)) {
-                (Value<T>(value: final v1), Value<T>(value: final v2)) =>
-                  v1 != v2,
-                (Exception<T>(exc: final e1), Exception<T>(exc: final e2)) =>
-                  e1 != e2,
-                _ => true
-              });
+      shouldNotify =
+          !gotNVE && (!_memoized || !(_prevResult?.equals(newResult) ?? false));
 
       if (shouldNotify) {
         _lastResult = newResult;
