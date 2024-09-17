@@ -3,6 +3,8 @@ description: Performant and flexible functional reactive programming for collect
 
 repository: https://github.com/mstniy/computed.dart/tree/master/packages/computed_collections
 
+publish_to: none
+
 version: 0.1.0
 
 environment:
