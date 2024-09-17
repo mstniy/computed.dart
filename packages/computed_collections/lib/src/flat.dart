@@ -18,26 +18,10 @@ class FlatComputedMap<K1, K2, V>
   late final CSTracker<(K1, K2), V> _tracker;
 
   FlatComputedMap(this._parent) {
-    final computedChanges = Computed(() {
-      final change = _parent.changes.use;
-      return switch (change) {
-        ChangeEventReplace<K1, ComputedMap<K2, V>>() => ChangeEventReplace(
-            change.newCollection.map(((key, value) => MapEntry(key, value)))),
-        KeyChanges<K1, ComputedMap<K2, V>>() =>
-          KeyChanges(IMap.fromEntries(change.changes.entries.map((e) {
-            final key = e.key;
-            return switch (e.value) {
-              ChangeRecordValue<ComputedMap<K2, V>>(value: var value) =>
-                MapEntry(key, ChangeRecordValue(value)),
-              ChangeRecordDelete<ComputedMap<K2, V>>() =>
-                MapEntry(key, ChangeRecordDelete<ComputedMap<K2, V>>()),
-            };
-          }))),
-      };
-    }, assertIdempotent: false);
+    Map<K1, ComputedSubscription<void>>?
+        keySubs; // null if we have not received an initial snapshot from the upstream
 
     late final MergingChangeStream<(K1, K2), V> merger;
-    var keySubs = <K1, ComputedSubscription<void>>{};
 
     ComputedSubscription<void> listenToNestedMap(
         K1 k1, ComputedMap<K2, V> nested) {
@@ -45,8 +29,20 @@ class FlatComputedMap<K1, K2, V>
       final changeStream = nested.changes;
       final initialPrevToken = IMap<K2, V>.empty();
       return Computed<IMap<K2, V>>.withPrev((prev) {
-        final snap = snapshotComputation.use;
-        final change = getIfChanged(changeStream);
+        final IMap<K2, V> snap;
+        final ChangeEvent<K2, V>? change;
+        try {
+          snap = snapshotComputation.use;
+          change = getIfChanged(changeStream);
+        } on NoValueException {
+          // This must be coming from the nested snapshot
+          // Can't do much without a snapshot
+          throw NoValueException();
+        } catch (e) {
+          merger.addError(e);
+          // Throwing the exception causes withPrev to stop computing us
+          rethrow;
+        }
 
         IMap<K2, V>? snapPrev;
         try {
@@ -81,16 +77,40 @@ class FlatComputedMap<K1, K2, V>
               async: true,
               dispose: (snap) => merger.add(KeyChanges(snap
                   .map((k2, _) => MapEntry((k1, k2), ChangeRecordDelete())))))
-          .listen(null);
+          // Explicitly ignore exceptions thrown by the computation,
+          // as they must be coming from the nested map and we handle
+          // them by adding them to the merger before throwing ourselves
+          .listen(null, (_) {});
     }
 
     void setM(IMap<K1, ComputedMap<K2, V>> m) {
-      for (var s in keySubs.values) {
+      for (var s in keySubs?.values ?? <ComputedSubscription<void>>[]) {
         s.cancel();
       }
       keySubs =
           m.unlock.map((k1, cm) => MapEntry(k1, listenToNestedMap(k1, cm)));
     }
+
+    final computedChanges = Computed.async(() {
+      if (keySubs == null) {
+        setM(_parent.snapshot.use);
+      }
+      final change = _parent.changes.use;
+      return switch (change) {
+        ChangeEventReplace<K1, ComputedMap<K2, V>>() => ChangeEventReplace(
+            change.newCollection.map(((key, value) => MapEntry(key, value)))),
+        KeyChanges<K1, ComputedMap<K2, V>>() =>
+          KeyChanges(IMap.fromEntries(change.changes.entries.map((e) {
+            final key = e.key;
+            return switch (e.value) {
+              ChangeRecordValue<ComputedMap<K2, V>>(value: var value) =>
+                MapEntry(key, ChangeRecordValue(value)),
+              ChangeRecordDelete<ComputedMap<K2, V>>() =>
+                MapEntry(key, ChangeRecordDelete<ComputedMap<K2, V>>()),
+            };
+          }))),
+      };
+    });
 
     void computedChangesListener(
         ChangeEvent<K1, ComputedMap<K2, V>> computedChangesValue) {
@@ -104,13 +124,13 @@ class FlatComputedMap<K1, K2, V>
           for (var e in computedChangesValue.changes.entries) {
             final k1 = e.key;
             final change = e.value;
-            keySubs[k1]
+            keySubs![k1]
                 ?.cancel(); // Note that this emits deletion events for the old key products, if a snapshot exists
             switch (change) {
               case ChangeRecordValue<ComputedMap<K2, V>>():
-                keySubs[k1] = listenToNestedMap(k1, change.value);
+                keySubs![k1] = listenToNestedMap(k1, change.value);
               case ChangeRecordDelete<ComputedMap<K2, V>>():
-                keySubs.remove(k1);
+                keySubs!.remove(k1);
             }
           }
       }
@@ -123,18 +143,15 @@ class FlatComputedMap<K1, K2, V>
       computedChangesSubscription =
           computedChanges.listen(computedChangesListener, merger.addError);
     }, onCancel: () {
-      for (var sub in keySubs.values) {
+      for (var sub in keySubs?.values ?? <ComputedSubscription<void>>[]) {
         sub.cancel();
       }
-      keySubs.clear();
+      keySubs = null;
       computedChangesSubscription!.cancel();
       computedChangesSubscription = null;
     });
     changes = $(() => merger.use);
-    snapshot = snapshotComputation(changes, () {
-      setM(_parent.snapshot.use);
-      return IMap<(K1, K2), V>.empty();
-    });
+    snapshot = snapshotComputation(changes, null);
 
     _tracker = CSTracker(changes, snapshot);
   }

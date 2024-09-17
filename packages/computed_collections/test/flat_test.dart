@@ -128,4 +128,80 @@ void main() {
     final m2 = m1.flat();
     await testCoherence(m2, {(0, 1): 2, (3, 4): 5, (3, 6): 7}.lock, (0, 0), 0);
   });
+
+  test('(regression) subscribing to just .changes works', () async {
+    final s = ValueStream<IMap<int, int>>(sync: true);
+    final m1 = ComputedMap.fromSnapshotStream($(() => s.use));
+    final m2 = ComputedMap.fromIMap({0: m1}.lock).flat();
+
+    expect(
+        await getValuesWhile(m2.changes, () {
+          s.add({0: 1}.lock);
+        }),
+        [
+          KeyChanges({(0, 0): ChangeRecordValue(1)}.lock)
+        ]);
+  });
+
+  test('propagates exceptions from nested maps', () async {
+    final m1 = ComputedMap.fromIMap({0: 1}.lock);
+    final m2 = ComputedMap.fromChangeStream($(() => throw 42));
+    final m3 = ComputedMap.fromIMap({0: m1, 1: m2}.lock).flat();
+
+    for (final x in [
+      () => m3.snapshot,
+      () => m3.changes,
+      () => m3[(1, 0)],
+      () => m3.isEmpty,
+      () => m3.isNotEmpty,
+      () => m3.length,
+      () => m3.containsKey((1, 0)),
+      () => m3.containsValue(0),
+      () => m3.containsValue(1),
+    ]) {
+      var cnt = 0;
+      Object? last;
+      final sub = x().listen(null, (e) {
+        cnt++;
+        last = e;
+      });
+
+      await Future.value();
+      await Future.value();
+      expect(cnt, 1);
+      expect(last, 42);
+
+      sub.cancel();
+    }
+  });
+
+  test('propagates exceptions directly from the parent', () async {
+    final m3 = ComputedMap<int, ComputedMap<int, int>>.fromChangeStream(
+        $(() => throw 42)).flat();
+
+    for (final x in [
+      () => m3.snapshot,
+      () => m3.changes,
+      () => m3[(1, 0)],
+      () => m3.isEmpty,
+      () => m3.isNotEmpty,
+      () => m3.length,
+      () => m3.containsKey((1, 0)),
+      () => m3.containsValue(0),
+    ]) {
+      var cnt = 0;
+      Object? last;
+      final sub = x().listen(null, (e) {
+        cnt++;
+        last = e;
+      });
+
+      await Future.value();
+      await Future.value();
+      expect(cnt, 1);
+      expect(last, 42);
+
+      sub.cancel();
+    }
+  });
 }
