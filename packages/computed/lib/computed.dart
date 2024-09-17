@@ -121,15 +121,39 @@ abstract class ComputedSubscription<T> {
 
 /// Thrown when a data source [use]d by a computation
 /// has not produced a value yet.
-class NoValueException implements Exception {}
+class NoValueException implements Exception {
+  @override
+  bool operator ==(Object other) => other is NoValueException;
+
+  @override
+  int get hashCode => Object.hash(NoValueException, null);
+}
 
 /// Thrown when [useWeak] is called on a computation which
 /// has no non-weak downstream computations or listeners.
-class NoStrongUserException implements Exception {}
+class NoStrongUserException implements Exception {
+  @override
+  bool operator ==(Object other) => other is NoStrongUserException;
+
+  @override
+  int get hashCode => Object.hash(NoStrongUserException, null);
+}
 
 /// Thrown by [Computed.use] if this usage
 /// would cause a cyclic dependency.
-class CyclicUseException implements Exception {}
+class CyclicUseException implements Exception {
+  @override
+  bool operator ==(Object other) => other is CyclicUseException;
+
+  @override
+  int get hashCode => Object.hash(CyclicUseException, null);
+}
 
 /// Thrown when non-async computations attempt to do async operations
-class ComputedAsyncError extends Error {}
+class ComputedAsyncError extends Error {
+  @override
+  bool operator ==(Object other) => other is ComputedAsyncError;
+
+  @override
+  int get hashCode => Object.hash(ComputedAsyncError, null);
+}

@@ -5,6 +5,7 @@ import 'package:meta/meta.dart';
 import '../computed.dart';
 import 'data_source_subscription.dart';
 import 'sync_zone.dart';
+import 'utils/value_or_exception.dart';
 
 class _Token {
   _Token();
@@ -12,30 +13,9 @@ class _Token {
 
 final _isComputedZone = _Token();
 
-class _ValueOrException<T> {
-  final bool _isValue;
-  Object? _exc;
-  StackTrace? _st;
-  T? _value;
-
-  _ValueOrException.value(this._value) : _isValue = true;
-  _ValueOrException.exc(this._exc, this._st) : _isValue = false;
-
-  T get value {
-    if (_isValue) return _value as T;
-    throw _exc!;
-  }
-
-  bool shouldNotifyMemoized(_ValueOrException<T>? other) {
-    return (_isValue != other?._isValue) ||
-        (_isValue && _value != other?._value) ||
-        (!_isValue && _exc != other?._exc);
-  }
-}
-
 class _RouterValueOrException<T> {
   final ComputedImpl<T> _router;
-  _ValueOrException<T>? _voe;
+  ValueOrException<T>? _voe;
 
   _RouterValueOrException(this._router, this._voe);
 }
@@ -92,7 +72,7 @@ void _dispatchOnError(Function onError, Object o, StackTrace st) {
 class _WeakMemoizedValueOrException<T> {
   final bool _weak;
   final bool _memoized;
-  final _ValueOrException<T>? _voe;
+  final ValueOrException<T>? _voe;
 
   _WeakMemoizedValueOrException(this._weak, this._memoized, this._voe);
 }
@@ -125,15 +105,16 @@ class GlobalCtx {
     if (rvoe == null) {
       rvoe = _RouterValueOrException(
           ComputedImpl(() {
-            if (rvoe!._voe == null) {
-              throw NoValueException();
+            switch (rvoe!._voe) {
+              case null:
+                throw NoValueException();
+              case Value<T>(value: final value):
+                return value;
+              case Exception<T>(exc: final exc, st: final st):
+                Error.throwWithStackTrace(exc, st);
             }
-            if (rvoe._voe!._isValue) return rvoe._voe!._value as T;
-            Error.throwWithStackTrace(rvoe._voe!._exc!, rvoe._voe!._st!);
           }, true, false, false, null, null),
-          currentValue != null
-              ? _ValueOrException.value(currentValue())
-              : null);
+          currentValue != null ? ValueOrException.value(currentValue()) : null);
       // Run the subscriber outside the sync zone
       final zone = Zone.current[_isComputedZone] == true
           ? Zone.current.parent!
@@ -211,8 +192,8 @@ class ComputedImpl<T> implements Computed<T> {
   _Token? _lastUpdate;
 
   bool get _novalue => _lastResult == null;
-  _ValueOrException<T>? _lastResult;
-  _ValueOrException<T>? _prevResult;
+  ValueOrException<T>? _lastResult;
+  ValueOrException<T>? _prevResult;
   T? _initialPrev;
   var _lastUpstreamComputations =
       <ComputedImpl, _WeakMemoizedValueOrException>{};
@@ -262,12 +243,15 @@ class ComputedImpl<T> implements Computed<T> {
       _injectNodesToDAG(downstream);
     }
 
-    if (_lastResult == null) throw NoValueException();
-
-    // We don't use Error.throwWithStackTrace here - even if we are a router
-    // As this might make it more difficult to pinpoint where exceptions
-    // are actually coming from.
-    return _lastResult!.value;
+    switch (_lastResult) {
+      case null:
+        throw NoValueException();
+      // We don't use Error.throwWithStackTrace here - even if we are a router
+      // As this might make it more difficult to pinpoint where exceptions
+      // are actually coming from.
+      case ValueOrException<T>(valueOrThrow: final v):
+        return v;
+    }
   }
 
   @override
@@ -291,7 +275,7 @@ class ComputedImpl<T> implements Computed<T> {
         throw NoValueException();
       }
     }
-    return _lastResult!.value;
+    return _lastResult!.valueOrThrow;
   }
 
   @override
@@ -299,13 +283,13 @@ class ComputedImpl<T> implements Computed<T> {
     final caller = GlobalCtx.currentComputation;
     if (caller == this) {
       if (_prevResult == null && _initialPrev == null) throw NoValueException();
-      return (_prevResult?.value ?? _initialPrev)!;
+      return (_prevResult?.valueOrThrow ?? _initialPrev)!;
     } else {
       final mvoe = caller._lastUpstreamComputations[this];
       if (mvoe?._voe == null) {
         throw NoValueException();
       }
-      return mvoe!._voe!.value;
+      return mvoe!._voe!.valueOrThrow;
     }
   }
 
@@ -321,8 +305,8 @@ class ComputedImpl<T> implements Computed<T> {
       void Function(T value)? dispose,
       void Function()? onCancel) {
     late ComputedImpl<T> c;
-    c = ComputedImpl<T>(() => f(c._prevResult?.value ?? initialPrev), memoized,
-        assertIdempotent && !async, async, dispose, onCancel);
+    c = ComputedImpl<T>(() => f(c._prevResult?.valueOrThrow ?? initialPrev),
+        memoized, assertIdempotent && !async, async, dispose, onCancel);
     c._initialPrev = initialPrev;
 
     return c;
@@ -334,11 +318,12 @@ class ComputedImpl<T> implements Computed<T> {
     _dss!._lastEmit = GlobalCtx._currentUpdate;
     final rvoe =
         GlobalCtx._routerExpando[_dss!._ds] as _RouterValueOrException<T>;
-    if (rvoe._voe == null ||
-        !rvoe._voe!._isValue ||
-        rvoe._voe!._value != data) {
+    if (switch (rvoe._voe) {
+      Value<T>(value: final value) => value != data,
+      _ => true
+    }) {
       // Update the global last value cache
-      rvoe._voe = _ValueOrException<T>.value(data);
+      rvoe._voe = ValueOrException<T>.value(data);
     } else if (_nonMemoizedDownstreamComputations.isEmpty) {
       return;
     }
@@ -352,9 +337,12 @@ class ComputedImpl<T> implements Computed<T> {
     _dss!._lastEmit = GlobalCtx._currentUpdate;
     final rvoe =
         GlobalCtx._routerExpando[_dss!._ds] as _RouterValueOrException<T>;
-    if (rvoe._voe == null || rvoe._voe!._isValue || rvoe._voe!._exc != err) {
+    if (switch (rvoe._voe) {
+      Exception(exc: final exc) => exc != err,
+      _ => true
+    }) {
       // Update the global last value cache
-      rvoe._voe = _ValueOrException<T>.exc(err, st);
+      rvoe._voe = ValueOrException<T>.exc(err, st);
     } else if (_nonMemoizedDownstreamComputations.isEmpty) {
       return;
     }
@@ -378,29 +366,35 @@ class ComputedImpl<T> implements Computed<T> {
     _listeners[sub] = false;
 
     if (!_novalue) {
-      if (!_lastResult!._isValue &&
-          onError == null &&
-          _weakDownstreamComputations.isEmpty &&
-          _memoizedDownstreamComputations.isEmpty &&
-          _nonMemoizedDownstreamComputations.isEmpty &&
-          _listeners.length == 1) {
-        Zone.current.handleUncaughtError(_lastResult!._exc!, _lastResult!._st!);
+      switch (_lastResult!) {
+        case Exception(exc: final exc, st: final st):
+          if (onError == null &&
+              _weakDownstreamComputations.isEmpty &&
+              _memoizedDownstreamComputations.isEmpty &&
+              _nonMemoizedDownstreamComputations.isEmpty &&
+              _listeners.length == 1) {
+            Zone.current.handleUncaughtError(exc, st);
+          }
+        case Value():
+        // pass
       }
+
       scheduleMicrotask(() {
         if (_listeners[sub] != false) {
           return; // We have been cancelled or the listener has already been notified
         }
         // No need to set the value of _listeners here, it will never be used again
-        if (!_novalue) {
-          if (!_lastResult!._isValue) {
-            if (sub._onError != null) {
-              _dispatchOnError(
-                  sub._onError!, _lastResult!._exc!, _lastResult!._st!);
+        switch (_lastResult) {
+          case Value<T>(value: final value):
+            if (sub._onData != null) {
+              sub._onData!(value);
             }
-          } else if (_lastResult!._isValue && sub._onData != null) {
-            final lastResult = _lastResult!._value as T;
-            sub._onData!(lastResult);
-          }
+          case Exception<T>(exc: final exc, st: final st):
+            if (sub._onError != null) {
+              _dispatchOnError(sub._onError!, exc, st);
+            }
+          case null:
+          // pass
         }
       });
     }
@@ -471,9 +465,9 @@ class ComputedImpl<T> implements Computed<T> {
     return zone.run(_f);
   }
 
-  _ValueOrException<T> _evalFGuarded() {
+  ValueOrException<T> _evalFGuarded() {
     try {
-      final result = _ValueOrException.value(_evalFInZone());
+      final result = ValueOrException.value(_evalFInZone());
       if (_reactSuppressedException != null) {
         // Throw it here
         final exc = _reactSuppressedException!;
@@ -484,7 +478,7 @@ class ComputedImpl<T> implements Computed<T> {
       }
       return result;
     } catch (e, s) {
-      return _ValueOrException.exc(e, s);
+      return ValueOrException.exc(e, s);
     }
   }
 
@@ -505,32 +499,42 @@ class ComputedImpl<T> implements Computed<T> {
       GlobalCtx._currentComputation = this;
       var newResult = _evalFGuarded();
       if (_assertIdempotent &&
-          (newResult._isValue || newResult._exc is NoValueException)) {
+          switch (newResult) {
+            Value() => true,
+            Exception(exc: final exc) => exc is NoValueException
+          }) {
         // Run f() once again and see if it behaves identically
         bool ensureIdempotent() {
           final idempotentResult = _evalFGuarded();
-          if (newResult._isValue) {
-            return idempotentResult._isValue &&
-                idempotentResult._value == newResult._value;
-          } else {
-            assert(newResult._exc is NoValueException);
-            return !idempotentResult._isValue &&
-                idempotentResult._exc is NoValueException;
-          }
+          return switch ((newResult, idempotentResult)) {
+            (Value(value: final v1), Value(value: final v2)) => v1 == v2,
+            (Exception(exc: final exc1), Exception(exc: final exc2)) =>
+              exc1 == exc2,
+            _ => false
+          };
         }
 
         try {
           assert(ensureIdempotent(), idempotencyFailureMessage);
         } on AssertionError catch (e, s) {
-          newResult = _ValueOrException.exc(e, s);
+          newResult = ValueOrException.exc(e, s);
         }
       }
 
-      final gotNVE = !newResult._isValue && newResult._exc is NoValueException;
+      final gotNVE = switch (newResult) {
+        Value<T>() => false,
+        Exception<T>(exc: final exc) => exc is NoValueException,
+      };
 
       shouldNotify = !gotNVE &&
           (!_memoized ||
-              (_prevResult?.shouldNotifyMemoized(newResult) ?? true));
+              switch ((_prevResult, newResult)) {
+                (Value<T>(value: final v1), Value<T>(value: final v2)) =>
+                  v1 != v2,
+                (Exception<T>(exc: final e1), Exception<T>(exc: final e2)) =>
+                  e1 != e2,
+                _ => true
+              });
 
       if (shouldNotify) {
         _lastResult = newResult;
@@ -558,7 +562,8 @@ class ComputedImpl<T> implements Computed<T> {
       _lastUpdate = GlobalCtx._currentUpdate;
 
       if (gotNVE) {
-        Error.throwWithStackTrace(newResult._exc!, newResult._st!);
+        Error.throwWithStackTrace(
+            (newResult as Exception).exc, (newResult as Exception).st);
       } else {
         final downstream = <ComputedImpl>{};
         downstream.addAll(
@@ -591,41 +596,40 @@ class ComputedImpl<T> implements Computed<T> {
   void _notifyListeners() {
     // Take a copy in case the listeners cancel themselves/other listeners on this node
     final listenersCopy = _listeners.keys.toList();
-    if (!_lastResult!._isValue) {
-      // Exception
-      var onErrorNotified = false;
-      for (var listener in listenersCopy) {
-        // Might have been cancelled, so double-check
-        if (_listeners.containsKey(listener)) {
-          _listeners[listener] = true;
-          if (listener._onError != null) {
-            onErrorNotified = true;
-            _dispatchOnError(
-                listener._onError!, _lastResult!._exc!, _lastResult!._st!);
+    switch (_lastResult!) {
+      case Value<T>(value: final value):
+        for (var listener in listenersCopy) {
+          // Might have been cancelled, so double-check
+          if (_listeners.containsKey(listener)) {
+            _listeners[listener] = true;
+            if (listener._onData != null) {
+              listener._onData!(value);
+            }
           }
         }
-      }
-      if (_listeners
-              .isNotEmpty && // As then we must have been called from an initial listen(), and it will handle this itself
-          !onErrorNotified &&
-          // Note that there is no need to check for lazy listeners here,
-          // because even if we do have any, there must also be some non-lazy
-          // downstream computation to trigger this.
-          _memoizedDownstreamComputations.isEmpty &&
-          _nonMemoizedDownstreamComputations.isEmpty) {
-        // Propagate to the Zone
-        Zone.current.handleUncaughtError(_lastResult!._exc!, _lastResult!._st!);
-      }
-    } else {
-      for (var listener in listenersCopy) {
-        // Might have been cancelled, so double-check
-        if (_listeners.containsKey(listener)) {
-          _listeners[listener] = true;
-          if (listener._onData != null) {
-            listener._onData!(_lastResult!._value as T);
+      case Exception<T>(exc: final exc, st: final st):
+        var onErrorNotified = false;
+        for (var listener in listenersCopy) {
+          // Might have been cancelled, so double-check
+          if (_listeners.containsKey(listener)) {
+            _listeners[listener] = true;
+            if (listener._onError != null) {
+              onErrorNotified = true;
+              _dispatchOnError(listener._onError!, exc, st);
+            }
           }
         }
-      }
+        if (_listeners
+                .isNotEmpty && // As then we must have been called from an initial listen(), and it will handle this itself
+            !onErrorNotified &&
+            // Note that there is no need to check for lazy listeners here,
+            // because even if we do have any, there must also be some non-lazy
+            // downstream computation to trigger this.
+            _memoizedDownstreamComputations.isEmpty &&
+            _nonMemoizedDownstreamComputations.isEmpty) {
+          // Propagate to the Zone
+          Zone.current.handleUncaughtError(exc, st);
+        }
     }
   }
 
@@ -692,11 +696,15 @@ class ComputedImpl<T> implements Computed<T> {
     _lastResult = null; // So that we re-run the next time we are subscribed to
     _lastUpdate = null;
 
-    if (lastResultBackup != null) {
-      if (lastResultBackup._isValue && _dispose != null) {
-        _dispose(lastResultBackup._value as T);
-      }
+    switch (lastResultBackup) {
+      case Value<T>(value: final value):
+        if (_dispose != null) {
+          _dispose(value);
+        }
+      case _:
+      // pass
     }
+
     if (_onCancel != null) _onCancel();
   }
 
@@ -744,15 +752,18 @@ class ComputedImpl<T> implements Computed<T> {
 
     GlobalCtx._reacting = true;
     try {
-      if (_lastResult!._isValue) {
-        onData(_lastResult!._value as T);
-      } else if (onError != null) {
-        _dispatchOnError(onError, _lastResult!._exc!, _lastResult!._st!);
-      } else {
-        // Do not throw the exception here,
-        // as this might cause other .react/.use-s to get skipped
-        caller._reactSuppressedException ??= _lastResult!._exc;
-        caller._reactSuppressedExceptionStackTrace ??= _lastResult!._st;
+      switch (_lastResult!) {
+        case Value<T>(value: final value):
+          onData(value);
+        case Exception<T>(exc: final exc, st: final st):
+          if (onError != null) {
+            _dispatchOnError(onError, exc, st);
+          } else {
+            // Do not throw the exception here,
+            // as this might cause other .react/.use-s to get skipped
+            caller._reactSuppressedException ??= exc;
+            caller._reactSuppressedExceptionStackTrace ??= st;
+          }
       }
     } finally {
       GlobalCtx._reacting = false;
