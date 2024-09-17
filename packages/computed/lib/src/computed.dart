@@ -384,7 +384,9 @@ class ComputedImpl<T> implements Computed<T> {
           return; // We have been cancelled or the listener has already been notified
         }
         // No need to set the value of _listeners here, it will never be used again
-        switch (_lastResult) {
+        // Note that _lastResult cannot be null here - for that we must have been cancelled,
+        //  but we just checked that we are not.
+        switch (_lastResult!) {
           case Value<T>(value: final value):
             if (sub._onData != null) {
               sub._onData!(value);
@@ -393,8 +395,6 @@ class ComputedImpl<T> implements Computed<T> {
             if (sub._onError != null) {
               _dispatchOnError(sub._onError!, exc, st);
             }
-          case null:
-          // pass
         }
       });
     }
