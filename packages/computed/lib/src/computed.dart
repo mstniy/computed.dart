@@ -521,8 +521,13 @@ class ComputedImpl<T> implements Computed<T> {
         Exception<T>(exc: final exc) => exc is NoValueException,
       };
 
-      shouldNotify =
-          !gotNVE && (!_memoized || !(_prevResult?.equals(newResult) ?? false));
+      final prevEqualsNew = _prevResult?.equals(newResult) ?? false;
+
+      if (!prevEqualsNew && _prevResult is Value<T> && _dispose != null) {
+        _dispose((_prevResult as Value<T>).value);
+      }
+
+      shouldNotify = !gotNVE && (!_memoized || !prevEqualsNew);
 
       if (shouldNotify) {
         _lastResult = newResult;

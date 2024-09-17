@@ -3102,6 +3102,49 @@ void main() {
   });
 
   group('dispose', () {
+    test('is called when a computation changes value', () async {
+      var cnt = 0;
+      int? last;
+      final s = ValueStream.seeded(() => 0, sync: true);
+      final sub = Computed(() => s.use(), dispose: (e) {
+        cnt++;
+        last = e;
+      }).listen(null, (_) {});
+
+      for (var i = 0; i < 5; i++) {
+        await Future.value();
+      }
+
+      expect(cnt, 0);
+      s.add(() => 1);
+      expect(cnt, 1);
+      expect(last, 0);
+
+      s.add(() => 2);
+      expect(cnt, 2);
+      expect(last, 1);
+
+      // Also when a computation which has a value throws
+      s.add(() => throw 42);
+      expect(cnt, 3);
+      expect(last, 2);
+
+      // But not if the last run threw
+      s.add(() => throw 43);
+      expect(cnt, 3);
+
+      // Not even if the next run returns a value
+      s.add(() => 0);
+      expect(cnt, 3);
+
+      // Now it is back to normal
+      s.add(() => 1);
+      expect(cnt, 4);
+      expect(last, 0);
+
+      sub.cancel();
+    });
+
     test('is called upon losing the last downstream computation', () async {
       var cCnt = 0;
       int? lastArg;
