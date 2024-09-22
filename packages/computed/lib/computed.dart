@@ -117,6 +117,9 @@ abstract class ComputedSubscription<T> {
 }
 
 /// Thrown if this data source does not have a value yet.
+///
+/// A computation throwing [NoValueException] does not gain value.
+/// If it already has a value, it keeps its last value.
 class NoValueException implements Exception {
   @override
   bool operator ==(Object other) => other is NoValueException;
