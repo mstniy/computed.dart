@@ -7,9 +7,6 @@ Computed<T> $<T>(T Function() f, {bool memoized = true}) =>
     Computed(f, memoized: memoized);
 
 /// Reactive computation with a return type of [T].
-///
-/// Note that the equality operator [==] should be meaningful for [T],
-/// as it is used for memoization.
 abstract interface class Computed<T> {
   /// Creates a reactive computation whose value is computed by the given function.
   ///
@@ -21,13 +18,13 @@ abstract interface class Computed<T> {
   /// If [assertIdempotent] is set to false, disables the idempotency assertion.
   /// This is useful for computations returning incomparable values, like other computations.
   ///
-  /// If [dispose] is set, it will be called with the latest value of the computation
-  /// when the computation loses all of its listeners and downstream computations,
-  /// if the computation has a current non-exception value.
+  /// If [dispose] is set, it will be called with the previous value of the computation
+  /// when it changes value, switches from producing values to throwing exceptions,
+  /// or loses all of its listeners and non-weak downstream computations,
+  /// if it previously had a value.
   ///
   /// If [onCancel] is set, it will be called when the computation loses all of its listeners
-  /// and downstream computations.
-  /// [onCancel] is called after [dispose].
+  /// and non-weak downstream computations. Called after [dispose].
   factory Computed(
     T Function() f, {
     bool memoized = true,
@@ -39,17 +36,17 @@ abstract interface class Computed<T> {
 
   /// Creates an "async" computation, which is allowed to run asynchronous operations.
   /// This implicitly disables the idempotency assertion.
+  /// See [Computed.new].
   factory Computed.async(T Function() f,
           {bool memoized = true,
           void Function(T value)? dispose,
           void Function()? onCancel}) =>
       ComputedImpl(f, memoized, false, true, dispose, onCancel);
 
-  /// As [Computed], but calls the given function with its last value.
+  /// As [Computed.new], but calls the given function with its last value.
   ///
-  /// If the computation has no value yet, [prev] is set to [initialPrev].
-  ///
-  /// Note that setting [async] disables the idempotency check.
+  /// If the computation has no value yet, it is called with [initialPrev].
+  /// See [Computed.new] and [Computed.async].
   factory Computed.withPrev(
     T Function(T prev) f, {
     required T initialPrev,
@@ -74,7 +71,7 @@ abstract interface class Computed<T> {
   /// for non-idempotency.
   /// For memoized computations, the listener will be called only
   /// when the result of the computation changes.
-  /// [onError] has the same semantics as in [Stream.listen]
+  /// [onError] has the same semantics as in [Stream.listen].
   ComputedSubscription<T> listen(void Function(T event)? onData,
       [Function? onError]);
 

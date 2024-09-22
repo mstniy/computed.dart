@@ -9,7 +9,7 @@ class ComputationCache<K, V> {
   final bool _assertIdempotent;
 
   /// Constructs an empty cache.
-  /// The configs are as with [Computed].
+  /// The configs are as with [Computed.new].
   ComputationCache(
       {bool memoized = true,
       bool assertIdempotent = true,

@@ -30,19 +30,20 @@ extension StreamComputedExtension<T> on Stream<T> {
   /// As [use], but returns [value] instead of throwing [NoValueException].
   T useOr(T value) => StreamComputedExtensionImpl<T>(this).useOr(value);
 
-  /// If this stream has produced a value or error since the last time the current computation notified its downstream, runs the given functional on the value or error produced by this stream.
+  /// Subscribes to this stream in a non-memoized manner.
   ///
+  /// [onData] or [onError] is called if this stream has triggered the current set of recomputations.
   /// If no onError is provided and the stream has produced an error, the current computation
   /// will be assumed to have thrown that error at the end if it returns a value.
-  /// Also subscribes the current computation to all values and errors produced by this stream.
-  /// As a rule of thumb, you should use [react] over [use] if this stream
-  /// represents a sequence of events rather than a state.
+  ///
   /// Unlike [use], [react] does trigger a re-computation if the stream
   /// consecutively produces values comparing equal to each other.
+  ///
+  /// As a rule of thumb, you should use [react] over [use] if this stream
+  /// represents a sequence of events rather than a state.
   /// Can only be used inside computations.
   /// Cannot be used inside [react] callbacks.
-  /// If the last item in the stream is an error, throws it.
-  /// [onError] has the same semantics as in [Stream.listen]
+  /// [onError] has the same semantics as in [Stream.listen].
   void react(void Function(T) onData, [Function? onError]) =>
       StreamComputedExtensionImpl<T>(this).react(onData, onError);
 

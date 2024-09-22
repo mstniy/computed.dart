@@ -2,7 +2,7 @@ import 'dart:async';
 
 import '../src/utils/value_or_exception.dart';
 
-/// A [StreamController]-like class.
+/// A [Stream] with value semantics.
 ///
 /// This class:
 /// - Is a [Stream] by itself.
@@ -21,6 +21,7 @@ class ValueStream<T> extends Stream<T> implements EventSink<T> {
   final void Function()? _userOnListen;
   final void Function()? _userOnCancel;
 
+  /// As with [StreamController.new].
   ValueStream(
       {void Function()? onListen,
       FutureOr<void> Function()? onCancel,
@@ -31,7 +32,9 @@ class ValueStream<T> extends Stream<T> implements EventSink<T> {
     _setController();
   }
 
-  /// Constructs a [ValueStream] with an initial value
+  /// Constructs a [ValueStream] with an initial value.
+  ///
+  /// See [ValueStream.new]
   factory ValueStream.seeded(T initialValue,
       {void Function()? onListen,
       FutureOr<void> Function()? onCancel,
@@ -110,6 +113,7 @@ class ValueStream<T> extends Stream<T> implements EventSink<T> {
         onError: onError, onDone: onDone, cancelOnError: cancelOnError);
   }
 
+  /// As with [StreamController.hasListener].
   bool get hasListener => _controller.hasListener;
 
   void _setController() {
