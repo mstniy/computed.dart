@@ -37,47 +37,39 @@ class CSTracker<K, V> {
       try {
         change = changeStream.use;
       } on NoValueException {
-        if (sOld == null) {
-          // TODO: iterate over either the set of streams or the set of keys
-          //  in the snapshot, whichever is smaller.
-          return allStreams();
-        }
-        return {};
+        // For the initial snapshot we always have to notify all streams
+        //  as they have not been initialized yet.
+        return sOld == null ? allStreams() : {};
+      }
+      // Check again here
+      if (sOld == null) {
+        return allStreams();
       }
       // We don't catch other exceptions here - instead assuming
       //  the snapshot stream would have thrown them.
       // "push" the update to the relevant streams by returning them as our downstream
       return switch (change) {
-        KeyChanges<K, V>(changes: final changes) => sOld == null
-            ? {..._keyStreams.values, ..._valueStreams.values}
-            : {
-                // TODO: iterate over either the set of streams or the set of keys
-                //  in both the old and the new snapshots, whichever is smaller.
-                ...changes.entries
-                    .where((e) =>
-                        _keyStreams.containsKey(e.key) &&
-                        switch (e.value) {
-                          ChangeRecordValue<V>(value: final value) =>
-                            !sOld.containsKey(e.key) || sOld[e.key] != value,
-                          ChangeRecordDelete<V>() => sOld.containsKey(e.key),
-                        })
-                    .map((e) => _keyStreams[e.key]!),
-                ...changes.entries
-                    .where((e) =>
-                        sOld.containsKey(e.key) &&
+        KeyChanges<K, V>(changes: final changes) =>
+          // TODO: iterate over either the set of streams or the set of keys
+          //  in both the old and the new snapshots, whichever is smaller.
+          changes.entries
+              .expand((e) => [
+                    if (_keyStreams.containsKey(e.key)) _keyStreams[e.key]!,
+                    if (sOld.containsKey(e.key) &&
                         _valueStreams.containsKey(sOld[e.key]))
-                    .map((e) => _valueStreams[sOld[e.key]]!),
-                ...changes.values
-                    .where((ce) =>
-                        ce is ChangeRecordValue<V> &&
-                        _valueStreams.containsKey(ce.value))
-                    .map((ce) =>
-                        _valueStreams[(ce as ChangeRecordValue<V>).value]!)
-              },
-        ChangeEventReplace<K, V>() => {
-            ..._keyStreams.values,
-            ..._valueStreams.values
-          }
+                      _valueStreams[sOld[e.key]]!,
+                    ...switch (e.value) {
+                      ChangeRecordValue<V>(value: final v)
+                          when _valueStreams.containsKey(v) =>
+                        [
+                          _valueStreams[
+                              (e.value as ChangeRecordValue<V>).value]!
+                        ],
+                      _ => <Computed>[],
+                    }
+                  ])
+              .toSet(),
+        ChangeEventReplace<K, V>() => allStreams()
       };
     }, downstream);
   }
