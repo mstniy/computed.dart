@@ -1,5 +1,6 @@
 import '../computed.dart';
 
+/// A cache for uniting computations by a key.
 class ComputationCache<K, V> {
   final _m = <K, Computed<V>>{};
   final void Function(V value)? _dispose;
@@ -7,6 +8,8 @@ class ComputationCache<K, V> {
   final bool _memoized;
   final bool _assertIdempotent;
 
+  /// Constructs an empty cache.
+  /// The configs are as with [Computed].
   ComputationCache(
       {bool memoized = true,
       bool assertIdempotent = true,
@@ -17,6 +20,12 @@ class ComputationCache<K, V> {
         _dispose = dispose,
         _onCancel = onCancel;
 
+  /// Returns a computation that creates and uses a leader for the given [key].
+  ///
+  /// The leader, in turn, runs the given [computation].
+  /// For each [key] there is at most a single leader. This means
+  /// the given [computation] will be run at most once per upstream
+  /// changes no matter how many [wrap] calls with the same [key] was made.
   Computed<V> wrap(K key, V Function() computation) {
     final cachedComputation = _m[key];
     if (cachedComputation != null) return cachedComputation;
