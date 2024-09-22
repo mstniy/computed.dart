@@ -2,7 +2,7 @@ sealed class ValueOrException<T> {
   ValueOrException._();
 
   factory ValueOrException.value(T value) => Value._(value);
-  factory ValueOrException.exc(Object exc, StackTrace st) =>
+  factory ValueOrException.exc(Object exc, StackTrace? st) =>
       Exception._(exc, st);
 
   T get valueOrThrow => switch (this) {
@@ -28,7 +28,7 @@ class Value<T> extends ValueOrException<T> {
 
 class Exception<T> extends ValueOrException<T> {
   final Object exc;
-  final StackTrace st;
+  final StackTrace? st;
 
   Exception._(this.exc, this.st) : super._();
 }

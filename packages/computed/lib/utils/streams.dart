@@ -1,25 +1,6 @@
 import 'dart:async';
 
-sealed class _ValueOrException<T> {
-  _ValueOrException._();
-
-  factory _ValueOrException.value(T value) => Value(value);
-  factory _ValueOrException.exc(Object exc, StackTrace? st) =>
-      Exception(exc, st);
-}
-
-class Value<T> extends _ValueOrException<T> {
-  final T _value;
-
-  Value(this._value) : super._();
-}
-
-class Exception<T> extends _ValueOrException<T> {
-  final Object exc;
-  final StackTrace? st;
-
-  Exception(this.exc, this.st) : super._();
-}
+import '../src/utils/value_or_exception.dart';
 
 /// A [StreamController]-like class.
 ///
@@ -33,8 +14,8 @@ class Exception<T> extends _ValueOrException<T> {
 /// Note that most of these properties are similar to rxdart's BehaviorSubject.
 class ValueStream<T> extends Stream<T> implements EventSink<T> {
   late StreamController<T> _controller;
-  _ValueOrException<T>? _lastNotifiedValue;
-  _ValueOrException<T>? _lastAddedValue;
+  ValueOrException<T>? _lastNotifiedValue;
+  ValueOrException<T>? _lastAddedValue;
   bool _controllerAddScheduled = false;
   final bool _sync;
   final void Function()? _userOnListen;
@@ -66,7 +47,7 @@ class ValueStream<T> extends Stream<T> implements EventSink<T> {
     // If _lastNotifiedValue and _lastAddedValue have equal values,
     // skip notifying listeners.
     switch ((_lastNotifiedValue, _lastAddedValue)) {
-      case (Value(_value: final v1), Value(_value: final v2)):
+      case (Value(value: final v1), Value(value: final v2)):
         if (v1 == v2) {
           return;
         }
@@ -77,7 +58,7 @@ class ValueStream<T> extends Stream<T> implements EventSink<T> {
       // Otherwise the controller will buffer
       _lastNotifiedValue = _lastAddedValue;
       switch (_lastAddedValue!) {
-        case Value<T>(_value: final value):
+        case Value<T>(value: final value):
           _controller.add(value);
         case Exception<T>(exc: final exc, st: final st):
           _controller.addError(exc, st);
@@ -99,7 +80,7 @@ class ValueStream<T> extends Stream<T> implements EventSink<T> {
   /// buffered values/errors.
   @override
   void add(T t) {
-    _lastAddedValue = _ValueOrException.value(t);
+    _lastAddedValue = ValueOrException.value(t);
     if (!_sync && _controller.hasListener) {
       if (_controllerAddScheduled) return;
       _controllerAddScheduled = true;
@@ -112,7 +93,7 @@ class ValueStream<T> extends Stream<T> implements EventSink<T> {
   /// As with [add], but for adding errors.
   @override
   void addError(Object o, [StackTrace? st]) {
-    _lastAddedValue = _ValueOrException.exc(o, st);
+    _lastAddedValue = ValueOrException.exc(o, st);
     if (!_sync && _controller.hasListener) {
       if (_controllerAddScheduled) return;
       _controllerAddScheduled = true;

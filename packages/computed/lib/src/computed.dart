@@ -61,9 +61,9 @@ void _validateOnError(Function? onError) {
   }
 }
 
-void _dispatchOnError(Function onError, Object o, StackTrace st) {
+void _dispatchOnError(Function onError, Object o, StackTrace? st) {
   if (onError is Function(Object, StackTrace)) {
-    onError(o, st);
+    onError(o, st ?? StackTrace.empty);
   } else {
     onError(o);
   }
@@ -111,7 +111,7 @@ class GlobalCtx {
               case Value<T>(value: final value):
                 return value;
               case Exception<T>(exc: final exc, st: final st):
-                Error.throwWithStackTrace(exc, st);
+                Error.throwWithStackTrace(exc, st ?? StackTrace.empty);
             }
           }, true, false, false, null, null),
           currentValue != null ? ValueOrException.value(currentValue()) : null);
@@ -373,7 +373,7 @@ class ComputedImpl<T> implements Computed<T> {
               _memoizedDownstreamComputations.isEmpty &&
               _nonMemoizedDownstreamComputations.isEmpty &&
               _listeners.length == 1) {
-            Zone.current.handleUncaughtError(exc, st);
+            Zone.current.handleUncaughtError(exc, st ?? StackTrace.empty);
           }
         case Value():
         // pass
@@ -555,8 +555,8 @@ class ComputedImpl<T> implements Computed<T> {
       _lastUpdate = GlobalCtx._currentUpdate;
 
       if (gotNVE) {
-        Error.throwWithStackTrace(
-            (newResult as Exception).exc, (newResult as Exception).st);
+        final Exception(:exc, :st) = newResult as Exception;
+        Error.throwWithStackTrace(exc, st ?? StackTrace.empty);
       } else {
         final downstream = <ComputedImpl>{};
         downstream.addAll(
@@ -621,7 +621,7 @@ class ComputedImpl<T> implements Computed<T> {
             _memoizedDownstreamComputations.isEmpty &&
             _nonMemoizedDownstreamComputations.isEmpty) {
           // Propagate to the Zone
-          Zone.current.handleUncaughtError(exc, st);
+          Zone.current.handleUncaughtError(exc, st ?? StackTrace.empty);
         }
     }
   }
