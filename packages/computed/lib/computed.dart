@@ -74,7 +74,7 @@ abstract interface class Computed<T> {
   /// for non-idempotency.
   /// For memoized computations, the listener will be called only
   /// when the result of the computation changes.
-  /// [onError] has the same semantics as in [Future.listen]
+  /// [onError] has the same semantics as in [Stream.listen]
   ComputedSubscription<T> listen(void Function(T event)? onData,
       [Function? onError]);
 
@@ -119,8 +119,7 @@ abstract class ComputedSubscription<T> {
   void cancel();
 }
 
-/// Thrown when a data source [use]d by a computation
-/// has not produced a value yet.
+/// Thrown if this data source does not have a value yet.
 class NoValueException implements Exception {
   @override
   bool operator ==(Object other) => other is NoValueException;
@@ -129,7 +128,7 @@ class NoValueException implements Exception {
   int get hashCode => Object.hash(NoValueException, null);
 }
 
-/// Thrown when [useWeak] is called on a computation which
+/// Thrown when [Computed.useWeak] is called on a computation which
 /// has no non-weak downstream computations or listeners.
 class NoStrongUserException implements Exception {
   @override
@@ -139,7 +138,7 @@ class NoStrongUserException implements Exception {
   int get hashCode => Object.hash(NoStrongUserException, null);
 }
 
-/// Thrown by [Computed.use] if this usage
+/// Thrown by [Computed.use]/[Computed.useWeak] if this usage
 /// would cause a cyclic dependency.
 class CyclicUseException implements Exception {
   @override
@@ -149,7 +148,7 @@ class CyclicUseException implements Exception {
   int get hashCode => Object.hash(CyclicUseException, null);
 }
 
-/// Thrown when non-async computations attempt to do async operations
+/// Thrown when non-async computations attempt to do async operations.
 class ComputedAsyncError extends Error {
   @override
   bool operator ==(Object other) => other is ComputedAsyncError;

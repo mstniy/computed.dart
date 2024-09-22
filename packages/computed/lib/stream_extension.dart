@@ -42,7 +42,7 @@ extension StreamComputedExtension<T> on Stream<T> {
   /// Can only be used inside computations.
   /// Cannot be used inside [react] callbacks.
   /// If the last item in the stream is an error, throws it.
-  /// [onError] has the same semantics as in [Future.listen]
+  /// [onError] has the same semantics as in [Stream.listen]
   void react(void Function(T) onData, [Function? onError]) =>
       StreamComputedExtensionImpl<T>(this).react(onData, onError);
 
