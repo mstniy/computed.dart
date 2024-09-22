@@ -427,6 +427,45 @@ void main() {
     sub.cancel();
   });
 
+  test('can subscribe to just .changes when the upstream has a sync snapshot',
+      () async {
+    final s = ValueStream<ChangeEvent<int, int>>(sync: true);
+    final m1 = ComputedMap.fromChangeStream($(() => s.use));
+    final m2 = m1.mapValuesComputed((key, value) => $(() => value + 1));
+
+    s.add(ChangeEventReplace({0: 1, 1: 2}.lock));
+    IMap<int, int>? m1snap;
+    final sub1 = m1.snapshot
+        .listen((s) => m1snap = s); // Force Computed to subscribe to [s]
+
+    await Future.value();
+    expect(m1snap, {0: 1, 1: 2}.lock);
+
+    var cnt = 0;
+    ChangeEvent<int, int>? last;
+    final sub2 = m2.changes.listen((c) {
+      cnt++;
+      last = c;
+    });
+
+    await Future.value();
+    await Future.value();
+    expect(cnt, 1);
+    expect(last, ChangeEventReplace({0: 2, 1: 3}.lock));
+
+    s.add(KeyChanges(
+        {0: ChangeRecordDelete<int>(), 1: ChangeRecordValue(0)}.lock));
+    await Future.value();
+    expect(cnt, 2);
+    expect(
+        last,
+        KeyChanges(
+            {0: ChangeRecordDelete<int>(), 1: ChangeRecordValue(1)}.lock));
+
+    sub1.cancel();
+    sub2.cancel();
+  });
+
   test('propagates exceptions', () async {
     final s = ValueStream<ChangeEvent<int, int>>(sync: true);
     final m = ComputedMap.fromChangeStream($(() => s.use));
