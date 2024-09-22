@@ -50,25 +50,25 @@ class CSTracker<K, V> {
       // "push" the update to the relevant streams by returning them as our downstream
       return switch (change) {
         KeyChanges<K, V>(changes: final changes) =>
-          // TODO: iterate over either the set of streams or the set of keys
-          //  in both the old and the new snapshots, whichever is smaller.
-          changes.entries
-              .expand((e) => [
-                    if (_keyStreams.containsKey(e.key)) _keyStreams[e.key]!,
-                    if (sOld.containsKey(e.key) &&
-                        _valueStreams.containsKey(sOld[e.key]))
-                      _valueStreams[sOld[e.key]]!,
-                    ...switch (e.value) {
-                      ChangeRecordValue<V>(value: final v)
-                          when _valueStreams.containsKey(v) =>
-                        [
-                          _valueStreams[
-                              (e.value as ChangeRecordValue<V>).value]!
-                        ],
-                      _ => <Computed>[],
-                    }
-                  ])
-              .toSet(),
+          (changes.length > _keyStreams.length + _valueStreams.length)
+              ? allStreams() // Note that this is a safe bet
+              : changes.entries
+                  .expand((e) => [
+                        if (_keyStreams.containsKey(e.key)) _keyStreams[e.key]!,
+                        if (sOld.containsKey(e.key) &&
+                            _valueStreams.containsKey(sOld[e.key]))
+                          _valueStreams[sOld[e.key]]!,
+                        ...switch (e.value) {
+                          ChangeRecordValue<V>(value: final v)
+                              when _valueStreams.containsKey(v) =>
+                            [
+                              _valueStreams[
+                                  (e.value as ChangeRecordValue<V>).value]!
+                            ],
+                          _ => <Computed>[],
+                        }
+                      ])
+                  .toSet(),
         ChangeEventReplace<K, V>() => allStreams()
       };
     }, downstream);
