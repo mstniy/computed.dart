@@ -185,8 +185,6 @@ class MapValuesComputedComputedMap<K, V, VParent>
   @override
   late final Computed<IMap<K, V>> snapshot;
 
-  // TODO: We can be slightly smarter about this by not evaluating any computation as soon as
-  //  one of them gains a value. Cannot think of an easy way to do this, though.
   @override
   Computed<bool> get isEmpty =>
       isEmptyExpando[this] ??= $(() => snapshot.use.isEmpty);
