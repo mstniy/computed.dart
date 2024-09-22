@@ -33,22 +33,24 @@ class CSTracker<K, V> {
         _snapshot = ValueOrException.exc(e);
         return allStreams();
       }
-      final ChangeEvent<K, V> change;
+      ChangeEvent<K, V>? change;
       try {
         change = changeStream.use;
       } on NoValueException {
-        // For the initial snapshot we always have to notify all streams
-        //  as they have not been initialized yet.
-        return sOld == null ? allStreams() : {};
+        // pass
       }
-      // Check again here
+      // For the initial snapshot we always have to notify all streams
+      //  as they have not been initialized yet.
       if (sOld == null) {
+        // Even if change is null
         return allStreams();
       }
       // We don't catch other exceptions here - instead assuming
       //  the snapshot stream would have thrown them.
       // "push" the update to the relevant streams by returning them as our downstream
       return switch (change) {
+        null => {},
+        ChangeEventReplace<K, V>() => allStreams(),
         KeyChanges<K, V>(changes: final changes) =>
           (changes.length > _keyStreams.length + _valueStreams.length)
               ? allStreams() // Note that this is a safe bet
@@ -68,8 +70,7 @@ class CSTracker<K, V> {
                           _ => <Computed>[],
                         }
                       ])
-                  .toSet(),
-        ChangeEventReplace<K, V>() => allStreams()
+                  .toSet()
       };
     }, downstream);
   }
