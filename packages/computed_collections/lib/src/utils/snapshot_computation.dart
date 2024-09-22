@@ -2,6 +2,7 @@ import 'package:computed/computed.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import '../../change_event.dart';
+import 'with_change.dart';
 
 Computed<IMap<K, V>> snapshotComputation<K, V>(
     Computed<ChangeEvent<K, V>> changes,

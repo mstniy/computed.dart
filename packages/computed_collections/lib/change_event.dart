@@ -1,16 +1,19 @@
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:meta/meta.dart';
 
+/// Represents a change on a map.
 @immutable
 sealed class ChangeEvent<K, V> {
   ChangeEvent();
 }
 
+/// Represent a change on one key of a map.
 @immutable
 sealed class ChangeRecord<V> {
   ChangeRecord();
 }
 
+/// Describes how the keys of a map were changed.
 @immutable
 class KeyChanges<K, V> extends ChangeEvent<K, V> {
   final IMap<K, ChangeRecord<V>> changes;
@@ -28,6 +31,7 @@ class KeyChanges<K, V> extends ChangeEvent<K, V> {
   String toString() => 'KeyChanges(${changes.toString()})';
 }
 
+/// Describes the new value of one key of a map.
 @immutable
 class ChangeRecordValue<V> extends ChangeRecord<V> {
   final V value;
@@ -45,6 +49,7 @@ class ChangeRecordValue<V> extends ChangeRecord<V> {
   String toString() => 'ChangeRecordValue(${value.toString()})';
 }
 
+/// Describes that this key, if it existed, was deleted.
 @immutable
 class ChangeRecordDelete<V> extends ChangeRecord<V> {
   ChangeRecordDelete();
@@ -56,6 +61,7 @@ class ChangeRecordDelete<V> extends ChangeRecord<V> {
   int get hashCode => 0;
 }
 
+/// Describes that the map was entirely replaced.
 @immutable
 class ChangeEventReplace<K, V> extends ChangeEvent<K, V> {
   final IMap<K, V> newCollection;
@@ -71,16 +77,4 @@ class ChangeEventReplace<K, V> extends ChangeEvent<K, V> {
 
   @override
   String toString() => 'ChangeEventReplace(${newCollection.toString()})';
-}
-
-extension ChangeEventApplication<K, V> on IMap<K, V> {
-  IMap<K, V> withChange(ChangeEvent<K, V> e) => switch (e) {
-        KeyChanges(changes: var changes) => changes.entries.fold(
-            this,
-            (c, change) => switch (change.value) {
-                  ChangeRecordValue(value: var v) => c.add(change.key, v),
-                  ChangeRecordDelete() => c.remove(change.key),
-                }),
-        ChangeEventReplace(newCollection: var c) => c,
-      };
 }

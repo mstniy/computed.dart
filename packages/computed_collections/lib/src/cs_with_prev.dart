@@ -1,9 +1,10 @@
 import 'package:computed/computed.dart';
-import 'package:computed_collections/change_event.dart';
-import 'package:computed_collections/computedmap.dart';
-import 'package:computed_collections/src/utils/cs_tracker.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
+import '../change_event.dart';
+import '../computedmap.dart';
+import 'utils/cs_tracker.dart';
+import 'utils/with_change.dart';
 import 'computedmap_mixins.dart';
 import 'expandos.dart';
 
