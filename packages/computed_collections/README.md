@@ -1,6 +1,7 @@
 Performant and flexible functional reactive programming for collections.
 
-> [!TIP] > `computed_collections` builds on [`computed`](https://pub.dev/packages/computed). Make sure you are familiar with `computed` fundamentals.
+> [!TIP]
+> computed_collections builds on [`computed`](https://pub.dev/packages/computed). Make sure you are familiar with `computed` fundamentals.
 
 ---
 
@@ -12,7 +13,25 @@ Performant and flexible functional reactive programming for collections.
 - allows local key queries on all reactive collections
 - is designed to be asymptotically optimal for all operations
 
-### An example
+## <a name='table-of-contents'></a>Table of contents
+
+<!-- vscode-markdown-toc -->
+
+- [Table of contents](#table-of-contents)
+- [An example](#an-example)
+- [Ingesting external change streams](#ingesting-external-change-streams)
+- [Constant reactive maps](#constant-reactive-maps)
+- [Mapping with inter-key dependencies](#mapping-with-inter-key-dependencies)
+- [An index of operators](#an-index-of-operators)
+- [An index of attributes](#an-index-of-attributes)
+
+<!-- vscode-markdown-toc-config
+	numbering=false
+	autoSave=true
+	/vscode-markdown-toc-config -->
+<!-- /vscode-markdown-toc -->
+
+## <a name='an-example'></a>An example
 
 Imagine you want to display in your UI a list of objects. You get the objects from a database or server. However, you only want to display the objects which have recently been modified.
 
@@ -81,7 +100,9 @@ filtered.snapshot.listen((s) => displayInUI(s.values.toList()));
 
 That's all. `fromSnapshotStream` internally handles the manual diffing we did in the imperative example and construct a _change stream_. `.removeWhere` subscribes to this change stream to incrementally maintain the filtered map. Finally, we use `filtered.snapshot`, which returns a `computed` computation representing the snapshot of the filtered map, on which we attach a listener to update the UI. In this case, we had to use `.lock` on the map we got from the stream to turn it into a [fast immutable map](https://pub.dev/documentation/fast_immutable_collections/latest/fast_immutable_collections/IMap-class.html) as `computed_collections` operates exclusively on them, but this can reasonly be assumed not to harm asymptotical complexity.
 
-### Ingesting external change streams
+Of course, it would be even better to ingest a change stream instead of a snapshot stream, so that we could avoid diffing subsequent snapshots in the first place. Which brings us to...
+
+## <a name='ingesting-external-change-streams'></a>Ingesting external change streams
 
 `computed_collection` is built on change streams. A reactive map, represented with the interface `ComputedMap`, internally has a snapshot and a change stream. Operators, such as `.map`, `.join` and `.removeWhere` use and transform these streams. If you have a change stream computation, you can use the factory function `ComputedMap.fromChangeStream`:
 
@@ -92,7 +113,36 @@ final cmap = ComputedMap.fromChangeStream(changes); // has type `ComputedMap<Obj
 
 The [`ChangeEvent`](https://pub.dev/documentation/computed_collections/latest/change_event/ChangeEvent-class.html) class represents a set of changes made on a map. Mind you that you might need to write some "glue" code to convert a change stream using an external format into the format used by `computed_collections`. This should not be too difficult with `computed`.
 
-### An index of operators
+## <a name='constant-reactive-maps'></a>Constant reactive maps
+
+You can use `ComputedMap.fromIMap` to define a constant reactive map. Then it is not quite so reactive.
+
+```dart
+final m1 = ComputedMap.fromIMap({1:2, 2:3}.lock);
+final m2 = m1.mapValues((k, v) => v+1); // Is {1:3, 2:4}
+m2.snapshot.listen(print); // Prints {1:3, 2:4}
+```
+
+## <a name='mapping-with-inter-key-dependencies'></a>Mapping with inter-key dependencies
+
+You can use the operators with `*Computed` in their name to define transformations with arbitrary reactive dependencies. In particular, the transformation of one key can depend on the result of the transformation of another key, like the following program which decleratively computes how many steps each integers in the range $[1,16]$ take to be reduced to 1 in the Collatz conjuncture:
+
+```dart
+final m1 = ComputedMap.fromIMap(
+    IMap.fromEntries(List.generate(200, (i) => MapEntry(i, 0))));
+late final ComputedMap<int, int> m2;
+m2 = m1.mapValuesComputed((k, v) => k <= 1
+    ? $(() => 0)
+    : $(() => m2[((k % 2) == 0 ? k ~/ 2 : (k * 3 + 1))].use! + 1));
+final m3 = m1
+    .removeWhere((k, v) => k == 0 || k > 16)
+    .mapValuesComputed((k, v) => m2[k]);
+m3.snapshot.listen(print);
+```
+
+This might not be the most performant implementation, but note that it is asymptotically optimal in the sense that it uses memoization. It also showcases the key-local query capabilities, as computing the Collatz sequences of all the integers in the range $[0, 200]$ requires more than 200 indices.
+
+## <a name='an-index-of-operators'></a>An index of operators
 
 Below is a list of reactive operators on reactive maps along with a high-level description of them.
 
@@ -122,14 +172,14 @@ Below is a list of reactive operators on reactive maps along with a high-level d
 | **`.cartesianProduct`**    | Computes a reactive cartesian product of a pair of reactive maps.                                     |
 | **`.flat`**                | Reactively flattens a reactive map of reactive maps.                                                  |
 
-### An index of attributes
+## <a name='an-index-of-attributes'></a>An index of attributes
 
 Below is a list of attributes on reactive maps along with a high-level description of them.
 
 | Attribute         | Description                                           |
 | ----------------- | ----------------------------------------------------- |
 | **`.changes`**    | The change stream computation for this map.           |
-| **`.snapshot`**   | The snapshot computation for this map                 |
+| **`.snapshot`**   | The snapshot computation for this map.                |
 | **`.operator[]`** | A computation representing the given key of this map. |
 | **`.isEmpty`**    | A computation representing the emptyness of this map. |
 | **`.isNotEmpty`** | Opposite of `.isEmpty`.                               |

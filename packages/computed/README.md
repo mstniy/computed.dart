@@ -43,8 +43,8 @@ Computed:
 - [Pitfalls](#pitfalls)
   - [Do not use mutable values in computations](#do-not-use-mutable-values-in-computations)
   - [Use the async mode for computations kicking off async operations](#use-the-async-mode-for-computations-kicking-off-async-operations)
-  - [Do not `.use` `Future`s or `Stream`s inside the computation that created it](#do-not-`.use`-`future`s-or-`stream`s-inside-the-computation-that-created-it)
-  - [Do not create computations inside computations](#do-not-create-computations-inside-computations)
+  - [Do not `.use` a `Future`s or `Stream` inside the computation that created it](#do-not-`.use`-a-`future`s-or-`stream`-inside-the-computation-that-created-it)
+  - [Do not `.use` a computation inside the computation that created it](#do-not-`.use`-a-computation-inside-the-computation-that-created-it)
   - [`Future`s returned from computations are not awaited](#`future`s-returned-from-computations-are-not-awaited)
   - [Do not forget to `.use` or `.react` your data sources](#do-not-forget-to-`.use`-or-`.react`-your-data-sources)
   - [Keep in mind that `.prev` does not subscribe](#keep-in-mind-that-`.prev`-does-not-subscribe)
@@ -60,13 +60,13 @@ Computed:
 
 Assume you have a data source, like a `Stream` representing a series of external events:
 
-```
+```dart
 Stream<int> s;
 ```
 
 And a database to which you would like to persist your state:
 
-```
+```dart
 FictionaryDatabase db;
 ```
 
@@ -74,7 +74,7 @@ Assume for the sake of example that your business logic is to multiply the recei
 
 Here is how you can do this using Computed:
 
-```
+```dart
 final sub = $(() => s.use * 2).
   listen(db.write);
 ```
@@ -83,13 +83,13 @@ That's it. Computed will take care of re-running the computation and calling the
 
 To cancel the listener, you can use `.cancel()`:
 
-```
+```dart
 sub.cancel();
 ```
 
 You can also have computations which use other computations' results:
 
-```
+```dart
 final cPlus1 = $(() => c.use + 1);
 ```
 
@@ -97,13 +97,13 @@ final cPlus1 = $(() => c.use + 1);
 
 Assume you have two data sources, one is a stream of integers:
 
-```
+```dart
 Stream<int> threshold;
 ```
 
 And the other is a stream of lists of integers:
 
-```
+```dart
 Stream<List<int>> items;
 ```
 
@@ -113,14 +113,14 @@ Here is how you might approach this problem using an imperative approach.
 
 First you define your state:
 
-```
+```dart
 int? currentThreshold;
 var currentUnfilteredItems = <int>[];
 ```
 
 Followed by setting up listeners:
 
-```
+```dart
 threshold.listen((value) => {
     if (value == currentThreshold) return ;
     currentThreshold = value;
@@ -134,7 +134,7 @@ items.listen((value) => {
 
 And your state computation logic:
 
-```
+```dart
 void updateDB() {
     if (currentThreshold == null) return ;
     final filteredItems = currentUnfilteredItems.
@@ -146,7 +146,7 @@ void updateDB() {
 
 And here is how to do the same using Computed:
 
-```
+```dart
 Computed(() {
     final currentThreshold = threshold.use;
     return items.use.
@@ -192,7 +192,7 @@ If set, this callback be called when the computation loses all of its listeners 
 Effects allow you to define computations with side effects. Like `.listen`, effects ultimately trigger the computation graph for the computations they use.  
 Effects are particularly useful if you wish to define side effects depending on multiple data sources or computations:
 
-```
+```dart
 Stream<PageType> activePage;
 Stream<bool> isDarkMode;
 
@@ -201,7 +201,7 @@ final sub = Computed.effect(() => sendAnalytics(activePage.use, isDarkMode.use))
 
 Like listeners effects can be cancelled with `.cancel()`:
 
-```
+```dart
 sub.cancel();
 ```
 
@@ -211,7 +211,7 @@ sub.cancel();
 
 Here is a simple example that computes the difference between the old and new values of a data source whenever it produces a value:
 
-```
+```dart
 final c = $(() {
     s.use; // Make sure it has a value
     late int res;
@@ -227,7 +227,7 @@ Note the use of `.react` in this example.
 
 You can also create temporal accumulators:
 
-```
+```dart
 final sum = Computed<int>.withPrev((prev) {
     var res = prev;
     s.react((val) => res += val);
@@ -239,7 +239,7 @@ final sum = Computed<int>.withPrev((prev) {
 
 Your application might need to run queries with computed state as its parameters. You can achieve this using "async" computations and `unwrap`:
 
-```
+```dart
 class FictionaryDatabase {
     Future<List<Object>> filterByCategory(int category, bool includeDeleted);
 }
@@ -292,7 +292,7 @@ Note that using this feature requires you to depend on the Computed internals, r
 
 Especially if conditionals depending on them are guarding `.use` expressions. Here is an example:
 
-```
+```dart
 Stream<int> value;
 var b = false;
 
@@ -305,11 +305,11 @@ As this may cause Computed to stop tracking `value`, breaking the reactivity of 
 
 This will disable some checks which don't make sense for such computations.
 
-### <a name='do-not-`.use`-`future`s-or-`stream`s-inside-the-computation-that-created-it'></a>Do not `.use` a `Future`s or `Stream` inside the computation that created it
+### <a name='do-not-`.use`-a-`future`s-or-`stream`-inside-the-computation-that-created-it'></a>Do not `.use` a `Future`s or `Stream` inside the computation that created it
 
 As this might lead to an infinite loop between the computation running, creating a new data source, and running again when it produces a value.
 
-### <a name='do-not-create-computations-inside-computations'></a>Do not `.use` a computation inside the computation that created it
+### <a name='do-not-`.use`-a-computation-inside-the-computation-that-created-it'></a>Do not `.use` a computation inside the computation that created it
 
 As this might be inefficient if the outer computation re-creates the inner computation each time. Instead, consider creating the inner computation before the outer computation, and capturing it as part of its closure. If you require reactive values to construct the inner computation, consider constructing it in a dedicated middle computation with `assertIdempotent: false` and `.unwrap`ing the middle computation inside the outer one.
 
