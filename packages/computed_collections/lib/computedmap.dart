@@ -10,9 +10,10 @@ import 'src/ss.dart';
 
 /// An in-memory, partially- or fully-observable key-value store.
 ///
-/// Similar to the ObservableMap from the `observable` package, but with the following upsides:
+/// Similar to the ObservableMap from the observable package, but with the following upsides:
 /// - Individual keys can be observed in an asymptotically optimal manner.
-/// - Supports immutable snapshots (using fast_immutable_collections)
+/// - Has value semantics thanks to immutability (using fast_immutable_collections).
+/// - Supports reactive operations consuming and emitting [ComputedMap]s.
 abstract class ComputedMap<K, V> {
   /// Constructs a constant computed map from a given [IMap].
   factory ComputedMap.fromIMap(IMap<K, V> m) => ConstComputedMap(m);
