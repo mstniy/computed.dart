@@ -162,7 +162,7 @@ final m3 = m1
 m3.snapshot.listen(print);
 ```
 
-This might not be the most performant implementation, but note that it is asymptotically optimal in the sense that it uses memoization. It also showcases the key-local query capabilities, as computing the Collatz sequences of all the integers in the range $[0, 200]$ requires more than 200 indices.
+This might not be the most performant implementation, but note that it is asymptotically optimal in the sense that it uses memoization. It also showcases the key-local query capabilities, as computing the Collatz sequences of all the integers in the key range of `m1` ( $[1, 199]$ ) requires accessing integers larger than 199.
 
 In [`example/collatz.dart`](example/collatz.dart), you can find a more advanced implementation which is also asymptotically optimal in its memory complexity.
 
