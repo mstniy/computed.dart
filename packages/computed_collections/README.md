@@ -25,6 +25,7 @@ Performant and flexible functional reactive programming for collections.
 - [Mapping with inter-key dependencies](#mapping-with-inter-key-dependencies)
 - [An index of operators](#an-index-of-operators)
 - [An index of attributes](#an-index-of-attributes)
+- [An index of factories](#an-index-of-factories)
 
 <!-- vscode-markdown-toc-config
 	numbering=false
@@ -101,7 +102,7 @@ filtered.snapshot.listen((s) => displayInUI(s.values.toList()));
 
 That's all. `fromSnapshotStream` internally handles the manual diffing we did in the imperative example and construct a _change stream_. `.removeWhere` subscribes to this change stream to incrementally maintain the filtered map. Finally, we use `filtered.snapshot`, which returns a `computed` computation representing the snapshot of the filtered map, on which we attach a listener to update the UI. In this case, we had to use `.lock` on the map we got from the stream to turn it into a [fast immutable map](https://pub.dev/documentation/fast_immutable_collections/latest/fast_immutable_collections/IMap-class.html) as `computed_collections` operates exclusively on them, but this can reasonly be assumed not to harm asymptotical complexity.
 
-Of course, it would be even better to ingest a change stream instead of a snapshot stream, so that we could avoid diffing subsequent snapshots in the first place. Which brings us to...
+Of course, it would be even better to ingest a change stream instead of a snapshot stream, so that we could avoid diffing consequtive snapshots in the first place. Which brings us to...
 
 ## <a name='ingesting-external-change-streams'></a>Ingesting external change streams
 
@@ -207,3 +208,16 @@ Below is a list of attributes on reactive maps along with a high-level descripti
 | **`.isEmpty`**    | A computation representing the emptyness of this map. |
 | **`.isNotEmpty`** | Opposite of `.isEmpty`.                               |
 | **`.length`**     | A computation representing the length of this map.    |
+
+## <a name='an-index-of-factories'></a>An index of factories
+
+Below is a list of ways to create `ComputedMap`s.
+
+| Factory                         | Description                                                                                                                                   |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`.fromChangeStream`**         | Track a given change stream. Initialized to the empty map.                                                                                    |
+| **`.fromSnapshotStream`**       | Tracks a given snapshot stream. Internally creates a change stream by diffing consecutive snapshots.                                          |
+| **`.fromIMap`**                 | A constant map equal to the given `IMap`.                                                                                                     |
+| **`.fromChangeStreamWithPrev`** | Like `.fromChangeStream`, but lets the change stream computation depend on the snapshot of the map.                                           |
+| **`.fromPiecewise`**            | A generalization of `.fromIMap` that creates a computed map from a given function over a given domain of keys based on reactive dependencies. |
+| **`.fromPiecewiseComputed`**    | Like `.fromPiecewise`, but the values are defined by reactive computations.                                                                   |
