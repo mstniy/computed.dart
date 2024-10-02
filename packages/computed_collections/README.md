@@ -87,7 +87,7 @@ objectsUnfiltered.listen((objs) {
 });
 ```
 
-Phew. That was a mouthful. We had to maintain a pair of maps are our state: one representing the last set of unfiltered objects and another for the filtered set. For each change in the stream, we compute an upstream delta, if a previous value existed, and update the state and UI accordingly.
+Phew. That was a mouthful. We had to maintain a pair of maps as our state: one representing the last set of unfiltered objects and another for the filtered set. For each change in the stream, we compute an upstream delta if a previous state existed, and update the state and UI accordingly.
 
 You can see how such an architecture can quickly become difficult to maintain. All this was just for an asymptotically optimal, reactive `.where`. Imagine if we needed to use the same upstream for multiple downstream operations, like one `.where` and one `groupBy`. A reactive `groupBy` is already significantly more complex than the case above, but what if we also wanted to "share" the delta we compute across these downstream operations for efficiency's sake?
 
@@ -100,7 +100,7 @@ final filtered = unfiltered.removeWhere((k, v) => !isRecent(v));
 filtered.snapshot.listen((s) => displayInUI(s.values.toList()));
 ```
 
-That's all. `fromSnapshotStream` internally handles the manual diffing we did in the imperative example and construct a _change stream_. `.removeWhere` subscribes to this change stream to incrementally maintain the filtered map. Finally, we use `filtered.snapshot`, which returns a `computed` computation representing the snapshot of the filtered map, on which we attach a listener to update the UI. In this case, we had to use `.lock` on the map we got from the stream to turn it into a [fast immutable map](https://pub.dev/documentation/fast_immutable_collections/latest/fast_immutable_collections/IMap-class.html) as `computed_collections` operates exclusively on them, but this can reasonly be assumed not to harm asymptotical complexity.
+That's all. `fromSnapshotStream` internally handles the manual diffing we did in the imperative example and construct a _change stream_. `.removeWhere` subscribes to this change stream to incrementally maintain the filtered map. Finally, we use `filtered.snapshot`, which returns a `computed` computation representing the snapshot of the filtered map, on which we attach a listener to update the UI. In this case, we had to use `.lock` on the map we got from the stream to turn it into a [fast immutable map](https://pub.dev/documentation/fast_immutable_collections/latest/fast_immutable_collections/IMap-class.html) as `computed_collections` operates exclusively on them, but this can reasonably be assumed not to harm asymptotical complexity.
 
 Of course, it would be even better to ingest a change stream instead of a snapshot stream, so that we could avoid diffing consequtive snapshots in the first place. Which brings us to...
 
@@ -117,7 +117,7 @@ The [`ChangeEvent`](https://pub.dev/documentation/computed_collections/latest/ch
 
 ### <a name='stateful-change-streams'></a>Stateful change streams
 
-You might need the conversion from the external change stream to the internal one to be stateful. You can do this using internal sub-computations captured in the change stream computation's closure. But what if the state you need is the snapshot of the collection you are building? A simple use case would be to listen on a stream and incrementing the value of each published key by one. You can do this using `ComputedMap.fromChangeStreamWithPrev`. Analogous to the `computed`'s [`Computed.withPrev`](https://pub.dev/documentation/computed/latest/computed/Computed/Computed.withPrev.html), it passes the collection's previous snapshot to the change stream computation:
+You might need the conversion from the external change stream format to be stateful. You can do this using internal sub-computations captured in the change stream computation's closure. But what if the state you need is the snapshot of the collection you are building? A simple use case would be to listen on a stream and increment the value of each published key by one. You can do this using `ComputedMap.fromChangeStreamWithPrev`. Analogous to the `computed`'s [`Computed.withPrev`](https://pub.dev/documentation/computed/latest/computed/Computed/Computed.withPrev.html), it passes the collection's previous snapshot to the change stream computation:
 
 ```dart
 final s = StreamController<int>(sync: true);
@@ -164,7 +164,7 @@ m3.snapshot.listen(print);
 
 This might not be the most performant implementation, but note that it is asymptotically optimal in the sense that it uses memoization. It also showcases the key-local query capabilities, as computing the Collatz sequences of all the integers in the range $[0, 200]$ requires more than 200 indices.
 
-In [`examples/collatz.dart`](examples/collatz.dart), you can find a more advanced implementation which is also asymptotically optimal in its memory complexity.
+In [`example/collatz.dart`](example/collatz.dart), you can find a more advanced implementation which is also asymptotically optimal in its memory complexity.
 
 ## <a name='an-index-of-operators'></a>An index of operators
 
