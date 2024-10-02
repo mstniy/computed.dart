@@ -2,6 +2,7 @@ import 'package:computed/computed.dart';
 import 'package:computed_collections/change_event.dart';
 import 'package:computed_collections/src/const.dart';
 import 'package:computed_collections/src/flat.dart';
+import 'package:computed_collections/src/piecewise.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import 'src/cs.dart';
@@ -29,6 +30,17 @@ abstract class ComputedMap<K, V> {
   /// each new snapshot to the previous one.
   factory ComputedMap.fromSnapshotStream(Computed<IMap<K, V>> stream) =>
       SnapshotStreamComputedMap(stream);
+
+  /// Constructs a constant computed map defined by the given function over the given key domain.
+  ///
+  /// The main advantage over `fromIMap` is that only the reactively
+  /// used keys are computed.
+  ///
+  /// Make sure either:
+  ///   - the domain is finite or
+  ///   - `.snapshot` is never used.
+  factory ComputedMap.fromPiecewise(Iterable<K> domain, V Function(K key) f) =>
+      PiecewiseComputedMap(domain, f);
 
   /// A computation representing the last change event on this map.
   Computed<ChangeEvent<K, V>> get changes;
