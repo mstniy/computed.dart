@@ -42,6 +42,10 @@ abstract class ComputedMap<K, V> {
   factory ComputedMap.fromPiecewise(Iterable<K> domain, V Function(K key) f) =>
       PiecewiseComputedMap(domain, f);
 
+  factory ComputedMap.fromPiecewiseComputed(
+          Iterable<K> domain, Computed<V> Function(K key) f) =>
+      ComputedMap.fromPiecewise(domain, f).mapValuesComputed((_, c) => c);
+
   /// A computation representing the last change event on this map.
   Computed<ChangeEvent<K, V>> get changes;
 

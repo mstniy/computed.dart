@@ -14,11 +14,12 @@ class PiecewiseComputedMap<K, V>
   // This is not powerful enough to represent uncountably infinite domains :(
   final Iterable<K> _domain;
   final V Function(K) _f;
-  final _keyCache = ComputationCache<K, Option<V>>();
+  final _keyCache = ComputationCache<K, Option<V>>(assertIdempotent: false);
   final _containsValueCache = ComputationCache<V, bool>();
 
   PiecewiseComputedMap(this._domain, this._f) {
-    snapshot = $(() => IMap.fromKeys(keys: _domain, valueMapper: _f));
+    snapshot = Computed(() => IMap.fromKeys(keys: _domain, valueMapper: _f),
+        assertIdempotent: false);
   }
 
   Option<V> Function() _getKeyComputation(K key) =>

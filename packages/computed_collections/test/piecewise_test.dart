@@ -1,3 +1,4 @@
+import 'package:computed/computed.dart';
 import 'package:computed_collections/computedmap.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:test/test.dart';
@@ -57,5 +58,13 @@ void main() {
     expect(await getValue(m[0]), -1);
     expect(await getValue(m[1]), 0);
     expect(await getValue(m[-1]), null);
+  });
+
+  test('fromPiecewiseComputed works', () async {
+    expect(
+        await getValue(
+            ComputedMap.fromPiecewiseComputed([0, 1], (x) => $(() => x + 1))
+                .snapshot),
+        {0: 1, 1: 2}.lock);
   });
 }
