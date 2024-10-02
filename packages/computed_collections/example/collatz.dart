@@ -1,16 +1,27 @@
 import 'package:computed/computed.dart';
 import 'package:computed_collections/computedmap.dart';
-import 'package:fast_immutable_collections/fast_immutable_collections.dart';
+
+Iterable<int> naturalNumbers() sync* {
+  var x = 0;
+  while (true) {
+    yield x++;
+  }
+}
 
 void main() {
-  final m1 = ComputedMap.fromIMap(
-      IMap.fromEntries(List.generate(200, (i) => MapEntry(i, 0))));
-  late final ComputedMap<int, int> m2;
-  m2 = m1.mapValuesComputed((k, v) => k <= 1
+  final naturals = ComputedMap.fromPiecewise(naturalNumbers(), (_) => 0);
+  final domain = ComputedMap.fromPiecewise(
+      Iterable<int>.generate(16, (x) => x + 1), (_) => 0);
+  late final ComputedMap<int, int> collatz;
+  // We cannot define `collatz` by as a transformation of `domain`,
+  // as computing the Collatz sequence of an integer may require
+  // accessing the sequence for larger integers.
+  collatz = naturals.mapValuesComputed((k, v) => k <= 1
       ? $(() => 0)
-      : $(() => m2[((k % 2) == 0 ? k ~/ 2 : (k * 3 + 1))].use! + 1));
-  final m3 = m1
-      .removeWhere((k, v) => k == 0 || k > 16)
-      .mapValuesComputed((k, v) => m2[k]);
-  m3.snapshot.listen(print);
+      : $(() => collatz[((k % 2) == 0 ? k ~/ 2 : (k * 3 + 1))].use! + 1));
+  // We define a `rangedCollatz` as `collatz` is an infinite collection.
+  // Note that we cannot use `.removeWhere`, as that propagates `.snapshot`
+  // calls, and we cannot compute the snapshot of an infinite collection.
+  final rangedCollatz = domain.mapValuesComputed((k, v) => collatz[k]);
+  rangedCollatz.snapshot.listen(print);
 }

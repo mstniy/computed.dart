@@ -163,6 +163,8 @@ m3.snapshot.listen(print);
 
 This might not be the most performant implementation, but note that it is asymptotically optimal in the sense that it uses memoization. It also showcases the key-local query capabilities, as computing the Collatz sequences of all the integers in the range $[0, 200]$ requires more than 200 indices.
 
+In [`examples/collatz.dart`](examples/collatz.dart), you can find a more advanced implementation which is also asymptotically optimal in its memory complexity.
+
 ## <a name='an-index-of-operators'></a>An index of operators
 
 Below is a list of reactive operators on reactive maps along with a high-level description of them.
