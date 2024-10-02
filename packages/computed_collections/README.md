@@ -20,6 +20,7 @@ Performant and flexible functional reactive programming for collections.
 - [Table of contents](#table-of-contents)
 - [An example](#an-example)
 - [Ingesting external change streams](#ingesting-external-change-streams)
+  - [Stateful change streams](#stateful-change-streams)
 - [Constant reactive maps](#constant-reactive-maps)
 - [Mapping with inter-key dependencies](#mapping-with-inter-key-dependencies)
 - [An index of operators](#an-index-of-operators)
@@ -112,6 +113,26 @@ final cmap = ComputedMap.fromChangeStream(changes); // has type `ComputedMap<Obj
 ```
 
 The [`ChangeEvent`](https://pub.dev/documentation/computed_collections/latest/change_event/ChangeEvent-class.html) class represents a set of changes made on a map. Mind you that you might need to write some "glue" code to convert a change stream using an external format into the format used by `computed_collections`. This should not be too difficult with `computed`.
+
+### <a name='stateful-change-streams'></a>Stateful change streams
+
+You might need the conversion from the external change stream to the internal one to be stateful. You can do this using internal sub-computations captured in the change stream computation's closure. But what if the state you need is the snapshot of the collection you are building? A simple use case would be to listen on a stream and incrementing the value of each published key by one. You can do this using `ComputedMap.fromChangeStreamWithPrev`. Analogous to the `computed`'s [`Computed.withPrev`](https://pub.dev/documentation/computed/latest/computed/Computed/Computed.withPrev.html), it passes the collection's previous snapshot to the change stream computation:
+
+```dart
+final s = StreamController<int>(sync: true);
+final stream = s.stream;
+final m = ComputedMap.fromChangeStreamWithPrev((prev){
+  final c = KeyChanges(<int, ChangeRecord<int>>{}.lock);
+  stream.react((idx) => c[idx] = ChangeRecordValue(prev[idx] ?? 0 + 1));
+  return c;
+});
+
+m.snapshot.listen(print);
+
+s.add(0); // prints {0:1}
+s.add(0); // prints {0:2}
+s.add(1); // prints {0:2, 1:1}
+```
 
 ## <a name='constant-reactive-maps'></a>Constant reactive maps
 
