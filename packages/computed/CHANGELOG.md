@@ -1,3 +1,8 @@
+## 0.5.1 - 2024-10-09
+
+- `dispose` also runs when the value of a computation changes
+- Upgraded dependencies
+
 ## 0.5.0 - 2024-09-16
 
 - New computation configuration options: `dispose`, `onCancel`, `assertIdempotent`
