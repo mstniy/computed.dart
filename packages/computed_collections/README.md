@@ -178,8 +178,8 @@ Below is a list of reactive operators on reactive maps along with a high-level d
 | **`.cast`**                | Reactively casts the entries of a reactive map.                                                       |
 | **`.containsKey`**         | Returns a computation representing if a reactive map contains a given key.                            |
 | **`.containsValue`**       | Returns a computation representing if a reactive map contains a given value.                          |
-| **`.map`**                 | Reactively maps each entries of a reactive map by a given synchronous function.                       |
-| **`.mapComputed`**         | Reactively maps each entries of a reactive map by a given reactive convertion computation.            |
+| **`.map`**                 | Reactively maps each entry of a reactive map by a given synchronous function.                         |
+| **`.mapComputed`**         | Reactively maps each entry of a reactive map by a given reactive convertion computation.              |
 | **`.mapValues`**           | Reactively maps all values of a reactive map by a given synchronous function.                         |
 | **`.mapValuesComputed`**   | Reactively maps all values of a reactive map by a given reactive convertion computation.              |
 | **`.putIfAbsent`**         | Reactively adds a given key to a reactive map, if it does not already exist.                          |
