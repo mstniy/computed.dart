@@ -29,7 +29,9 @@ class SnapshotStreamComputedMap<K, V>
       final cur = _snapshotStream.use;
       final allKeys = prev.keys.toSet().union(cur.keys.toSet());
       final changes = IMap.fromEntries(allKeys
-          .where((e) => prev[e] != cur[e])
+          .where((e) =>
+              (prev.containsKey(e) != cur.containsKey(e)) ||
+              (prev[e] != cur[e]))
           .map((e) => MapEntry(
               e,
               cur.containsKey(e)

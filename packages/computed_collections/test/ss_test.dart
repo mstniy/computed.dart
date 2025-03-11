@@ -38,6 +38,25 @@ void main() {
         ]);
   });
 
+  test(
+      '(regression) change stream works even for additions of keys with null values',
+      () async {
+    final ss = StreamController<IMap<int, Null>>.broadcast(sync: true);
+    final sstream = ss.stream;
+    final m = SnapshotStreamComputedMap($(() => sstream.use));
+    expect(
+        await getValuesWhile(m.changes, () {
+          ss.add({0: null}.lock);
+          ss.add({0: null, 1: null}.lock);
+          ss.add({0: null}.lock);
+        }),
+        [
+          ChangeEventReplace({0: null}.lock),
+          KeyChanges({1: ChangeRecordValue(null)}.lock),
+          KeyChanges({1: ChangeRecordDelete<int>()}.lock),
+        ]);
+  });
+
   test('attributes are coherent', () async {
     final m = ComputedMap.fromSnapshotStream($(() => {0: 1}.lock));
     await testCoherenceInt(m, {0: 1}.lock);
