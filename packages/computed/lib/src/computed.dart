@@ -198,8 +198,6 @@ class ComputedImpl<T> implements Computed<T> {
 
   bool get _computing =>
       GlobalCtx._currentUpdateUpstreamComputations[this] != null;
-  Object? _reactSuppressedException;
-  StackTrace? _reactSuppressedExceptionStackTrace;
 
   final _memoizedDownstreamComputations = <ComputedImpl>{};
   final _nonMemoizedDownstreamComputations = <ComputedImpl>{};
@@ -464,16 +462,7 @@ class ComputedImpl<T> implements Computed<T> {
 
   ValueOrException<T> _evalFGuarded() {
     try {
-      final result = ValueOrException.value(_evalFInZone());
-      if (_reactSuppressedException != null) {
-        // Throw it here
-        final exc = _reactSuppressedException!;
-        final st = _reactSuppressedExceptionStackTrace!;
-        _reactSuppressedException = null;
-        _reactSuppressedExceptionStackTrace = null;
-        Error.throwWithStackTrace(exc, st);
-      }
-      return result;
+      return ValueOrException.value(_evalFInZone());
     } catch (e, s) {
       return ValueOrException.exc(e, s);
     }
@@ -727,7 +716,6 @@ class ComputedImpl<T> implements Computed<T> {
 
   void _react(void Function(T) onData, Function? onError) {
     // Only routers can be .react-ed to
-    // As otherwise the meaning of .prev becomes ambiguous
     assert(_dss != null);
     final caller = GlobalCtx.currentComputation;
     if (GlobalCtx._reacting) {
@@ -751,10 +739,10 @@ class ComputedImpl<T> implements Computed<T> {
           if (onError != null) {
             _dispatchOnError(onError, exc, st);
           } else {
-            // Do not throw the exception here,
-            // as this might cause other .react/.use-s to get skipped
-            caller._reactSuppressedException ??= exc;
-            caller._reactSuppressedExceptionStackTrace ??= st;
+            // We don't use Error.throwWithStackTrace here
+            // As this might make it more difficult to pinpoint where exceptions
+            // are actually coming from.
+            throw exc;
           }
       }
     } finally {

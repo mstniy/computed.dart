@@ -1828,13 +1828,16 @@ void main() {
       sub.cancel();
     });
 
-    test('.react delays exceptions if no onError is provided', () async {
+    test('.react throws exceptions if no onError is provided', () async {
       final controller1 = StreamController<int>.broadcast(
           sync: true); // Use a broadcast stream to make debugging easier
       final source1 = controller1.stream;
 
+      var cCnt = 0;
+
       final c = Computed(() {
         source1.react((p0) {});
+        cCnt++;
       });
 
       var expectError = false;
@@ -1844,20 +1847,22 @@ void main() {
       final sub = c.listen((event) {
         lCnt++;
         expect(expectError, false);
-      }, (e) {
+      }, (e, st) {
         lCnt++;
         expect(expectError, true);
         expect(e, expectation);
       });
 
       expect(lCnt, 0);
-      controller1.add(0);
+      expect(cCnt, 2);
+      // Await for Computed to call the listener
       await Future.value();
       expect(lCnt, 1);
       expectError = true;
       expectation = 1;
+
       controller1.addError(1);
-      await Future.value();
+      expect(cCnt, 2);
       expect(lCnt, 2);
 
       sub.cancel();

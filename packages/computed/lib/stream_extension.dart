@@ -33,8 +33,7 @@ extension StreamComputedExtension<T> on Stream<T> {
   /// Subscribes to this stream in a non-memoized manner.
   ///
   /// [onData] or [onError] is called if this stream has triggered the current set of recomputations.
-  /// If no onError is provided and the stream has produced an error, the current computation
-  /// will be assumed to have thrown that error at the end if it returns a value.
+  /// If no onError is provided and the stream has produced an error, throws it.
   ///
   /// Unlike [use], [react] does trigger a re-computation if the stream
   /// consecutively produces values comparing equal to each other.
