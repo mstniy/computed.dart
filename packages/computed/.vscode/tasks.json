@@ -1,0 +1,13 @@
+{
+  // See https://go.microsoft.com/fwlink/?LinkId=733558
+  // for the documentation about the tasks.json format
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Test with coverage",
+      "type": "shell",
+      "command": "dart pub global run coverage:test_with_coverage --branch-coverage && lcov --list coverage/lcov.info --branch-coverage",
+      "problemMatcher": []
+    }
+  ]
+}
