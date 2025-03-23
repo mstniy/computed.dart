@@ -1851,13 +1851,12 @@ void main() {
       });
 
       expect(lCnt, 0);
-      controller1.add(0);
+      // Await for Computed to call the listener
       await Future.value();
       expect(lCnt, 1);
       expectError = true;
       expectation = 1;
       controller1.addError(1);
-      await Future.value();
       expect(lCnt, 2);
 
       sub.cancel();

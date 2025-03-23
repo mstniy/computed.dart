@@ -140,6 +140,8 @@ class GlobalCtx {
   static Expando<bool> _currentUpdateNodeDirty = Expando();
   static Expando<Map<ComputedImpl, _WeakMemoizedValueOrException>>
       _currentUpdateUpstreamComputations = Expando();
+  static Expando<({Object exc, StackTrace? st})>
+      _currentUpdateReactSuppressedException = Expando();
 
   static var _reacting = false;
 }
@@ -155,6 +157,7 @@ void _rerunGraph(Set<ComputedImpl> roots) {
   GlobalCtx._currentUpdateNodes = {};
   GlobalCtx._currentUpdateNodeDirty = Expando();
   GlobalCtx._currentUpdateUpstreamComputations = Expando();
+  GlobalCtx._currentUpdateReactSuppressedException = Expando();
   _injectNodesToDAG(roots);
 
   void evalAfterEnsureUpstreamEvald(ComputedImpl node) {
@@ -198,8 +201,6 @@ class ComputedImpl<T> implements Computed<T> {
 
   bool get _computing =>
       GlobalCtx._currentUpdateUpstreamComputations[this] != null;
-  Object? _reactSuppressedException;
-  StackTrace? _reactSuppressedExceptionStackTrace;
 
   final _memoizedDownstreamComputations = <ComputedImpl>{};
   final _nonMemoizedDownstreamComputations = <ComputedImpl>{};
@@ -465,13 +466,17 @@ class ComputedImpl<T> implements Computed<T> {
   ValueOrException<T> _evalFGuarded() {
     try {
       final result = ValueOrException.value(_evalFInZone());
-      if (_reactSuppressedException != null) {
+      final suppressedException =
+          GlobalCtx._currentUpdateReactSuppressedException[this];
+      if (suppressedException != null) {
         // Throw it here
-        final exc = _reactSuppressedException!;
-        final st = _reactSuppressedExceptionStackTrace!;
-        _reactSuppressedException = null;
-        _reactSuppressedExceptionStackTrace = null;
-        Error.throwWithStackTrace(exc, st);
+        GlobalCtx._currentUpdateReactSuppressedException[this] = null;
+        switch (suppressedException.st) {
+          case final st?:
+            Error.throwWithStackTrace(suppressedException.exc, st);
+          case null:
+            throw suppressedException.exc;
+        }
       }
       return result;
     } catch (e, s) {
@@ -753,8 +758,8 @@ class ComputedImpl<T> implements Computed<T> {
           } else {
             // Do not throw the exception here,
             // as this might cause other .react/.use-s to get skipped
-            caller._reactSuppressedException ??= exc;
-            caller._reactSuppressedExceptionStackTrace ??= st;
+            GlobalCtx._currentUpdateReactSuppressedException[caller] ??=
+                (exc: exc, st: st);
           }
       }
     } finally {
