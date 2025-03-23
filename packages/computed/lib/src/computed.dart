@@ -137,8 +137,9 @@ class GlobalCtx {
 
   static var _currentUpdate = _Token(); // Guaranteed to be unique thanks to GC
   static Set<ComputedImpl> _currentUpdateNodes = {};
-  static Expando<bool> _currentUpdateNodeDirty =
-      Expando('computed_dag_runner_node_dirty');
+  static Expando<bool> _currentUpdateNodeDirty = Expando();
+  static Expando<Map<ComputedImpl, _WeakMemoizedValueOrException>>
+      _currentUpdateUpstreamComputations = Expando();
 
   static var _reacting = false;
 }
@@ -152,7 +153,8 @@ void _injectNodesToDAG(Set<Computed> nodes) {
 
 void _rerunGraph(Set<ComputedImpl> roots) {
   GlobalCtx._currentUpdateNodes = {};
-  GlobalCtx._currentUpdateNodeDirty = Expando('computed_dag_runner_node_dirty');
+  GlobalCtx._currentUpdateNodeDirty = Expando();
+  GlobalCtx._currentUpdateUpstreamComputations = Expando();
   _injectNodesToDAG(roots);
 
   void evalAfterEnsureUpstreamEvald(ComputedImpl node) {
@@ -194,10 +196,10 @@ class ComputedImpl<T> implements Computed<T> {
   var _lastUpstreamComputations =
       <ComputedImpl, _WeakMemoizedValueOrException>{};
 
-  bool get _computing => _curUpstreamComputations != null;
+  bool get _computing =>
+      GlobalCtx._currentUpdateUpstreamComputations[this] != null;
   Object? _reactSuppressedException;
   StackTrace? _reactSuppressedExceptionStackTrace;
-  Map<ComputedImpl, _WeakMemoizedValueOrException>? _curUpstreamComputations;
 
   final _memoizedDownstreamComputations = <ComputedImpl>{};
   final _nonMemoizedDownstreamComputations = <ComputedImpl>{};
@@ -220,7 +222,7 @@ class ComputedImpl<T> implements Computed<T> {
       throw StateError(_noReactivityInsideReact);
     }
     // Make sure the caller is subscribed, upgrade to non-weak if needed
-    caller._curUpstreamComputations!.update(
+    GlobalCtx._currentUpdateUpstreamComputations[caller]!.update(
         this,
         (v) =>
             _WeakMemoizedValueOrException(weak && v._weak, true, _lastResult),
@@ -490,7 +492,7 @@ class ComputedImpl<T> implements Computed<T> {
     bool shouldNotify = false;
     try {
       _prevResult = _lastResult;
-      _curUpstreamComputations = {};
+      GlobalCtx._currentUpdateUpstreamComputations[this] = {};
       GlobalCtx._currentComputation = this;
       var newResult = _evalFGuarded();
       if (_assertIdempotent &&
@@ -530,13 +532,13 @@ class ComputedImpl<T> implements Computed<T> {
       }
 
       // Commit the changes to the DAG
-      for (var e in _curUpstreamComputations!.entries) {
+      for (var e
+          in GlobalCtx._currentUpdateUpstreamComputations[this]!.entries) {
         final up = e.key;
         up._addDownstreamComputation(this, e.value._memoized, e.value._weak);
       }
-      final oldDiffNew = _lastUpstreamComputations.keys
-          .toSet()
-          .difference(_curUpstreamComputations!.keys.toSet());
+      final oldDiffNew = _lastUpstreamComputations.keys.toSet().difference(
+          GlobalCtx._currentUpdateUpstreamComputations[this]!.keys.toSet());
       for (var up in oldDiffNew) {
         up._removeDownstreamComputation(this);
       }
@@ -544,8 +546,9 @@ class ComputedImpl<T> implements Computed<T> {
       // Even if f() throws NoValueException
       // So that we can memoize that f threw NoValueException
       // when ran with a specific set of dependencies, for example.
-      _lastUpstreamComputations = _curUpstreamComputations!;
-      _curUpstreamComputations = null;
+      _lastUpstreamComputations =
+          GlobalCtx._currentUpdateUpstreamComputations[this]!;
+      GlobalCtx._currentUpdateUpstreamComputations[this] = null;
       // Bookkeep the fact the we ran/tried to run this computation
       // so that we can unlock its downstream during the DAG walk
       _lastUpdate = GlobalCtx._currentUpdate;
@@ -731,7 +734,7 @@ class ComputedImpl<T> implements Computed<T> {
       throw StateError(_noReactivityInsideReact);
     }
     // Make sure the caller is subscribed
-    caller._curUpstreamComputations![this] =
+    GlobalCtx._currentUpdateUpstreamComputations[caller]![this] =
         _WeakMemoizedValueOrException(false, false, _lastResult);
 
     if (_dss!._lastEmit != GlobalCtx._currentUpdate) {
