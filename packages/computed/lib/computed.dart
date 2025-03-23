@@ -3,17 +3,11 @@ export 'future_extension.dart';
 export 'stream_extension.dart';
 
 /// Shorthand for creating reactive computations. See [Computed].
-Computed<T> $<T>(T Function() f, {bool memoized = true}) =>
-    Computed(f, memoized: memoized);
+Computed<T> $<T>(T Function() f) => Computed(f);
 
 /// Reactive computation with a return type of [T].
 abstract interface class Computed<T> {
   /// Creates a reactive computation whose value is computed by the given function.
-  ///
-  /// If [memoized] is set to false, listeners of this computation as well as
-  /// other computations using its value will be re-run every time this computation
-  /// is re-run, even if it's value stays the same, except for the extra computations
-  /// being done in debug mode to check for non-idempotency.
   ///
   /// If [assertIdempotent] is set to false, disables the idempotency assertion.
   /// This is useful for computations returning incomparable values, like other computations.
@@ -27,21 +21,18 @@ abstract interface class Computed<T> {
   /// and non-weak downstream computations. Called after [dispose].
   factory Computed(
     T Function() f, {
-    bool memoized = true,
     bool assertIdempotent = true,
     void Function(T value)? dispose,
     void Function()? onCancel,
   }) =>
-      ComputedImpl(f, memoized, assertIdempotent, false, dispose, onCancel);
+      ComputedImpl(f, assertIdempotent, false, dispose, onCancel);
 
   /// Creates an "async" computation, which is allowed to run asynchronous operations.
   /// This implicitly disables the idempotency assertion.
   /// See [Computed.new].
   factory Computed.async(T Function() f,
-          {bool memoized = true,
-          void Function(T value)? dispose,
-          void Function()? onCancel}) =>
-      ComputedImpl(f, memoized, false, true, dispose, onCancel);
+          {void Function(T value)? dispose, void Function()? onCancel}) =>
+      ComputedImpl(f, false, true, dispose, onCancel);
 
   /// As [Computed.new], but calls the given function with its last value.
   ///
@@ -50,14 +41,13 @@ abstract interface class Computed<T> {
   factory Computed.withPrev(
     T Function(T prev) f, {
     required T initialPrev,
-    bool memoized = true,
     bool assertIdempotent = true,
     bool async = false,
     void Function(T value)? dispose,
     void Function()? onCancel,
   }) =>
       ComputedImpl.withPrev(
-          f, initialPrev, memoized, assertIdempotent, async, dispose, onCancel);
+          f, initialPrev, assertIdempotent, async, dispose, onCancel);
 
   /// Defines an "effect", which is a computation meant to have side effects.
   static ComputedSubscription<void> effect(void Function() f) =>
@@ -65,12 +55,9 @@ abstract interface class Computed<T> {
 
   /// Subscribes to this computation.
   ///
-  /// For non-memoized computations, the listener will be called every time
-  /// this computation is re-run, even if it's value stays the same,
-  /// except for the extra computations being done in debug mode to check
-  /// for non-idempotency.
-  /// For memoized computations, the listener will be called only
-  /// when the result of the computation changes.
+  /// The listener will be called when the computation
+  /// gains a value or throws an exception for the
+  /// first time or when the result of the computation changes.
   /// [onError] has the same semantics as in [Stream.listen].
   ComputedSubscription<T> listen(void Function(T event)? onData,
       [Function? onError]);

@@ -5,18 +5,15 @@ class ComputationCache<K, V> {
   final _m = <K, Computed<V>>{};
   final void Function(V value)? _dispose;
   final void Function()? _onCancel;
-  final bool _memoized;
   final bool _assertIdempotent;
 
   /// Constructs an empty cache.
   /// The configs are as with [Computed.new].
   ComputationCache(
-      {bool memoized = true,
-      bool assertIdempotent = true,
+      {bool assertIdempotent = true,
       void Function(V value)? dispose,
       void Function()? onCancel})
-      : _memoized = memoized,
-        _assertIdempotent = assertIdempotent,
+      : _assertIdempotent = assertIdempotent,
         _dispose = dispose,
         _onCancel = onCancel;
 
@@ -50,7 +47,6 @@ class ComputationCache<K, V> {
       _m[key] = newComputation;
       return computation();
     },
-        memoized: _memoized,
         assertIdempotent: _assertIdempotent,
         dispose: _dispose,
         onCancel: onCancel);

@@ -137,7 +137,7 @@ void main() {
         late int res;
         s.react((p0) => res = p0);
         return res;
-      }, memoized: false);
+      });
 
       var expectation = 0;
       var subCnt = 0;

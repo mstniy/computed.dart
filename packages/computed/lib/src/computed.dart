@@ -113,7 +113,7 @@ class GlobalCtx {
               case Exception<T>(exc: final exc, st: final st):
                 Error.throwWithStackTrace(exc, st ?? StackTrace.empty);
             }
-          }, true, false, false, null, null),
+          }, false, false, null, null),
           currentValue != null ? ValueOrException.value(currentValue()) : null);
       // Run the subscriber outside the sync zone
       final zone = Zone.current[_isComputedZone] == true
@@ -184,10 +184,6 @@ void _rerunGraph(Set<ComputedImpl> roots) {
 class ComputedImpl<T> implements Computed<T> {
   _DataSourceAndSubscription<T>? _dss;
 
-  // Whether this node is memoized.
-  // Always true for routers, which might have both memoized (.use)
-  // and non-memoized (.react) listeners.
-  final bool _memoized;
   final bool _assertIdempotent, _async;
   _Token? _lastUpdate;
 
@@ -293,20 +289,19 @@ class ComputedImpl<T> implements Computed<T> {
     }
   }
 
-  ComputedImpl(this._f, this._memoized, this._assertIdempotent, this._async,
-      this._dispose, this._onCancel);
+  ComputedImpl(this._f, this._assertIdempotent, this._async, this._dispose,
+      this._onCancel);
 
   static ComputedImpl<T> withPrev<T>(
       T Function(T prev) f,
       T initialPrev,
-      bool memoized,
       bool assertIdempotent,
       bool async,
       void Function(T value)? dispose,
       void Function()? onCancel) {
     late ComputedImpl<T> c;
     c = ComputedImpl<T>(() => f(c._prevResult?.valueOrThrow ?? initialPrev),
-        memoized, assertIdempotent && !async, async, dispose, onCancel);
+        assertIdempotent && !async, async, dispose, onCancel);
     c._initialPrev = initialPrev;
 
     return c;
@@ -527,7 +522,8 @@ class ComputedImpl<T> implements Computed<T> {
         _dispose((_prevResult as Value<T>).value);
       }
 
-      shouldNotify = !gotNVE && (!_memoized || !prevEqualsNew);
+      // Do not notify downstream for transitions to NVE
+      shouldNotify = !prevEqualsNew && !gotNVE;
 
       if (shouldNotify) {
         _lastResult = newResult;

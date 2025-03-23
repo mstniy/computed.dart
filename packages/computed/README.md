@@ -26,7 +26,6 @@ Computed:
 - [Here is how it works](#here-is-how-it-works)
 - [A larger example](#a-larger-example)
 - [Computation Configs](#computation-configs)
-  - [`memoized`](#`memoized`)
   - [`assertIdempotent`](#`assertidempotent`)
   - [`async`](#`async`)
   - [`dispose`](#`dispose`)
@@ -161,10 +160,6 @@ Note that use of [`assertIdempotent: false`](#assertidempotent), as `List` does 
 
 The shorthand `$` notation used in the previous examples is a quick way of expressing "pure" reactive computations, computations which are idempotent with respect to the equality operator of the result and have no side effects. Computed also allows you to express computations which are not idempotent and/or have side effects using the following configuration parameters:
 
-### <a name='`memoized`'></a>`memoized`
-
-If set to `true` (default), Computed "memoizes" the value of this computation, skipping to notify the downstream/listeners if this computation returns a value or throws an exception comparing equal to the previous one.
-
 ### <a name='`assertidempotent`'></a>`assertIdempotent`
 
 If set to `true` (default), Computed runs this computation twice initially and in response to upstream changes in debug mode and checks if the two runs return equal values or throw equal exceptions. If not, it asserts.
@@ -216,14 +211,14 @@ final c = $(() {
     s.use; // Make sure it has a value
     late int res;
     s.react((val) => res = val - s.prevOr(0));
-    return res;
-}, memoized: false);
+    return Boxed(res);
+});
 ```
 
 Note the use of `.react` in this example.
 `.react` marks the current computation to be recomputed for all values produced by a data source, even if it consecutively produces a pair of values comparing `==`. `.react` will run the given function if the data source has produced a new value/error. As a rule of thumb, you should use `.react` over `.use` for data sources representing a sequence of events rather than a state.  
 `.prevOr` is a handy shortcut which returns the given fallback value instead of throwing `NoValueException` if the data source had no value the last time the current computation notified its listeners or other computations which depend on it.  
-[`memoized: false`](#memoized) prevents the result of the computation from being memoized, as we want the downstream computations and listeners to be notificed even if the difference did not change.
+We warp the result of the computation in a hypothetical `Boxed` object to prevent the result of the computation from being memoized, as we want the downstream computations and listeners to be notificed even if the difference did not change.
 
 You can also create temporal accumulators:
 
