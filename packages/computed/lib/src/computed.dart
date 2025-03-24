@@ -14,7 +14,7 @@ class _Token {
 final _isComputedZone = _Token();
 
 class _RouterValueOrException<T> {
-  final ComputedImpl<T> _router;
+  final RouterImpl<T> _router;
   ValueOrException<T>? _voe;
 
   _RouterValueOrException(this._router, this._voe);
@@ -91,29 +91,20 @@ class GlobalCtx {
     return _currentComputation!;
   }
 
-  static ComputedImpl? routerFor(Object ds) {
+  @visibleForTesting
+  static RouterImpl? routerFor(Object ds) {
     return _routerExpando[ds]?._router;
   }
 
   static _RouterValueOrException<T> _maybeCreateRouterFor<T>(
       Object dataSource,
-      DataSourceSubscription<T> Function(ComputedImpl<T> router) dss,
+      DataSourceSubscription<T> Function(RouterImpl<T> router) dss,
       T Function()? currentValue) {
     var rvoe =
         GlobalCtx._routerExpando[dataSource] as _RouterValueOrException<T>?;
 
     if (rvoe == null) {
-      rvoe = _RouterValueOrException(
-          ComputedImpl(() {
-            switch (rvoe!._voe) {
-              case null:
-                throw NoValueException();
-              case Value<T>(value: final value):
-                return value;
-              case Exception<T>(exc: final exc, st: final st):
-                Error.throwWithStackTrace(exc, st ?? StackTrace.empty);
-            }
-          }, false, false, null, null),
+      rvoe = _RouterValueOrException(RouterImpl._(() => rvoe!._voe),
           currentValue != null ? ValueOrException.value(currentValue()) : null);
       // Run the subscriber outside the sync zone
       final zone = Zone.current[_isComputedZone] == true
@@ -184,8 +175,6 @@ void _rerunGraph(Set<ComputedImpl> roots) {
 }
 
 class ComputedImpl<T> implements Computed<T> {
-  _DataSourceAndSubscription<T>? _dss;
-
   final bool _assertIdempotent, _async;
   _Token? _lastUpdate;
 
@@ -200,7 +189,6 @@ class ComputedImpl<T> implements Computed<T> {
       GlobalCtx._currentUpdateUpstreamComputations[this] != null;
 
   final _memoizedDownstreamComputations = <ComputedImpl>{};
-  final _nonMemoizedDownstreamComputations = <ComputedImpl>{};
   final _weakDownstreamComputations =
       <ComputedImpl>{}; // Note that these are always memoized
 
@@ -211,6 +199,16 @@ class ComputedImpl<T> implements Computed<T> {
 
   final void Function()? _onCancel;
   final void Function(T value)? _dispose;
+
+  bool _hasStrongUsers() =>
+      _memoizedDownstreamComputations.isNotEmpty || _listeners.isNotEmpty;
+
+  bool _hasStrongDownstreamComputations() =>
+      _memoizedDownstreamComputations.isNotEmpty;
+
+  bool _hasDownstreamComputations() =>
+      _memoizedDownstreamComputations.isNotEmpty ||
+      _weakDownstreamComputations.isNotEmpty;
 
   void _use(bool weak) {
     if (_computing) throw CyclicUseException();
@@ -263,9 +261,7 @@ class ComputedImpl<T> implements Computed<T> {
   T get useWeak {
     _use(true);
     if (_lastResult == null) {
-      if (_memoizedDownstreamComputations.isEmpty &&
-          _nonMemoizedDownstreamComputations.isEmpty &&
-          _listeners.isEmpty) {
+      if (!_hasStrongUsers()) {
         throw NoStrongUserException();
       } else {
         throw NoValueException();
@@ -307,44 +303,6 @@ class ComputedImpl<T> implements Computed<T> {
     return c;
   }
 
-  void onDataSourceData(T data) {
-    if (_dss == null) return;
-    GlobalCtx._currentUpdate = _Token();
-    _dss!._lastEmit = GlobalCtx._currentUpdate;
-    final rvoe =
-        GlobalCtx._routerExpando[_dss!._ds] as _RouterValueOrException<T>;
-    if (switch (rvoe._voe) {
-      Value<T>(value: final value) => value != data,
-      _ => true
-    }) {
-      // Update the global last value cache
-      rvoe._voe = ValueOrException<T>.value(data);
-    } else if (_nonMemoizedDownstreamComputations.isEmpty) {
-      return;
-    }
-
-    _rerunGraph({this});
-  }
-
-  void onDataSourceError(Object err, StackTrace st) {
-    GlobalCtx._currentUpdate = _Token();
-
-    _dss!._lastEmit = GlobalCtx._currentUpdate;
-    final rvoe =
-        GlobalCtx._routerExpando[_dss!._ds] as _RouterValueOrException<T>;
-    if (switch (rvoe._voe) {
-      Exception(exc: final exc) => exc != err,
-      _ => true
-    }) {
-      // Update the global last value cache
-      rvoe._voe = ValueOrException<T>.exc(err, st);
-    } else if (_nonMemoizedDownstreamComputations.isEmpty) {
-      return;
-    }
-
-    _rerunGraph({this});
-  }
-
   @override
   ComputedSubscription<T> listen(void Function(T event)? onData,
       [Function? onError]) {
@@ -364,9 +322,7 @@ class ComputedImpl<T> implements Computed<T> {
       switch (_lastResult!) {
         case Exception(exc: final exc, st: final st):
           if (onError == null &&
-              _weakDownstreamComputations.isEmpty &&
-              _memoizedDownstreamComputations.isEmpty &&
-              _nonMemoizedDownstreamComputations.isEmpty &&
+              !_hasDownstreamComputations() &&
               _listeners.length == 1) {
             Zone.current.handleUncaughtError(exc, st ?? StackTrace.empty);
           }
@@ -398,7 +354,7 @@ class ComputedImpl<T> implements Computed<T> {
 
   DT dataSourceUse<DT>(
       Object dataSource,
-      DataSourceSubscription<DT> Function(ComputedImpl<DT> router) dss,
+      DataSourceSubscription<DT> Function(RouterImpl<DT> router) dss,
       DT Function()? currentValue) {
     final rvoe =
         GlobalCtx._maybeCreateRouterFor<DT>(dataSource, dss, currentValue);
@@ -425,7 +381,7 @@ class ComputedImpl<T> implements Computed<T> {
 
   void dataSourceReact<DT>(
       Object dataSource,
-      DataSourceSubscription<DT> Function(ComputedImpl<DT> router) dss,
+      DataSourceSubscription<DT> Function(RouterImpl<DT> router) dss,
       DT Function()? currentValue,
       void Function(DT) onData,
       Function? onError) {
@@ -434,6 +390,7 @@ class ComputedImpl<T> implements Computed<T> {
         GlobalCtx._maybeCreateRouterFor<DT>(dataSource, dss, currentValue);
 
     // Routers don't call .react on data sources, they call .use
+    // ignore: unrelated_type_equality_checks
     assert(rvoe._router != this);
 
     rvoe._router._react(onData, onError);
@@ -547,8 +504,6 @@ class ComputedImpl<T> implements Computed<T> {
         Error.throwWithStackTrace(exc, st ?? StackTrace.empty);
       } else {
         final downstream = <ComputedImpl>{};
-        downstream.addAll(
-            _nonMemoizedDownstreamComputations.where((c) => !c._computing));
         if (shouldNotify) {
           downstream.addAll(
               _memoizedDownstreamComputations.where((c) => !c._computing));
@@ -606,8 +561,7 @@ class ComputedImpl<T> implements Computed<T> {
             // Note that there is no need to check for lazy listeners here,
             // because even if we do have any, there must also be some non-lazy
             // downstream computation to trigger this.
-            _memoizedDownstreamComputations.isEmpty &&
-            _nonMemoizedDownstreamComputations.isEmpty) {
+            !_hasStrongDownstreamComputations()) {
           // Propagate to the Zone
           Zone.current.handleUncaughtError(exc, st ?? StackTrace.empty);
         }
@@ -615,28 +569,10 @@ class ComputedImpl<T> implements Computed<T> {
   }
 
   void _addDownstreamComputation(ComputedImpl down, bool memoized, bool weak) {
-    if (memoized) {
-      if (_dss != null) {
-        // Make sure a downstream computation cannot be subscribed as both memoizing and non-memoizing
-        if (!_nonMemoizedDownstreamComputations.contains(down)) {
-          (weak ? _weakDownstreamComputations : _memoizedDownstreamComputations)
-              .add(down);
-        }
-      } else {
-        // No need to check non-memoized computations here, only routers can have them
-        (weak ? _weakDownstreamComputations : _memoizedDownstreamComputations)
-            .add(down);
-      }
-    } else {
-      assert(_dss !=
-          null); // Only routers can have non-memoized downstream computations
-      assert(!weak); // There is no weak .react
-      // Make sure a downstream computation cannot be subscribed as both memoizing and non-memoizing
-      // or weak and strong
-      _weakDownstreamComputations.remove(down);
-      _memoizedDownstreamComputations.remove(down);
-      _nonMemoizedDownstreamComputations.add(down);
-    }
+    // Only routers can have non-memoized downstream computations
+    assert(memoized);
+    (weak ? _weakDownstreamComputations : _memoizedDownstreamComputations)
+        .add(down);
   }
 
   void _removeDataSourcesAndUpstreams() {
@@ -644,12 +580,6 @@ class ComputedImpl<T> implements Computed<T> {
       upComp._removeDownstreamComputation(this);
     }
     _lastUpstreamComputations = {};
-    if (_dss != null) {
-      _dss!._dss.cancel();
-      // Remove ourselves from the expando
-      GlobalCtx._routerExpando[_dss!._ds] = null;
-      _dss = null;
-    }
 
     if (_weakDownstreamComputations.isNotEmpty) {
       final weakDownstreamCopy =
@@ -692,13 +622,9 @@ class ComputedImpl<T> implements Computed<T> {
   void _removeDownstreamComputation(ComputedImpl c) {
     bool wasWeak = _weakDownstreamComputations.contains(c);
     bool removed = _memoizedDownstreamComputations.remove(c) ||
-        _nonMemoizedDownstreamComputations.remove(c) ||
         _weakDownstreamComputations.remove(c);
     assert(removed, "Corrupted internal state");
-    if (!wasWeak &&
-        _memoizedDownstreamComputations.isEmpty &&
-        _nonMemoizedDownstreamComputations.isEmpty &&
-        _listeners.isEmpty) {
+    if (!wasWeak && !_hasStrongUsers()) {
       _removeDataSourcesAndUpstreams();
     }
   }
@@ -707,11 +633,95 @@ class ComputedImpl<T> implements Computed<T> {
     if (_listeners.remove(sub) == null) {
       return;
     }
-    if (_memoizedDownstreamComputations.isEmpty &&
-        _nonMemoizedDownstreamComputations.isEmpty &&
-        _listeners.isEmpty) {
+    if (!_hasStrongUsers()) {
       _removeDataSourcesAndUpstreams();
     }
+  }
+
+  void _checkCycle(ComputedImpl caller) {
+    final seen = <ComputedImpl>{};
+    void dfs(ComputedImpl c) {
+      if (seen.contains(c)) return;
+      seen.add(c);
+      seen.addAll(c._lastUpstreamComputations.keys);
+      for (var up in c._lastUpstreamComputations.keys) {
+        dfs(up);
+      }
+    }
+
+    dfs(this);
+
+    if (seen.contains(caller)) throw CyclicUseException();
+  }
+}
+
+final class RouterImpl<T> extends ComputedImpl<T> {
+  _DataSourceAndSubscription<T>? _dss;
+  final _nonMemoizedDownstreamComputations = <ComputedImpl>{};
+
+  RouterImpl._(ValueOrException<T>? Function() voe)
+      : super(() {
+          switch (voe()) {
+            case null:
+              throw NoValueException();
+            case Value<T>(value: final value):
+              return value;
+            case Exception<T>(exc: final exc, st: final st):
+              Error.throwWithStackTrace(exc, st ?? StackTrace.empty);
+          }
+        }, false, false, null, null);
+
+  @override
+  bool _hasStrongUsers() =>
+      super._hasStrongUsers() || _nonMemoizedDownstreamComputations.isNotEmpty;
+
+  @override
+  bool _hasStrongDownstreamComputations() =>
+      super._hasStrongDownstreamComputations() ||
+      _nonMemoizedDownstreamComputations.isNotEmpty;
+
+  @override
+  bool _hasDownstreamComputations() =>
+      super._hasDownstreamComputations() ||
+      _nonMemoizedDownstreamComputations.isNotEmpty;
+
+  void onDataSourceData(T data) {
+    if (_dss == null) return;
+    GlobalCtx._currentUpdate = _Token();
+    _dss!._lastEmit = GlobalCtx._currentUpdate;
+    final rvoe =
+        GlobalCtx._routerExpando[_dss!._ds] as _RouterValueOrException<T>;
+    if (switch (rvoe._voe) {
+      Value<T>(value: final value) => value != data,
+      _ => true
+    }) {
+      // Update the global last value cache
+      rvoe._voe = ValueOrException<T>.value(data);
+    } else if (_nonMemoizedDownstreamComputations.isEmpty) {
+      return;
+    }
+
+    _rerunGraph({this});
+  }
+
+  void onDataSourceError(Object err, StackTrace st) {
+    if (_dss == null) return;
+    GlobalCtx._currentUpdate = _Token();
+
+    _dss!._lastEmit = GlobalCtx._currentUpdate;
+    final rvoe =
+        GlobalCtx._routerExpando[_dss!._ds] as _RouterValueOrException<T>;
+    if (switch (rvoe._voe) {
+      Exception(exc: final exc) => exc != err,
+      _ => true
+    }) {
+      // Update the global last value cache
+      rvoe._voe = ValueOrException<T>.exc(err, st);
+    } else if (_nonMemoizedDownstreamComputations.isEmpty) {
+      return;
+    }
+
+    _rerunGraph({this});
   }
 
   void _react(void Function(T) onData, Function? onError) {
@@ -750,19 +760,51 @@ class ComputedImpl<T> implements Computed<T> {
     }
   }
 
-  void _checkCycle(ComputedImpl caller) {
-    final seen = <ComputedImpl>{};
-    void dfs(ComputedImpl c) {
-      if (seen.contains(c)) return;
-      seen.add(c);
-      seen.addAll(c._lastUpstreamComputations.keys);
-      for (var up in c._lastUpstreamComputations.keys) {
-        dfs(up);
+  @override
+  void _addDownstreamComputation(ComputedImpl down, bool memoized, bool weak) {
+    if (memoized) {
+      // Make sure a downstream computation cannot be subscribed as both memoizing and non-memoizing
+      if (!_nonMemoizedDownstreamComputations.contains(down)) {
+        (weak ? _weakDownstreamComputations : _memoizedDownstreamComputations)
+            .add(down);
       }
+    } else {
+      assert(!weak); // There is no weak .react
+      // Make sure a downstream computation cannot be subscribed as both memoizing and non-memoizing
+      // or weak and strong
+      _weakDownstreamComputations.remove(down);
+      _memoizedDownstreamComputations.remove(down);
+      _nonMemoizedDownstreamComputations.add(down);
     }
+  }
 
-    dfs(this);
+  @override
+  void _removeDataSourcesAndUpstreams() {
+    _dss!._dss.cancel();
+    // Remove ourselves from the expando
+    GlobalCtx._routerExpando[_dss!._ds] = null;
+    _dss = null;
+    super._removeDataSourcesAndUpstreams();
+  }
 
-    if (seen.contains(caller)) throw CyclicUseException();
+  @override
+  void _removeDownstreamComputation(ComputedImpl c) {
+    if (_nonMemoizedDownstreamComputations.remove(c)) {
+      if (!_hasStrongUsers()) {
+        _removeDataSourcesAndUpstreams();
+      }
+    } else {
+      super._removeDownstreamComputation(c);
+    }
+  }
+
+  @override
+  Set<Computed> eval() {
+    final superRes = super.eval();
+    // Always notify the non-memoized downstream
+    superRes
+        .addAll(_nonMemoizedDownstreamComputations.where((c) => !c._computing));
+
+    return superRes;
   }
 }

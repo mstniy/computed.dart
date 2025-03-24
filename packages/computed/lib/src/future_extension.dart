@@ -23,7 +23,7 @@ class FutureComputedExtensionImpl<T> {
 }
 
 class _FutureDataSourceSubscription<T> implements DataSourceSubscription<T> {
-  _FutureDataSourceSubscription(Future<T> f, ComputedImpl<T> router) {
+  _FutureDataSourceSubscription(Future<T> f, RouterImpl<T> router) {
     f.then((value) => router.onDataSourceData(value),
         // Note that although we capture the stack trace here,
         // there is no way for the user to actually access it,
