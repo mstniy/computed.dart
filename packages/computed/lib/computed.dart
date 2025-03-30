@@ -59,6 +59,8 @@ abstract interface class Computed<T> {
   /// gains a value or throws an exception for the
   /// first time or when the result of the computation changes.
   /// [onError] has the same semantics as in [Stream.listen].
+  ///
+  /// Cannot be used inside computations. Instead, see [use].
   ComputedSubscription<T> listen(void Function(T event)? onData,
       [Function? onError]);
 

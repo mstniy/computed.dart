@@ -1438,7 +1438,10 @@ void main() {
     }, (e) {
       expect(flag, false);
       flag = true;
-      expect(e, isA<ComputedAsyncError>());
+      expect(
+          e,
+          isA<StateError>().having((e) => e.message, 'message',
+              "`listen` is not allowed inside computations."));
     });
 
     await Future.value();

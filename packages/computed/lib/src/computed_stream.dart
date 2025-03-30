@@ -23,7 +23,10 @@ class ComputedStreamExtensionImpl<T> {
     // No onPause and onResume, as Computed doesn't support these.
   }
 
-  void _onListen() {
+  void _onListen() async {
+    // StreamController can call onListen synchronously,
+    // so call .listen in a separate microtask.
+    await Future.value();
     _computedSubscription ??= _parent.listen((event) => _controller!.add(event),
         (error) => _controller!.addError(error));
   }
