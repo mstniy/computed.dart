@@ -3,9 +3,11 @@ import '../computed.dart';
 /// A cache for uniting computations by a key.
 class ComputationCache<K, V> {
   final _m = <K, Computed<V>>{};
-  final void Function(V value)? _dispose;
   final void Function()? _onCancel;
-  final bool _assertIdempotent;
+  final Computed<V> Function(
+    V Function() f,
+    void Function()? onCancel,
+  ) cons;
 
   /// Constructs an empty cache.
   /// The configs are as with [Computed.new].
@@ -13,9 +15,19 @@ class ComputationCache<K, V> {
       {bool assertIdempotent = true,
       void Function(V value)? dispose,
       void Function()? onCancel})
-      : _assertIdempotent = assertIdempotent,
-        _dispose = dispose,
-        _onCancel = onCancel;
+      : _onCancel = onCancel,
+        cons = ((f, onCancel) => Computed(f,
+            assertIdempotent: assertIdempotent,
+            dispose: dispose,
+            onCancel: onCancel));
+
+  /// Same as [ComputationCache.new], but uses
+  /// [Computed.async] to construct computations.
+  ComputationCache.async(
+      {void Function(V value)? dispose, void Function()? onCancel})
+      : _onCancel = onCancel,
+        cons = ((f, onCancel) =>
+            Computed.async(f, dispose: dispose, onCancel: onCancel));
 
   /// Returns a computation that creates and uses a leader for the given [key].
   ///
@@ -37,7 +49,7 @@ class ComputationCache<K, V> {
       if (_onCancel != null) _onCancel();
     }
 
-    newComputation = Computed(() {
+    newComputation = cons(() {
       final cachedComputation = _m[key];
       if (cachedComputation != null &&
           !identical(cachedComputation, newComputation)) {
@@ -46,10 +58,7 @@ class ComputationCache<K, V> {
       // No cached result
       _m[key] = newComputation;
       return computation();
-    },
-        assertIdempotent: _assertIdempotent,
-        dispose: _dispose,
-        onCancel: onCancel);
+    }, onCancel);
     return newComputation;
   }
 }

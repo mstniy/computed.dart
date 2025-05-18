@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:computed/computed.dart';
 import 'package:computed/utils/computation_cache.dart';
 import 'package:computed/utils/streams.dart';
@@ -190,5 +192,19 @@ void main() {
     expect(cnt, 1);
     sub.cancel();
     expect(cnt, 2);
+  });
+
+  test('.async works', () async {
+    final c = ComputationCache<int, String>.async();
+    var flag = false;
+    c.wrap(0, () {
+      scheduleMicrotask(() {});
+      return "";
+    }).listen((res) {
+      expect(res, "");
+      flag = true;
+    });
+    await Future.value();
+    expect(flag, true);
   });
 }
